@@ -14,6 +14,11 @@ export const prisma =
     ? new PrismaClient({
         adapter: new PrismaPg({ connectionString }),
       })
-    : new PrismaClient({} as any));
+    : new Proxy({}, { 
+        get: () => {
+          if (process.env.NEXT_PHASE === 'phase-production-build') return () => Promise.resolve();
+          throw new Error("Prisma accessed without DATABASE_URL");
+        }
+      }) as any);
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;
