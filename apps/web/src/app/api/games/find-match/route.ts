@@ -87,17 +87,18 @@ export async function POST(req: NextRequest) {
         stake: parseFloat(stake) || 0,
         onChainMatchId: onChainMatchId,
         status: isAI ? 'ACTIVE' : 'PENDING',
-        isPublic: mode === 'cash',
+        isPublic: !isAI,
         player2Address: isAI ? 'AI' : null,
         player2Code: aiCode
       }
     });
 
-    if (mode === 'cash') {
+    if (!isAI) {
        // Broadcast to everyone that a new challenge is on the board
        await pusherServer.trigger('lobby-channel', 'challenge-created', {
-         gameId: newGame.id,
-         creator: address,
+         id: newGame.id,
+         player1Address: address,
+         mode: mode,
          stake: stake
        });
     }

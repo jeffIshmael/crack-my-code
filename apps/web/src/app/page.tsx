@@ -66,7 +66,7 @@ export default function Home() {
     const channel = pusherClient.subscribe('lobby-channel');
 
     channel.bind('challenge-created', (data: any) => {
-      if (data.creator !== address) {
+      if (data.player1Address !== address) {
         setLobbyGames(prev => [data, ...prev]);
       }
     });
