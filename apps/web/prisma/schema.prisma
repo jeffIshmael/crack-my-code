@@ -1,0 +1,51 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id        Int      @id @default(autoincrement())
+  address   String?  @unique
+  name      String?
+  rating    Int      @default(1000)
+  points    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  games     Game[]   @relation("PlayerGames")
+}
+
+model Game {
+  id              String   @id @default(cuid())
+  userId          Int      // Creator ID
+  player1Address  String   // Address of creator
+  player2Address  String?  // Address of opponent (null until matched)
+  status          String   @default("PENDING") // PENDING, ACTIVE, COMPLETED, CANCELLED
+  mode            String   // AI, FRIENDLY, CASH
+  stake           Float    @default(0)
+  onChainMatchId  String?  // Sync with smart contract matchId
+  isPublic        Boolean  @default(true)
+  player1Code     String?  // Code set by player 1
+  player2Code     String?  // Code set by player 2 (or AI code)
+  winnerAddress   String? 
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  player          User     @relation("PlayerGames", fields: [userId], references: [id])
+  guesses         Guess[]
+}
+
+model Guess {
+  id        String   @id @default(cuid())
+  gameId    String
+  isPlayer  Boolean  // true if player guess, false if opponent
+  digits    String   // e.g., "1234"
+  clues     String   // JSON string of {pos: number, val: number}
+  createdAt DateTime @default(now())
+
+  game      Game     @relation(fields: [gameId], references: [id])
+}

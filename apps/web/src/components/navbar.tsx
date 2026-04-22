@@ -22,7 +22,7 @@ export function Navbar() {
   const pathname = usePathname()
   
   return (
-    <header className="sticky top-0 z-50 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+    <header className="sticky top-0 z-50 w-full border-b border-white/5 bg-[#030C15]/80 backdrop-blur-md supports-[backdrop-filter]:bg-[#030C15]/60">
       <div className="container flex h-16 max-w-screen-2xl items-center justify-between px-4">
         <div className="flex items-center gap-2">
           {/* Mobile menu button */}
@@ -56,9 +56,7 @@ export function Navbar() {
                   </Link>
                 ))}
                 <div className="mt-6 pt-6 border-t">
-                  <Button asChild className="w-full">
-                    <WalletConnectButton />
-                  </Button>
+                  <ConnectButton />
                 </div>
               </nav>
             </SheetContent>
@@ -93,7 +91,7 @@ export function Navbar() {
           ))}
           
           <div className="flex items-center gap-3">
-            <WalletConnectButton />
+            <ConnectButton />
           </div>
         </nav>
       </div>
