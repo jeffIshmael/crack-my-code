@@ -81,7 +81,7 @@ export default function CodebreakerApp() {
 
   // ─── Phase: Lobby → Matchmaking ───────────────────────────────────────────
 
-  const handleFindMatch = useCallback(() => {
+  const handleFindMatch = useCallback((_mode: any, _stake: any) => {
     setGs((prev) => ({ ...prev, phase: 'matchmaking', opponentName: randomOpponentName() }));
     setTimeout(() => {
       setGs((prev) => ({
@@ -190,6 +190,7 @@ export default function CodebreakerApp() {
               isMatchmaking={gs.phase === 'matchmaking'}
               opponentName={gs.opponentName}
               onFindMatch={handleFindMatch}
+              onMatchFound={() => {}}
             />
           </motion.div>
         ) : gs.phase === 'setCode' ? (
@@ -200,11 +201,14 @@ export default function CodebreakerApp() {
           <motion.div key="game" className="w-full h-full" {...screenVariants}>
             <GameBoard
               playerGuesses={gs.playerGuesses}
+              opponentGuesses={gs.opponentGuesses}
               opponentGuessCount={gs.opponentGuessCount}
               currentInput={gs.currentInput}
+              opponentCurrentInput={gs.opponentCurrentInput}
               isPlayerTurn={gs.isPlayerTurn}
               timeLeft={gs.timeLeft}
               opponentName={gs.opponentName}
+              playerRating={gs.playerRating}
               onDigitPress={handleDigitPress}
               onDelete={handleDeleteDigit}
               onSubmit={() => handleSubmitGuess(gs.currentInput)}
@@ -213,6 +217,8 @@ export default function CodebreakerApp() {
               {gs.phase === 'result' && gs.result && (
                 <ResultModal
                   result={gs.result}
+                  gameMode={gs.gameMode}
+                  stakeAmount={gs.stakeAmount}
                   opponentCode={gs.opponentCode}
                   opponentName={gs.opponentName}
                   ratingDelta={gs.ratingDelta ?? 0}
