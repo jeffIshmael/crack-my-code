@@ -206,7 +206,6 @@ export default function CodebreakerApp() {
               currentInput={gs.currentInput}
               opponentCurrentInput={gs.opponentCurrentInput}
               isPlayerTurn={gs.isPlayerTurn}
-              timeLeft={gs.timeLeft}
               opponentName={gs.opponentName}
               playerRating={gs.playerRating}
               onDigitPress={handleDigitPress}

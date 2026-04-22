@@ -1,0 +1,77 @@
+• Packages in scope: web
+• Running build in 1 packages
+• Remote caching disabled
+web:build: cache miss, executing 37c52045ded7c374
+web:build: 
+web:build: > web@0.1.0 build /Users/jeff/coding/my-celo-app/apps/web
+web:build: > next build
+web:build: 
+web:build:   ▲ Next.js 14.2.35
+web:build:   - Environments: .env
+web:build: 
+web:build:    Creating an optimized production build ...
+web:build:  ⚠ Compiled with warnings
+web:build: 
+web:build: ../../node_modules/.pnpm/@metamask+sdk@0.33.1/node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+web:build: Module not found: Can't resolve '@react-native-async-storage/async-storage' in '/Users/jeff/coding/my-celo-app/node_modules/.pnpm/@metamask+sdk@0.33.1/node_modules/@metamask/sdk/dist/browser/es'
+web:build: 
+web:build: Import trace for requested module:
+web:build: ../../node_modules/.pnpm/@metamask+sdk@0.33.1/node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+web:build: ../../node_modules/.pnpm/@wagmi+connectors@6.2.0_@tanstack+react-query@5.99.0_@types+react@18.3.28_@wagmi+core@2.22.1__7wkcgqlneof6wt6aoq3sbd32by/node_modules/@wagmi/connectors/dist/esm/metaMask.js
+web:build: ../../node_modules/.pnpm/@wagmi+connectors@6.2.0_@tanstack+react-query@5.99.0_@types+react@18.3.28_@wagmi+core@2.22.1__7wkcgqlneof6wt6aoq3sbd32by/node_modules/@wagmi/connectors/dist/esm/exports/index.js
+web:build: ../../node_modules/.pnpm/wagmi@2.19.5_@tanstack+react-query@5.99.0_@types+react@18.3.28_react@18.3.1_typescript@5.9.3_viem@2.47.18/node_modules/wagmi/dist/esm/exports/connectors.js
+web:build: ../../node_modules/.pnpm/@rainbow-me+rainbowkit@2.2.10_@tanstack+react-query@5.99.0_@types+react@18.3.28_react-dom@18._gypckwp3ylibgc7nqlzn5uljea/node_modules/@rainbow-me/rainbowkit/dist/index.js
+web:build: ./src/components/wallet-provider.tsx
+web:build: 
+web:build: ../../node_modules/.pnpm/@metamask+sdk@0.33.1/node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+web:build: Module not found: Can't resolve '@react-native-async-storage/async-storage' in '/Users/jeff/coding/my-celo-app/node_modules/.pnpm/@metamask+sdk@0.33.1/node_modules/@metamask/sdk/dist/browser/es'
+web:build: 
+web:build: Import trace for requested module:
+web:build: ../../node_modules/.pnpm/@metamask+sdk@0.33.1/node_modules/@metamask/sdk/dist/browser/es/metamask-sdk.js
+web:build: ../../node_modules/.pnpm/@wagmi+connectors@6.2.0_@tanstack+react-query@5.99.0_@types+react@18.3.28_@wagmi+core@2.22.1__7wkcgqlneof6wt6aoq3sbd32by/node_modules/@wagmi/connectors/dist/esm/metaMask.js
+web:build: ../../node_modules/.pnpm/@wagmi+connectors@6.2.0_@tanstack+react-query@5.99.0_@types+react@18.3.28_@wagmi+core@2.22.1__7wkcgqlneof6wt6aoq3sbd32by/node_modules/@wagmi/connectors/dist/esm/exports/index.js
+web:build: ../../node_modules/.pnpm/wagmi@2.19.5_@tanstack+react-query@5.99.0_@types+react@18.3.28_react@18.3.1_typescript@5.9.3_viem@2.47.18/node_modules/wagmi/dist/esm/exports/connectors.js
+web:build: ../../node_modules/.pnpm/@rainbow-me+rainbowkit@2.2.10_@tanstack+react-query@5.99.0_@types+react@18.3.28_react-dom@18._gypckwp3ylibgc7nqlzn5uljea/node_modules/@rainbow-me/rainbowkit/dist/index.js
+web:build: ./src/components/wallet-provider.tsx
+web:build: 
+web:build:    Linting and checking validity of types ...
+web:build:    Collecting page data ...
+web:build:    Generating static pages (0/10) ...
+web:build:    Generating static pages (2/10) 
+web:build:    Generating static pages (4/10) 
+web:build: TypeError: i(...) is not a constructor
+web:build:     at 17114 (/Users/jeff/coding/my-celo-app/apps/web/.next/server/app/page.js:9:6637)
+web:build:     at Object.t [as require] (/Users/jeff/coding/my-celo-app/apps/web/.next/server/webpack-runtime.js:1:128)
+web:build:     at require (/Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:18811)
+web:build:     at s (/Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:88330)
+web:build:     at /Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:98875
+web:build:     at /Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:98962
+web:build:     at t (/Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:99165) {
+web:build:   digest: '2931048655'
+web:build: }
+web:build: 
+web:build: Error occurred prerendering page "/". Read more: https://nextjs.org/docs/messages/prerender-error
+web:build: 
+web:build: TypeError: i(...) is not a constructor
+web:build:     at 17114 (/Users/jeff/coding/my-celo-app/apps/web/.next/server/app/page.js:9:6637)
+web:build:     at Object.t [as require] (/Users/jeff/coding/my-celo-app/apps/web/.next/server/webpack-runtime.js:1:128)
+web:build:     at require (/Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:17:18811)
+web:build:     at s (/Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:88330)
+web:build:     at /Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:98875
+web:build:     at /Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:98962
+web:build:     at t (/Users/jeff/coding/my-celo-app/node_modules/.pnpm/next@14.2.35_react-dom@18.3.1_react@18.3.1/node_modules/next/dist/compiled/next-server/app-page.runtime.prod.js:12:99165)
+web:build:    Generating static pages (7/10) 
+web:build:  ✓ Generating static pages (10/10)
+web:build: 
+web:build: > Export encountered errors on following paths:
+web:build: 	/page: /
+web:build:  ELIFECYCLE  Command failed with exit code 1.
+web:build: ERROR: command finished with error: command (/Users/jeff/coding/my-celo-app/apps/web) /Users/jeff/Library/pnpm/.tools/pnpm/8.10.0/bin/pnpm run build exited (1)
+web#build: command (/Users/jeff/coding/my-celo-app/apps/web) /Users/jeff/Library/pnpm/.tools/pnpm/8.10.0/bin/pnpm run build exited (1)
+
+ Tasks:    0 successful, 1 total
+Cached:    0 cached, 1 total
+  Time:    13.775s 
+Failed:    web#build
+
+ ERROR  run failed: command  exited (1)
