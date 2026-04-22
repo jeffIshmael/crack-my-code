@@ -1,6 +1,6 @@
 import { createWalletClient, createPublicClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { celoSepolia } from 'viem/chains';
+import { celoSepolia, celo } from 'viem/chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './constants';
 
 const privateKey = process.env.AGENT_PRIVATE_KEY as `0x${string}` | undefined;
@@ -12,13 +12,13 @@ if (!privateKey) {
 const account = privateKey ? privateKeyToAccount(privateKey) : null;
 
 const publicClient = createPublicClient({
-  chain: celoSepolia,
+  chain: celo,
   transport: http(),
 });
 
 const walletClient = account ? createWalletClient({
   account,
-  chain: celoSepolia,
+  chain: celo,
   transport: http(),
 }) : null;
 

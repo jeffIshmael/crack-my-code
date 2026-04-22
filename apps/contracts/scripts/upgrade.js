@@ -6,7 +6,7 @@ const { ethers, upgrades } = require("hardhat");
 // const fs = require("fs");
 
 async function main() {
-const PROXY_ADDRESS = "0x24c3ccE29F3882cf59aA110E9CAba87A3aB7c845";
+const PROXY_ADDRESS = "0x0317e55136a46557516aa40EA96d66772767C72C";
   
   const GuessMyCodeV2 = await ethers.getContractFactory("GuessMyCode");
   console.log("Upgrading GuessMyCode...");
@@ -18,4 +18,4 @@ const PROXY_ADDRESS = "0x24c3ccE29F3882cf59aA110E9CAba87A3aB7c845";
 
 main().catch((e) => { console.error(e); process.exit(1); });
 
-// implementaion - 0xED89FAdA7393577A1af888fDeB3684937E92A58b
+// implementation - 0x99f781D7e2869d780d6C52c0762d980F43Ea99E4

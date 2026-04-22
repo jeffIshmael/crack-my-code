@@ -17,13 +17,13 @@ const connectors = connectorsForWallets(
     },
   ],
   {
-    appName: "my-celo-app",
+    appName: "crack-my-code",
     projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID!,
   }
 );
 
 const wagmiConfig = createConfig({
-  chains: [celo, celoSepolia],
+  chains: [celo,celoSepolia],
   connectors,
   transports: {
     [celo.id]: http(),

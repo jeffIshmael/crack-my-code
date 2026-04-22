@@ -1,5 +1,5 @@
-export const CONTRACT_ADDRESS = "0x24c3ccE29F3882cf59aA110E9CAba87A3aB7c845" as `0x${string}`;
-export const USDT_ADDRESS = "0xd077A400968890Eacc75cdc901F0356c943e4fDb" as `0x${string}`;
+export const CONTRACT_ADDRESS = "0x0317e55136a46557516aa40EA96d66772767C72C";
+export const USDT_ADDRESS = "0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e" as `0x${string}`;
 
 export const ERC20_ABI = [
   {

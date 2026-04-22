@@ -26,7 +26,7 @@ if (!apiKey) {
 
 // create a public client
 const publicClient = createPublicClient({
-    chain: celoSepolia,
+    chain: celo,
     transport: http()
 })
 

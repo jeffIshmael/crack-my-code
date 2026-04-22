@@ -6,7 +6,7 @@ const { ethers, upgrades } = require("hardhat");
 
 // ─── Celo Mainnet addresses ──────────────────────────────────────────────────
 // const CUSD_CELO     = "0x765DE816845861e75A25fCA122bb6898B8B1282a"; // cUSD
-const USDT_CELO     = "0xd077A400968890Eacc75cdc901F0356c943e4fDb"; // USDT (check current)
+const USDT_CELO     = "0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e"; // USDT (check current)
 const TREASURY_ADDR = process.env.TREASURY_ADDRESS;                  // your multisig
 
 
