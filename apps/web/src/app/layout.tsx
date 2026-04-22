@@ -19,6 +19,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark">
+      <meta name="talentapp:project_verification" content="9af4936c363200c2c29e3c154ef6fcb3e0f0cc120f9ebe5f2972226558494b0063366b4864d11d567957a6127b28ccc2f3def949a27b20a84ef62becd4d884ba" />
       <body className={`${inter.className} grid-bg noise-overlay min-h-dvh antialiased`}>
         {/* Navbar is included on all pages */}
         <div className="relative flex min-h-screen flex-col">
