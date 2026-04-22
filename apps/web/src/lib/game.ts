@@ -36,6 +36,12 @@ export const GAME_DURATION = 60;            // seconds per match
 export const MAX_GUESSES = 8;
 export const CODE_LENGTH = 4;
 
+/** Mock opponent — never changes, allows deterministic demo */
+export const MOCK_OPPONENT_NAMES = [
+  'Cipher_X', 'n0vax', 'byte_wolf', 'reaper77', 'l0gic_phantom',
+];
+
+
 // ─── Core logic ──────────────────────────────────────────────────────────────
 
 /**
@@ -75,6 +81,11 @@ export function evaluateGuess(guess: number[], secret: number[]): Clue[] {
 export function isWinningClues(clues: Clue[]): boolean {
   return clues.filter((c) => c === 'green').length === CODE_LENGTH;
 }
+
+export function randomOpponentName(): string {
+  return MOCK_OPPONENT_NAMES[Math.floor(Math.random() * MOCK_OPPONENT_NAMES.length)];
+}
+
 
 /**
  * Returns a verbose hint string for the given clues.
