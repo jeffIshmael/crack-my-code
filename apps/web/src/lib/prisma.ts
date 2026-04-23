@@ -9,9 +9,8 @@ const globalForPrisma = global as unknown as {
   prisma: PrismaClient | undefined;
 };
 
-const connectionString = process.env.DATABASE_URL;
-
 const createClient = () => {
+  const connectionString = process.env.DATABASE_URL;
   console.log("Prisma: Initializing with connection string:", !!connectionString);
   
   const effectiveConnectionString = connectionString || "postgresql://dummy:dummy@localhost:5432/dummy";
