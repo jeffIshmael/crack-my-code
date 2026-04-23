@@ -10,7 +10,8 @@ const globalForPrisma = global as unknown as {
 };
 
 const createClient = () => {
-  const connectionString = process.env.DATABASE_URL;
+  // Use DATABASE_URL first, fallback to Vercel's POSTGRES_PRISMA_URL or POSTGRES_URL if linked
+  const connectionString = process.env.DATABASE_URL || process.env.POSTGRES_PRISMA_URL || process.env.POSTGRES_URL;
   console.log("Prisma: Initializing with connection string:", !!connectionString);
   
   const effectiveConnectionString = connectionString || "postgresql://dummy:dummy@localhost:5432/dummy";
