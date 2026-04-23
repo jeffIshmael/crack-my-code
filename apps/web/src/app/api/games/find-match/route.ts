@@ -87,7 +87,7 @@ export async function POST(req: NextRequest) {
         player1Address: address,
         mode: mode,
         stake: parseFloat(stake) || 0,
-        onChainMatchId: onChainMatchId,
+        onChainMatchId: onChainMatchId || null,
         status: isAI ? 'ACTIVE' : 'PENDING',
         isPublic: !isAI,
         player2Address: isAI ? 'AI' : null,
@@ -97,12 +97,17 @@ export async function POST(req: NextRequest) {
 
     if (!isAI) {
        // Broadcast to everyone that a new challenge is on the board
-       await pusherServer.trigger('lobby-channel', 'challenge-created', {
-         id: newGame.id,
-         player1Address: address,
-         mode: mode,
-         stake: stake
-       });
+       try {
+         await pusherServer.trigger('lobby-channel', 'challenge-created', {
+           id: newGame.id,
+           player1Address: address,
+           mode: mode,
+           stake: stake
+         });
+       } catch (pusherError) {
+         console.error('Pusher broadcast failed:', pusherError);
+         // Don't fail the whole request if pusher fails, but log it
+       }
     }
 
     return NextResponse.json({ 
@@ -110,8 +115,11 @@ export async function POST(req: NextRequest) {
       gameId: newGame.id 
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Matchmaking error:', error);
-    return NextResponse.json({ error: 'Failed to initiate matchmaking' }, { status: 500 });
+    return NextResponse.json({ 
+      error: 'Failed to initiate matchmaking',
+      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+    }, { status: 500 });
   }
 }

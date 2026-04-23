@@ -254,13 +254,13 @@ export default function SetCode({ opponentName, onLockCode, isWaiting }: SetCode
           <motion.button
             onClick={handleLock}
             disabled={!isComplete || locked}
-            className="flex h-12 flex-[2] items-center justify-center gap-2 rounded-xl font-orbitron text-sm font-bold tracking-wider transition-all"
+            className="flex h-14 flex-[2] items-center justify-center gap-2 rounded-2xl font-orbitron text-sm font-black tracking-[0.15em] transition-all"
             style={{
               background: isComplete && !locked
                 ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
                 : 'var(--clue-gray)',
               color: isComplete && !locked ? '#fff' : 'var(--text-dim)',
-              boxShadow: isComplete && !locked ? '0 4px 18px rgba(16,185,129,0.4)' : 'none',
+              boxShadow: isComplete && !locked ? '0 8px 24px rgba(16,185,129,0.35)' : 'none',
               cursor: isComplete && !locked ? 'pointer' : 'not-allowed',
             }}
             whileTap={isComplete && !locked ? { scale: 0.96 } : {}}
@@ -287,7 +287,7 @@ export default function SetCode({ opponentName, onLockCode, isWaiting }: SetCode
               </motion.span>
             ) : (
               <>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
                   <rect x="3" y="11" width="18" height="11" rx="2"/>
                   <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>

@@ -8,6 +8,7 @@ import type { GameMode } from '@/lib/game';
 import { pusherClient } from '@/lib/pusher-client';
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
+import Image from 'next/image';
 
 interface LobbyProps {
   rating: number;
@@ -115,21 +116,23 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
   };
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-between px-5 pt-16 pb-24 text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col items-center justify-start gap-12 px-5 pt-28 pb-24 text-[var(--text)]">
 
       {/* ── Top status bar ── */}
       <motion.div
-        className="flex w-full max-w-sm items-center justify-between"
+        className="absolute top-8 left-0 right-0 px-8 flex items-center justify-between z-20"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2 rounded-full border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 px-3 py-1.5">
-            <span className="font-orbitron text-xs font-black tracking-widest text-[var(--clue-yellow)]">
-              {rating} <span className="text-[10px] opacity-70">CMC</span>
-            </span>
-          </div>
+          {isConnected && (
+            <div className="flex items-center gap-2 rounded-full border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 px-3 py-1.5">
+              <span className="font-orbitron text-xs font-black tracking-widest text-[var(--clue-yellow)]">
+                {rating} <span className="text-[10px] opacity-70">CMC</span>
+              </span>
+            </div>
+          )}
         </div>
         {isConnected ? (
           <div className="flex items-center gap-2">
@@ -159,70 +162,49 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
       </motion.div>
 
       {/* ── Hero / Logo ── */}
-      <motion.div className="flex flex-col items-center gap-8 text-center" variants={stagger} initial="initial" animate="animate">
+      <motion.div className="flex flex-col items-center gap-10 text-center" variants={stagger} initial="initial" animate="animate">
         {/* Glyph icon */}
-        <motion.div variants={fadeUp} className="relative">
-          <div
-            className="flex h-24 w-24 items-center justify-center rounded-[2.5rem]"
-            style={{
-              background: 'linear-gradient(135deg, var(--bg-elevated) 0%, var(--bg-card) 100%)',
-              border: '2px solid var(--border-bright)',
-              boxShadow: '0 0 40px rgba(0,207,255,0.2)',
-            }}
-          >
-            <div className="grid grid-cols-2 gap-2">
-              {['var(--clue-green)', 'var(--clue-yellow)', 'var(--clue-yellow)', 'var(--clue-gray)'].map((dot, i) => (
-                <motion.div
-                  key={i}
-                  className="h-4 w-4 rounded-full shadow-lg"
-                  style={{ background: dot, boxShadow: `0 0 8px ${dot}` }}
-                  animate={{ scale: [1, 1.2, 1], opacity: [0.8, 1, 0.8] }}
-                  transition={{ duration: 2, delay: i * 0.3, repeat: Infinity, ease: 'easeInOut' }}
-                />
-              ))}
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Title */}
-        <motion.div variants={fadeUp} className="flex flex-col items-center gap-2">
-          <h1 className="font-orbitron logo-shimmer text-4xl font-black tracking-tight">Crack-my-code</h1>
-          {/* <p className="text-[10px] font-black uppercase tracking-[0.4em] text-[var(--accent)] drop-shadow-[0_0_8px_rgba(0,207,255,0.4)]">
-            Decentralized Logic Duels
-          </p> */}
-        </motion.div>
-
+        <div className="relative group">
+          <div className="absolute inset-0 bg-[var(--accent)]/20 blur-3xl rounded-full scale-150 opacity-40 group-hover:opacity-70 transition-opacity" />
+          <Image 
+            src='/logo.png' 
+            alt='logo' 
+            width={180} 
+            height={180} 
+            className='rounded-full relative z-10 border-4 border-white/5 shadow-2xl transition-transform group-hover:scale-105' 
+          />
+        </div>
         {/* Primary CTA Buttons */}
-        <motion.div variants={fadeUp} className="flex w-full max-w-xs flex-col gap-5 pt-8">
+        <motion.div variants={fadeUp} className="flex w-full max-w-sm flex-col gap-10 pt-16">
           {isMatchmaking ? (
             <MatchmakingPulse opponentName={opponentName} mode={selectedMode} />
           ) : (
             <>
               <button
                 onClick={handleStartAI}
-                className="group relative flex items-center justify-between rounded-[1.75rem] bg-[var(--bg-elevated)] p-6 transition-all hover:scale-[1.02] border border-white/5 active:scale-[0.98]"
+                className="group relative flex items-center justify-between rounded-[2.5rem] bg-[var(--bg-elevated)] p-10 transition-all hover:scale-[1.02] border border-white/10 active:scale-[0.98] shadow-2xl"
               >
-                <div className="flex flex-col gap-1 text-left">
-                  <span className="font-orbitron text-xs font-black tracking-[0.2em] text-[var(--text)]">TRAIN WITH AI</span>
-                  <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Master your logic</span>
+                <div className="flex flex-col gap-2 text-left">
+                  <span className="font-orbitron text-base font-black tracking-[0.25em] text-[var(--text)]">TRAIN WITH AI</span>
+                  <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-[0.15em]">Master your logic</span>
                 </div>
-                <div className="text-3xl opacity-40 group-hover:opacity-100 transition-opacity">🤖</div>
+                <div className="text-5xl opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">🤖</div>
               </button>
 
               <button
                 onClick={openPvPModal}
-                className="group relative flex items-center justify-between rounded-[1.75rem] border border-[var(--accent)] bg-[var(--accent)]/5 p-6 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                style={{ boxShadow: '0 0 30px rgba(0,207,255,0.1)' }}
+                className="group relative flex items-center justify-between rounded-[2.5rem] border border-[var(--accent)] bg-[var(--accent)]/5 p-10 transition-all hover:scale-[1.02] active:scale-[0.98]"
+                style={{ boxShadow: '0 0 40px rgba(0,207,255,0.15)' }}
               >
-                <div className="flex flex-col gap-1 text-left">
-                  <span className="font-orbitron text-xs font-black tracking-[0.2em] text-[var(--accent)]">PVP DUEL</span>
-                  <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Challenge players</span>
+                <div className="flex flex-col gap-2 text-left">
+                  <span className="font-orbitron text-base font-black tracking-[0.25em] text-[var(--accent)]">PVP DUEL</span>
+                  <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-[0.15em]">Challenge players</span>
                 </div>
-                <div className="text-3xl filter saturate-0 group-hover:saturate-100 transition-all">⚔️</div>
+                <div className="text-5xl filter saturate-0 group-hover:saturate-100 group-hover:scale-110 transition-all duration-300">⚔️</div>
 
                 {/* Subtle scanline animation */}
                 <motion.div
-                  className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-[var(--accent)]/5 to-transparent shadow-inner"
+                  className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-[var(--accent)]/10 to-transparent shadow-inner opacity-30"
                   animate={{ x: ['-100%', '100%'] }}
                   transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
                 />

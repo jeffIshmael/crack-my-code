@@ -301,31 +301,31 @@ export default function GameBoard({
       <motion.button
         onClick={onSubmit}
         disabled={!canSubmit || isSubmitting}
-        className="mb-4 w-full rounded-2xl py-4 font-orbitron text-base font-bold tracking-widest relative overflow-hidden"
+        className="mb-4 w-full rounded-[2rem] py-5 font-orbitron text-base font-black tracking-[0.25em] relative overflow-hidden"
         style={{
           background: canSubmit
             ? 'linear-gradient(135deg, #0099CC 0%, #00CFFF 60%, #0099CC 100%)'
             : 'var(--clue-gray)',
           color: canSubmit ? '#030C15' : 'var(--text-dim)',
-          boxShadow: canSubmit ? '0 4px 20px var(--accent-glow)' : 'none',
+          boxShadow: canSubmit ? '0 12px 32px rgba(0,207,255,0.3)' : 'none',
           cursor: canSubmit && !isSubmitting ? 'pointer' : 'not-allowed',
-          transition: 'all 0.2s',
+          transition: 'all 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
         }}
-        animate={canSubmit && !isSubmitting ? { boxShadow: ['0 4px 20px rgba(0,207,255,0.3)', '0 4px 28px rgba(0,207,255,0.55)', '0 4px 20px rgba(0,207,255,0.3)'] } : {}}
-        transition={{ duration: 1.5, repeat: Infinity }}
+        animate={canSubmit && !isSubmitting ? { boxShadow: ['0 10px 24px rgba(0,207,255,0.25)', '0 12px 40px rgba(0,207,255,0.5)', '0 10px 24px rgba(0,207,255,0.25)'] } : {}}
+        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         whileTap={canSubmit && !isSubmitting ? { scale: 0.97 } : {}}
       >
         {isSubmitting ? (
           <div className="flex items-center justify-center gap-3">
              <motion.div 
-               className="h-4 w-4 rounded-full border-2 border-[#030C15]/30 border-t-[#030C15]"
+               className="h-5 w-5 rounded-full border-2 border-[#030C15]/40 border-t-[#030C15]"
                animate={{ rotate: 360 }}
                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
              />
-             <span className="animate-pulse">ANALYZING...</span>
+             <span className="animate-pulse tracking-widest">ANALYZING...</span>
           </div>
         ) : !isPlayerTurn ? (
-          <span className="flex items-center justify-center gap-2">
+          <span className="flex items-center justify-center gap-2 opacity-60">
             <motion.span
               animate={{ opacity: [0.4, 1, 0.4] }}
               transition={{ duration: 1, repeat: Infinity }}
@@ -337,7 +337,7 @@ export default function GameBoard({
         ) : canSubmit ? (
           'SUBMIT GUESS →'
         ) : (
-          `ENTER ${CODE_LENGTH - currentInput.length} MORE DIGIT${CODE_LENGTH - currentInput.length !== 1 ? 'S' : ''}`
+          <span className="text-xs opacity-50 tracking-[0.2em]">ENTER {CODE_LENGTH - currentInput.length} MORE DIGIT{CODE_LENGTH - currentInput.length !== 1 ? 'S' : ''}</span>
         )}
 
         {/* Loading overlay effect */}

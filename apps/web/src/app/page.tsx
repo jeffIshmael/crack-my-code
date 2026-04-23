@@ -61,6 +61,28 @@ export default function Home() {
     fetchLobby();
   }, []);
 
+  // 1.5 User Registration / Fetch Rating
+  useEffect(() => {
+    if (isConnected && address) {
+      const register = async () => {
+        try {
+          const res = await fetch('/api/users/register', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ address })
+          });
+          const data = await res.json();
+          if (data.rating !== undefined) {
+            setGs(prev => ({ ...prev, playerRating: data.rating }));
+          }
+        } catch (err) {
+          console.error('Registration failed', err);
+        }
+      };
+      register();
+    }
+  }, [isConnected, address]);
+
   // 2. Subscribe to Lobby events
   useEffect(() => {
     const channel = pusherClient.subscribe('lobby-channel');
@@ -684,11 +706,18 @@ export default function Home() {
 
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden">
-      <AnimatePresence mode="wait">
+      <div className="w-full max-w-xl px-4 relative z-10">
         {activeTab === 'home' ? renderHomeContent() :
           activeTab === 'games' ? renderOpenGames() :
             renderAbout()}
-      </AnimatePresence>
+            
+        {/* Debug fallback to ensure component is rendering */}
+        {!gs.phase && (
+          <div className="text-white text-center p-10">
+            Initial loading state...
+          </div>
+        )}
+      </div>
 
 
 

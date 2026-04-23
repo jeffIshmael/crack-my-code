@@ -18,7 +18,7 @@ const connectors = connectorsForWallets(
   ],
   {
     appName: "crack-my-code",
-    projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID!,
+    projectId: process.env.NEXT_PUBLIC_WC_PROJECT_ID || "3a8170812b1a5b83117df95c50294977", // Fallback ID
   }
 );
 
@@ -59,7 +59,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <WalletProviderInner>{children}</WalletProviderInner>
+          {!mounted ? (
+            <div style={{ visibility: 'hidden' }}>{children}</div>
+          ) : (
+            <WalletProviderInner>{children}</WalletProviderInner>
+          )}
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>
