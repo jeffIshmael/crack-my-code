@@ -13,21 +13,17 @@ const connectionString = process.env.DATABASE_URL;
 
 const createClient = () => {
   console.log("Prisma: Initializing with connection string:", !!connectionString);
-  // If we have a connection string, use the adapter
-  if (connectionString) {
-    const pool = new Pool({ 
-      connectionString,
-      ssl: {
-        rejectUnauthorized: false
-      }
-    });
-    const adapter = new PrismaPg(pool);
-    return new PrismaClient({ adapter });
-  }
-
-  // Fallback for build time - provides a dummy client to satisfy the constructor requirements
-  // but won't be used for actual queries.
-  return new PrismaClient();
+  
+  const effectiveConnectionString = connectionString || "postgresql://dummy:dummy@localhost:5432/dummy";
+  
+  const pool = new Pool({ 
+    connectionString: effectiveConnectionString,
+    ssl: {
+      rejectUnauthorized: false
+    }
+  });
+  const adapter = new PrismaPg(pool);
+  return new PrismaClient({ adapter });
 };
 
 export const prisma = globalForPrisma.prisma ?? createClient();
