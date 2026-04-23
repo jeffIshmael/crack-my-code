@@ -19,6 +19,7 @@ import type { GameMode, GuessEntry, GameState } from '@/lib/game';
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
 import { parseUnits, parseEventLogs } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../../blockchain/constants';
+import { useGuessMyCode } from '../../blockchain/hooks';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -44,6 +45,10 @@ export default function Home() {
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [myActiveGames, setMyActiveGames] = useState<any[]>([]);
+  const [isCancelling, setIsCancelling] = useState<string | null>(null);
+
+  const { cancelChallenge } = useGuessMyCode();
 
   const clearOppTimer = () => { if (oppTimerRef.current) clearTimeout(oppTimerRef.current); };
 
@@ -60,6 +65,22 @@ export default function Home() {
     };
     fetchLobby();
   }, []);
+
+  // 1.2 Fetch my active challenges
+  const fetchMyActive = useCallback(async () => {
+    if (!isConnected || !address) return;
+    try {
+      const res = await fetch(`/api/games/my-active?address=${address}`);
+      const data = await res.json();
+      setMyActiveGames(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('My active games fetch failed', err);
+    }
+  }, [isConnected, address]);
+
+  useEffect(() => {
+    fetchMyActive();
+  }, [fetchMyActive]);
 
   // 1.5 User Registration / Fetch Rating
   useEffect(() => {
@@ -88,9 +109,7 @@ export default function Home() {
     const channel = pusherClient.subscribe('lobby-channel');
 
     channel.bind('challenge-created', (data: any) => {
-      if (data.player1Address !== address) {
-        setLobbyGames(prev => [data, ...prev]);
-      }
+      setLobbyGames(prev => [data, ...prev]);
     });
 
     channel.bind('challenge-joined', (data: any) => {
@@ -304,11 +323,43 @@ export default function Home() {
     }));
   }, []);
 
+  const handleCancelChallenge = async (gameId: string, onChainMatchId?: string) => {
+    if (!isConnected || !address) return;
+    setIsCancelling(gameId);
+    try {
+      if (onChainMatchId) {
+        // --- ON-CHAIN: Cancel Challenge ---
+        await cancelChallenge(onChainMatchId as `0x${string}`);
+      }
+
+      const res = await fetch('/api/games/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId })
+      });
+
+      if (res.ok) {
+        setMyActiveGames(prev => prev.filter(g => g.id !== gameId));
+      }
+    } catch (err) {
+      console.error('Cancel failed', err);
+    } finally {
+      setIsCancelling(null);
+    }
+  };
+
   const handleFindMatch = useCallback(async (mode: GameMode, stake: number) => {
     setMatchError(null);
 
     if (!address && mode !== 'ai') {
       setMatchError("Connect wallet to play PvP or Professional duels.");
+      return;
+    }
+
+    // Check if user has active challenges
+    if (mode !== 'ai' && myActiveGames.length > 0) {
+      setMatchError("You already have an active challenge. Cancel it to create a new one.");
+      setActiveTab('games');
       return;
     }
 
@@ -632,53 +683,116 @@ export default function Home() {
   };
 
   const renderOpenGames = () => (
-    <motion.div key="games" className="flex w-full flex-col gap-6 px-5 py-20 text-left" {...screenVariants}>
-      <div className="flex flex-col gap-2">
-        <h2 className="font-orbitron text-2xl font-black tracking-widest text-[var(--text)] uppercase">Active Challenges</h2>
-        <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest pt-1">Accept a duel on the global board</p>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        {lobbyGames.length > 0 ? (
-          lobbyGames.map((game) => (
-            <motion.div
-              key={game.id}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="group flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-5 transition-all hover:bg-white/[0.08]"
-            >
+    <motion.div key="games" className="flex w-full flex-col gap-10 px-5 py-24 text-left" {...screenVariants}>
+      {!isConnected ? (
+        <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
+          <div className="text-6xl grayscale opacity-30">🛡️</div>
+          <div className="flex flex-col gap-2">
+            <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Wallet Not Connected</h2>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest max-w-[200px] mx-auto">Connect your wallet to view active challenges and accept duels</p>
+          </div>
+          <button 
+            onClick={() => {
+              // Trigger RainbowKit connect if possible, or just scroll to top
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className="rounded-full bg-[var(--accent)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[#030C15]"
+          >
+            Connect Wallet
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Section: My Active Challenges */}
+          {myActiveGames.length > 0 && (
+            <div className="flex flex-col gap-6">
               <div className="flex flex-col gap-1">
-                <span className="font-orbitron text-[10px] font-black tracking-widest text-[var(--accent)] uppercase">{game.mode === 'cash' ? 'Professional' : 'Friendly'} Duel</span>
-                <span className="font-code text-sm font-bold text-[var(--text)]">{game.player1Address.slice(0, 6)}...{game.player1Address.slice(-4)}</span>
+                <h2 className="font-orbitron text-base font-black tracking-widest text-[var(--orange)] uppercase">My Pending Dues</h2>
+                <p className="text-[8px] text-[var(--text-dim)] uppercase tracking-widest">You are currently hosting these challenges</p>
               </div>
+              <div className="flex flex-col gap-3">
+                {myActiveGames.map((game) => (
+                  <motion.div
+                    key={game.id}
+                    className="flex items-center justify-between rounded-2xl border border-[var(--orange)]/20 bg-[var(--orange)]/5 p-5"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="font-orbitron text-[9px] font-black tracking-widest text-[var(--orange)] uppercase">
+                        {game.mode === 'cash' ? 'Professional' : 'Friendly'} Duel
+                      </span>
+                      <span className="text-[10px] font-bold text-[var(--text-dim)]">WAITING FOR OPPONENT...</span>
+                    </div>
+                    <button
+                      onClick={() => handleCancelChallenge(game.id, game.onChainMatchId)}
+                      disabled={isCancelling === game.id}
+                      className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-red-400 transition-all hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      {isCancelling === game.id ? 'Cancelling...' : 'Cancel'}
+                    </button>
+                  </motion.div>
+                ))}
+              </div>
+              <div className="h-px w-full bg-white/5" />
+            </div>
+          )}
 
-              <div className="flex items-center gap-6">
-                {game.mode === 'cash' && (
-                  <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-dim)]">Stake</span>
-                    <span className="text-sm font-black text-[var(--orange)]">{game.stake} USDT</span>
+          {/* Section: Global Board */}
+          <div className="flex flex-col gap-6">
+            <div className="flex flex-col gap-2">
+              <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Global Challenges</h2>
+              <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest pt-1">Accept a duel on the global board</p>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {lobbyGames.length > 0 ? (
+                lobbyGames.map((game) => (
+                  <motion.div
+                    key={game.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="group flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-5 transition-all hover:bg-white/[0.08]"
+                  >
+                    <div className="flex flex-col gap-1">
+                      <span className="font-orbitron text-[10px] font-black tracking-widest text-[var(--accent)] uppercase">{game.mode === 'cash' ? 'Professional' : 'Friendly'} Duel</span>
+                      <span className="font-code text-sm font-bold text-[var(--text)]">{game.player1Address.slice(0, 6)}...{game.player1Address.slice(-4)}</span>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                      {game.mode === 'cash' && (
+                        <div className="flex flex-col items-end">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-dim)]">Stake</span>
+                          <span className="text-sm font-black text-[var(--orange)]">{game.stake} USDT</span>
+                        </div>
+                      )}
+                      {game.player1Address === address ? (
+                        <div className="rounded-xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-[var(--orange)] opacity-80">
+                          Hosting
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => handleJoinChallenge(game.id, game.player1Address)}
+                          disabled={isJoining === game.id}
+                          className="rounded-xl bg-[var(--text)] px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-[var(--bg)] transition-transform active:scale-95 disabled:opacity-50"
+                        >
+                          {isJoining === game.id ? 'Joining...' : 'Accept'}
+                        </button>
+                      )}
+                    </div>
+                  </motion.div>
+                ))
+              ) : (
+                <div className="flex items-center justify-center rounded-3xl border border-white/5 bg-white/5 py-20 text-center">
+                  <div className="flex flex-col gap-3">
+                    <div className="mx-auto h-12 w-12 rounded-full border-2 border-dashed border-[var(--text-dim)] opacity-20" />
+                    <p className="text-sm font-bold text-[var(--text-dim)]">No active public challenges</p>
+                    <button onClick={() => setActiveTab('home')} className="mx-auto mt-2 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] underline underline-offset-4">Create one now</button>
                   </div>
-                )}
-                <button
-                  onClick={() => handleJoinChallenge(game.id, game.player1Address)}
-                  disabled={isJoining === game.id}
-                  className="rounded-xl bg-[var(--text)] px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-[var(--bg)] transition-transform active:scale-95 disabled:opacity-50"
-                >
-                  {isJoining === game.id ? 'Joining...' : 'Accept'}
-                </button>
-              </div>
-            </motion.div>
-          ))
-        ) : (
-          <div className="flex items-center justify-center rounded-3xl border border-white/5 bg-white/5 py-20 text-center">
-            <div className="flex flex-col gap-3">
-              <div className="mx-auto h-12 w-12 rounded-full border-2 border-dashed border-[var(--text-dim)] opacity-20" />
-              <p className="text-sm font-bold text-[var(--text-dim)]">No active public challenges</p>
-              <button onClick={() => setActiveTab('home')} className="mx-auto mt-2 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] underline underline-offset-4">Create one now</button>
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>
+        </>
+      )}
     </motion.div>
   );
 
@@ -690,8 +804,8 @@ export default function Home() {
       </div>
       <div className="flex flex-col gap-6 rounded-3xl border border-white/5 bg-white/5 p-6">
         {[
-          { t: 'Objective', d: 'Guess your opponent\'s secret 4-digit code before they guess yours.' },
-          { t: 'The Clues', d: 'Green = Right digit, right place. Yellow = Right digit, wrong place. Gray = Digit not in code.' },
+          { t: 'Objective', d: 'Crack your opponent\'s secret 4-digit code before they crack yours.' },
+          { t: 'The Clues', d: 'The game provides numerical feedback: "X in the right place" and "Y reallocated" (right digit, wrong place).' },
           { t: 'USDT Staking', d: 'In Professional mode, both players stake USDT. Winner takes 99% of the pool.' },
           { t: 'Fair Play', d: 'Quitting during a cash game results in an automatic loss and forfeit of your stake.' }
         ].map((rule, i) => (

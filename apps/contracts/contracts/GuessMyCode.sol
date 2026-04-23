@@ -71,7 +71,11 @@ contract GuessMyCode is
     mapping(address => bytes32)       public activeMatchOf;
     mapping(address => bytes32)       public challengeBoard;
 
-    uint256[50] private __gap;
+    uint256 public totalAIGames;
+    uint256 public totalPvPPaidGames;
+    uint256 public totalPvPFreeGames;
+
+    uint256[47] private __gap;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -86,6 +90,7 @@ contract GuessMyCode is
     event PointsUpdated     (address indexed player, uint256 oldPoints, uint256 newPoints, string reason);
     event FeesWithdrawn     (address indexed to, uint256 amount);
     event TokenUpdated      (address indexed oldToken, address indexed newToken);
+    event GameTracked       (MatchType matchType, bool isAI, uint256 totalAI, uint256 totalPvPPaid, uint256 totalPvPFree);
 
     // ─── Modifiers ────────────────────────────────────────────────────────────
 
@@ -209,24 +214,25 @@ contract GuessMyCode is
         emit ChallengeJoined(matchId, challenger, msg.sender, block.timestamp);
     }
 
-    function cancelChallenge() external nonReentrant whenNotPaused {
-        bytes32 matchId = challengeBoard[msg.sender];
-        require(matchId != bytes32(0),          "CB: no open challenge");
-
+    function cancelChallenge(bytes32 matchId) external nonReentrant whenNotPaused {
         Match storage m = matches[matchId];
-        require(m.player1 == msg.sender,        "CB: not your challenge");
+        require(m.id != bytes32(0),             "CB: match not found");
         require(m.status == MatchStatus.Pending, "CB: match already started");
 
+        // Allowed if msg.sender is the challenger OR the backend (owner)
+        require(msg.sender == m.player1 || msg.sender == owner(), "CB: not authorized");
+
         if (m.matchType == MatchType.Paid && m.stakeAmount > 0) {
-            require(usdToken.transfer(msg.sender, m.stakeAmount), "CB: refund failed");
+            require(usdToken.transfer(m.player1, m.stakeAmount), "CB: refund failed");
         }
 
         m.status  = MatchStatus.Expired;
         m.endedAt = block.timestamp;
 
-        delete challengeBoard[msg.sender];
+        // Cleanup the challenge board for the original challenger
+        delete challengeBoard[m.player1];
 
-        emit ChallengeCancelled(matchId, msg.sender);
+        emit ChallengeCancelled(matchId, m.player1);
     }
 
     // Permissionless — anyone can trigger cleanup on a timed-out pending match.
@@ -333,6 +339,21 @@ contract GuessMyCode is
         m.player1Guesses = p1Guesses;
         m.player2Guesses = p2Guesses;
         emit GuessCountsUpdated(matchId, p1Guesses, p2Guesses);
+    }
+
+    /**
+     * @dev Tracks the number of games played on the platform.
+     *      Called by the backend after match resolution or AI game completion.
+     */
+    function trackGame(MatchType mType, bool isAI) external onlyBackend {
+        if (isAI) {
+            totalAIGames++;
+        } else if (mType == MatchType.Paid) {
+            totalPvPPaidGames++;
+        } else {
+            totalPvPFreeGames++;
+        }
+        emit GameTracked(mType, isAI, totalAIGames, totalPvPPaidGames, totalPvPFreeGames);
     }
 
     // ─── Internal Point Helpers ───────────────────────────────────────────────

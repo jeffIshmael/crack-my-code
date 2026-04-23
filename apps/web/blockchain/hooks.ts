@@ -72,6 +72,20 @@ export function useGuessMyCode() {
     });
   }, [joinChallengeAsync]);
 
+  const { writeContractAsync: cancelChallengeAsync, data: cancelHash } = useWriteContract();
+  const { isLoading: isCancellingChallenge, data: cancelReceipt } = useWaitForTransactionReceipt({
+    hash: cancelHash,
+  });
+
+  const cancelChallenge = useCallback(async (matchId: `0x${string}`) => {
+    return cancelChallengeAsync({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'cancelChallenge',
+      args: [matchId],
+    });
+  }, [cancelChallengeAsync]);
+
   return {
     // State
     allowance,
@@ -79,15 +93,19 @@ export function useGuessMyCode() {
     isApproving,
     isCreatingChallenge,
     isJoiningChallenge,
+    isCancellingChallenge,
     createReceipt,
     joinReceipt,
+    cancelReceipt,
     createHash,
     joinHash,
+    cancelHash,
 
     // Actions
     approveUsdt,
     createChallenge,
     joinChallenge,
+    cancelChallenge,
     refetchAllowance,
     refetchBalance,
   };

@@ -168,6 +168,43 @@ export const CONTRACT_ABI = [
       "anonymous": false,
       "inputs": [
         {
+          "indexed": false,
+          "internalType": "enum GuessMyCode.MatchType",
+          "name": "matchType",
+          "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "bool",
+          "name": "isAI",
+          "type": "bool"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalAI",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalPvPPaid",
+          "type": "uint256"
+        },
+        {
+          "indexed": false,
+          "internalType": "uint256",
+          "name": "totalPvPFree",
+          "type": "uint256"
+        }
+      ],
+      "name": "GameTracked",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
           "indexed": true,
           "internalType": "bytes32",
           "name": "matchId",
@@ -527,7 +564,13 @@ export const CONTRACT_ABI = [
       "type": "function"
     },
     {
-      "inputs": [],
+      "inputs": [
+        {
+          "internalType": "bytes32",
+          "name": "matchId",
+          "type": "bytes32"
+        }
+      ],
       "name": "cancelChallenge",
       "outputs": [],
       "stateMutability": "nonpayable",
@@ -1233,6 +1276,63 @@ export const CONTRACT_ABI = [
         }
       ],
       "name": "setUsdToken",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalAIGames",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalPvPFreeGames",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "totalPvPPaidGames",
+      "outputs": [
+        {
+          "internalType": "uint256",
+          "name": "",
+          "type": "uint256"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "enum GuessMyCode.MatchType",
+          "name": "mType",
+          "type": "uint8"
+        },
+        {
+          "internalType": "bool",
+          "name": "isAI",
+          "type": "bool"
+        }
+      ],
+      "name": "trackGame",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

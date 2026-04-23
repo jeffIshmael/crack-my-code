@@ -192,22 +192,34 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
               </button>
 
               <button
-                onClick={openPvPModal}
-                className="group relative flex items-center justify-between rounded-[2.5rem] border border-[var(--accent)] bg-[var(--accent)]/5 p-10 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                style={{ boxShadow: '0 0 40px rgba(0,207,255,0.15)' }}
+                onClick={isConnected ? openPvPModal : undefined}
+                className={`group relative flex items-center justify-between rounded-[2.5rem] border p-10 transition-all ${
+                  isConnected 
+                    ? "border-[var(--accent)] bg-[var(--accent)]/5 hover:scale-[1.02] active:scale-[0.98]" 
+                    : "border-white/10 bg-white/5 opacity-80 cursor-not-allowed"
+                }`}
+                style={isConnected ? { boxShadow: '0 0 40px rgba(0,207,255,0.15)' } : {}}
               >
                 <div className="flex flex-col gap-2 text-left">
-                  <span className="font-orbitron text-base font-black tracking-[0.25em] text-[var(--accent)]">PVP DUEL</span>
-                  <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-[0.15em]">Challenge players</span>
+                  <span className={`font-orbitron text-base font-black tracking-[0.25em] ${isConnected ? "text-[var(--accent)]" : "text-[var(--text-dim)]"}`}>
+                    {isConnected ? "PVP DUEL" : "CONNECT WALLET"}
+                  </span>
+                  <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-[0.15em]">
+                    {isConnected ? "Challenge players" : "Required for PVP"}
+                  </span>
                 </div>
-                <div className="text-5xl filter saturate-0 group-hover:saturate-100 group-hover:scale-110 transition-all duration-300">⚔️</div>
+                <div className={`text-5xl transition-all duration-300 ${isConnected ? "filter saturate-0 group-hover:saturate-100 group-hover:scale-110" : "opacity-20"}`}>
+                  ⚔️
+                </div>
 
                 {/* Subtle scanline animation */}
-                <motion.div
-                  className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-[var(--accent)]/10 to-transparent shadow-inner opacity-30"
-                  animate={{ x: ['-100%', '100%'] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-                />
+                {isConnected && (
+                  <motion.div
+                    className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-[var(--accent)]/10 to-transparent shadow-inner opacity-30"
+                    animate={{ x: ['-100%', '100%'] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
+                  />
+                )}
               </button>
             </>
           )}
