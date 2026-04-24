@@ -87,3 +87,24 @@ export async function updateGuessCountsOnChain(
   const hash = await walletClient.writeContract(request);
   return await publicClient.waitForTransactionReceipt({ hash });
 }
+
+/**
+ * Track a game completion on-chain (backend only)
+ */
+export async function trackGameOnChain(
+  matchType: number,
+  isAI: boolean
+) {
+  if (!account || !walletClient) throw new Error("Agent not initialized");
+
+  const { request } = await publicClient.simulateContract({
+    account,
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'trackGame',
+    args: [matchType, isAI],
+  });
+  
+  const hash = await walletClient.writeContract(request);
+  return await publicClient.waitForTransactionReceipt({ hash });
+}

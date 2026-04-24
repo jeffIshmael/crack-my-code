@@ -74,8 +74,9 @@ contract GuessMyCode is
     uint256 public totalAIGames;
     uint256 public totalPvPPaidGames;
     uint256 public totalPvPFreeGames;
+    address public backendAddress;  // authorized address for resolving matches
 
-    uint256[47] private __gap;
+    uint256[46] private __gap;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -91,11 +92,12 @@ contract GuessMyCode is
     event FeesWithdrawn     (address indexed to, uint256 amount);
     event TokenUpdated      (address indexed oldToken, address indexed newToken);
     event GameTracked       (MatchType matchType, bool isAI, uint256 totalAI, uint256 totalPvPPaid, uint256 totalPvPFree);
+    event BackendUpdated    (address indexed oldBackend, address indexed newBackend);
 
     // ─── Modifiers ────────────────────────────────────────────────────────────
 
     modifier onlyBackend() {
-        require(msg.sender == owner(), "CB: not backend");
+        require(msg.sender == backendAddress || msg.sender == owner(), "CB: not backend");
         _;
     }
 
@@ -117,6 +119,7 @@ contract GuessMyCode is
         usdToken       = IERC20(_usdToken);
         treasuryFeeBps = 100;  // 1%
         matchExpiry    = 600;  // 10 minutes
+        backendAddress = msg.sender;
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
@@ -475,6 +478,12 @@ contract GuessMyCode is
         require(_token != address(0), "CB: zero address");
         emit TokenUpdated(address(usdToken), _token);
         usdToken = IERC20(_token);
+    }
+
+    function setBackendAddress(address _newBackend) external onlyOwner {
+        require(_newBackend != address(0), "CB: zero address");
+        emit BackendUpdated(backendAddress, _newBackend);
+        backendAddress = _newBackend;
     }
 
     function pause()   external onlyOwner { _pause(); }

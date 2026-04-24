@@ -57,6 +57,25 @@ export const CONTRACT_ABI = [
         {
           "indexed": true,
           "internalType": "address",
+          "name": "oldBackend",
+          "type": "address"
+        },
+        {
+          "indexed": true,
+          "internalType": "address",
+          "name": "newBackend",
+          "type": "address"
+        }
+      ],
+      "name": "BackendUpdated",
+      "type": "event"
+    },
+    {
+      "anonymous": false,
+      "inputs": [
+        {
+          "indexed": true,
+          "internalType": "address",
           "name": "beacon",
           "type": "address"
         }
@@ -558,6 +577,19 @@ export const CONTRACT_ABI = [
           "internalType": "bytes32",
           "name": "",
           "type": "bytes32"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [],
+      "name": "backendAddress",
+      "outputs": [
+        {
+          "internalType": "address",
+          "name": "",
+          "type": "address"
         }
       ],
       "stateMutability": "view",
@@ -1237,6 +1269,19 @@ export const CONTRACT_ABI = [
         }
       ],
       "name": "resolveMatch",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "_newBackend",
+          "type": "address"
+        }
+      ],
+      "name": "setBackendAddress",
       "outputs": [],
       "stateMutability": "nonpayable",
       "type": "function"

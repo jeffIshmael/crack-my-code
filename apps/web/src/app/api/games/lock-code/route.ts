@@ -23,7 +23,7 @@ export async function POST(req: NextRequest) {
     const isPlayer1 = game.player1Address === address;
     const isPlayer2 = game.player2Address === address;
 
-    if (!isPlayer1 && !isPlayer1) {
+    if (!isPlayer1 && !isPlayer2) {
       return NextResponse.json({ error: 'Not a player in this game' }, { status: 403 });
     }
 

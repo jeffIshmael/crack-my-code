@@ -8,9 +8,11 @@ import { WalletProvider } from "@/components/wallet-provider"
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'my-celo-app',
-  description: 'A new Celo blockchain project',
+  title: 'Crack-My-Code',
+  description: 'Crack the code first to win.', 
 };
+
+import { Toaster } from '@/components/ui/toaster';
 
 export default function RootLayout({
   children,
@@ -28,6 +30,7 @@ export default function RootLayout({
             <main className="flex-1">
               {children}
             </main>
+            <Toaster position="top-center" expand={false} richColors />
           </WalletProvider>
         </div>
       </body>

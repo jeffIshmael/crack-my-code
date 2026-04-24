@@ -20,6 +20,8 @@ import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
 import { parseUnits, parseEventLogs } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../../blockchain/constants';
 import { useGuessMyCode } from '../../blockchain/hooks';
+import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/errors';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -302,11 +304,8 @@ export default function Home() {
 
   // ─── Phase: Lobby → Matchmaking ───────────────────────────────────────────
 
-  const [matchError, setMatchError] = useState<string | null>(null);
-
   const handleMatchFound = useCallback((gameId: string, opponentAddress: string) => {
     setCurrentGameId(gameId);
-    setMatchError(null);
     setGs((prev: GameState) => ({
       ...prev,
       phase: 'setCode',
@@ -343,22 +342,23 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Cancel failed', err);
+      toast.error('Cancel Failed', { description: getErrorMessage(err) });
     } finally {
       setIsCancelling(null);
     }
   };
 
   const handleFindMatch = useCallback(async (mode: GameMode, stake: number) => {
-    setMatchError(null);
-
     if (!address && mode !== 'ai') {
-      setMatchError("Connect wallet to play PvP or Professional duels.");
+      toast.error("Connect wallet to play PvP or Professional duels.");
       return;
     }
 
     // Check if user has active challenges
     if (mode !== 'ai' && myActiveGames.length > 0) {
-      setMatchError("You already have an active challenge. Cancel it to create a new one.");
+      toast.error("Active Challenge Detected", { 
+        description: "You already have an active challenge. Cancel it to create a new one." 
+      });
       setActiveTab('games');
       return;
     }
@@ -425,7 +425,7 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error('Matchmaking failed', err);
-      setMatchError(err.message || 'System error. Please try again.');
+      toast.error('Matchmaking Error', { description: getErrorMessage(err) });
       setGs(prev => ({ ...prev, phase: 'lobby' }));
     }
   }, [address, isConnected, publicClient, writeContractAsync, handleMatchFound]);
@@ -456,6 +456,7 @@ export default function Home() {
       // For PvP, we wait for 'game-started' Pusher event
     } catch (err) {
       console.error('Failed to lock code', err);
+      toast.error('System Error', { description: 'Failed to lock your code. Please try again.' });
       setIsWaiting(false);
     }
   }, [currentGameId, address, gs.gameMode]);
@@ -510,7 +511,8 @@ export default function Home() {
           });
         }
       } catch (err) {
-        console.error('Failed to notify opponent', err);
+        console.error('Failed to submit guess', err);
+        toast.error('Submission Failed', { description: getErrorMessage(err) });
       } finally {
         setIsSubmitting(false);
       }
@@ -568,36 +570,6 @@ export default function Home() {
   const renderHomeContent = () => (
     gs.phase === 'lobby' || gs.phase === 'matchmaking' ? (
       <motion.div key="lobby" className="w-full relative" {...screenVariants}>
-        <AnimatePresence>
-          {matchError && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="absolute top-4 left-4 right-4 z-50 rounded-2xl border border-red-500/50 bg-red-500/10 p-4 backdrop-blur-md"
-            >
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-full bg-red-500/20 text-red-500">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                    <circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" />
-                  </svg>
-                </div>
-                <div className="flex flex-col">
-                  <span className="text-xs font-bold text-red-500 uppercase tracking-widest">Matchmaking Error</span>
-                  <p className="text-[10px] text-red-200/70 font-medium">{matchError}</p>
-                </div>
-                <button
-                  onClick={() => setMatchError(null)}
-                  className="ml-auto text-red-500/50 hover:text-red-500"
-                >
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
 
         <Lobby
           rating={gs.playerRating}
@@ -677,13 +649,14 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Join failed', err);
+      toast.error('Join Error', { description: getErrorMessage(err) });
     } finally {
       setIsJoining(null);
     }
   };
 
   const renderOpenGames = () => (
-    <motion.div key="games" className="flex w-full flex-col gap-10 px-5 pt-24 pb-32 text-left" {...screenVariants}>
+    <motion.div key="games" className="flex w-full flex-col gap-10 px-5 pt-12 pb-48 text-left" {...screenVariants}>
       {!isConnected ? (
         <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
           <div className="text-6xl grayscale opacity-30">🛡️</div>
@@ -772,7 +745,7 @@ export default function Home() {
                         <button
                           onClick={() => handleJoinChallenge(game.id, game.player1Address)}
                           disabled={isJoining === game.id}
-                          className="rounded-xl bg-[var(--text)] px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-[var(--bg)] transition-transform active:scale-95 disabled:opacity-50"
+                          className="rounded-xl bg-[var(--text)] px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-[var(--bg-base)] transition-transform active:scale-95 disabled:opacity-50"
                         >
                           {isJoining === game.id ? 'Joining...' : 'Accept'}
                         </button>

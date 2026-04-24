@@ -9,6 +9,8 @@ import { pusherClient } from '@/lib/pusher-client';
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import Image from 'next/image';
+import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/errors';
 
 interface LobbyProps {
   rating: number;
@@ -65,12 +67,17 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
   const isApproving = isApprovingAction || isWaitingForApproval;
 
   const handleApprove = async (amount: bigint) => {
-    approve({
-      address: USDT_ADDRESS,
-      abi: ERC20_ABI,
-      functionName: 'approve',
-      args: [CONTRACT_ADDRESS, amount],
-    });
+    try {
+      approve({
+        address: USDT_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: 'approve',
+        args: [CONTRACT_ADDRESS, amount],
+      });
+    } catch (err) {
+      console.error('Approval failed', err);
+      toast.error('Approval Failed', { description: getErrorMessage(err) });
+    }
   };
 
   const stakeBigInt = useMemo(() => {
@@ -116,7 +123,7 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
   };
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-start gap-12 px-5 pt-28 pb-32 text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col items-center justify-start gap-12 px-5 pt-20 pb-40 text-[var(--text)]">
 
       {/* ── Top status bar ── */}
       <motion.div
@@ -308,15 +315,24 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
                     <div className="flex flex-col gap-6">
                       <div className="flex flex-col gap-3">
                         <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-dim)]">Enter USDT Stake</label>
-                        <div className="relative flex items-center">
-                          <input
-                            type="number"
-                            value={stake}
-                            onChange={(e) => setStake(e.target.value)}
-                            className="w-full flex-1 rounded-2xl border border-white/10 bg-white/5 p-5 text-2xl font-black text-[var(--orange)] outline-none ring-[var(--orange)] focus:ring-1"
-                            autoFocus
-                          />
-                          <span className="absolute right-5 text-lg font-black text-[var(--text-dim)]">USDT</span>
+                        <div className="relative flex flex-col gap-2">
+                          <div className="relative flex items-center">
+                            <input
+                              type="number"
+                              value={stake}
+                              onChange={(e) => setStake(e.target.value)}
+                              className="w-full flex-1 rounded-2xl border border-white/10 bg-white/5 p-5 text-2xl font-black text-[var(--orange)] outline-none ring-[var(--orange)] focus:ring-1"
+                              autoFocus
+                              placeholder="0.00"
+                            />
+                            <span className="absolute right-5 text-lg font-black text-[var(--text-dim)] mr-6">USDT</span>
+                          </div>
+                          <div className="flex items-center justify-between px-2">
+                            <span className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider">Min: 0.1 USDT</span>
+                            <span className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
+                              Available: <span className="text-[var(--text)]">{usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)} USDT` : '...'}</span>
+                            </span>
+                          </div>
                         </div>
                       </div>
 
