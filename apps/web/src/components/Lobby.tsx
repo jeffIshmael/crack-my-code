@@ -116,7 +116,7 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
   };
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-start gap-12 px-5 pt-28 pb-24 text-[var(--text)]">
+    <div className="flex min-h-dvh flex-col items-center justify-start gap-12 px-5 pt-28 pb-32 text-[var(--text)]">
 
       {/* ── Top status bar ── */}
       <motion.div
@@ -369,7 +369,7 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
               </AnimatePresence>
 
               {/* Close Spacer */}
-              <div className="h-6" />
+              <div className="h-12" />
             </motion.div>
           </div>
         )}

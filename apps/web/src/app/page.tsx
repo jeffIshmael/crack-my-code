@@ -683,7 +683,7 @@ export default function Home() {
   };
 
   const renderOpenGames = () => (
-    <motion.div key="games" className="flex w-full flex-col gap-10 px-5 py-24 text-left" {...screenVariants}>
+    <motion.div key="games" className="flex w-full flex-col gap-10 px-5 pt-24 pb-32 text-left" {...screenVariants}>
       {!isConnected ? (
         <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
           <div className="text-6xl grayscale opacity-30">🛡️</div>
@@ -797,7 +797,7 @@ export default function Home() {
   );
 
   const renderAbout = () => (
-    <motion.div key="about" className="flex w-full flex-col gap-8 px-5 py-20 text-left" {...screenVariants}>
+    <motion.div key="about" className="flex w-full flex-col gap-8 px-5 pt-24 pb-32 text-left" {...screenVariants}>
       <div className="flex flex-col gap-2 text-center">
         <h2 className="font-orbitron text-2xl font-black tracking-widest text-[var(--text)]">ABOUT GAME</h2>
         <p className="text-xs text-[var(--text-dim)] uppercase tracking-widest">Rules & Rewards</p>
@@ -819,8 +819,8 @@ export default function Home() {
   );
 
   return (
-    <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden">
-      <div className="w-full max-w-xl px-4 relative z-10">
+    <main className="relative flex min-h-dvh flex-col items-center justify-start overflow-y-auto overflow-x-hidden">
+      <div className="w-full max-w-xl px-4 relative">
         {activeTab === 'home' ? renderHomeContent() :
           activeTab === 'games' ? renderOpenGames() :
             renderAbout()}
