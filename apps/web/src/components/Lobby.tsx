@@ -192,8 +192,8 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
                 className="group relative flex items-center justify-between rounded-[2.5rem] bg-[var(--bg-elevated)] p-10 transition-all hover:scale-[1.02] border border-white/10 active:scale-[0.98] shadow-2xl"
               >
                 <div className="flex flex-col gap-2 text-left">
-                  <span className="font-orbitron text-base font-black tracking-[0.25em] text-[var(--text)]">TRAIN WITH AI</span>
-                  <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-[0.15em]">Master your logic</span>
+                  <span className="font-orbitron text-base font-black tracking-[0.25em] text-[var(--text)]">PLAY WITH AI</span>
+                  <span className="text-xs font-bold text-white/50 uppercase tracking-[0.15em]">Sharpen your strategy</span>
                 </div>
                 <div className="text-5xl opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">🤖</div>
               </button>

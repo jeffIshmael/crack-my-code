@@ -13,6 +13,7 @@ import {
   initialGameState,
   evaluateGuess,
   isWinningClues,
+  getClueCounts,
   MAX_GUESSES,
 } from '@/lib/game';
 import type { GameMode, GuessEntry, GameState } from '@/lib/game';
@@ -40,6 +41,23 @@ export default function Home() {
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const [gs, setGs] = useState(() => initialGameState());
+  const gsRef = useRef(gs);
+  useEffect(() => { gsRef.current = gs; }, [gs]);
+
+  const allPermutations = useRef<number[][]>([]);
+  if (allPermutations.current.length === 0) {
+    const generate = (current: number[]) => {
+      if (current.length === 4) {
+        allPermutations.current.push(current);
+        return;
+      }
+      for (let i = 0; i <= 9; i++) {
+        if (!current.includes(i)) generate([...current, i]);
+      }
+    };
+    generate([]);
+  }
+
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [lobbyGames, setLobbyGames] = useState<any[]>([]);
   const [isJoining, setIsJoining] = useState<string | null>(null);
@@ -179,83 +197,72 @@ export default function Home() {
   };
 
   const scheduleOpponentTurn = useCallback(() => {
-    if (gs.gameMode !== 'ai') return;
+    if (gsRef.current.gameMode !== 'ai') return;
     clearOppTimer();
 
     const thinkingDelay = 1000 + Math.random() * 1000;
 
     oppTimerRef.current = setTimeout(() => {
-      // 🚀 SMARTER AI: Mastermind Solver
-      // 1. Get all previous guesses the AI has made against the player
-      const history = gs.opponentGuesses;
+      const currentGs = gsRef.current;
+      const history = currentGs.opponentGuesses;
+      const playerCode = currentGs.playerCode;
 
-      // 2. Generate/Filter possible codes
-      // We generate all permutations of 4 unique digits (0-9)
-      const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-      let candidates: number[][] = [];
+      if (!playerCode || playerCode.length === 0) return;
 
-      // Recursive permutation generator (simplified)
-      const generate = (current: number[]) => {
-        if (current.length === 4) {
-          // Check if this candidate is consistent with all previous clues
-          const isConsistent = history.every((h: GuessEntry) => {
-            const clues = evaluateGuess(h.digits, current);
-            return JSON.stringify(clues) === JSON.stringify(h.clues);
-          });
-          if (isConsistent) candidates.push(current);
-          return;
-        }
-        for (let d of digits) {
-          if (!current.includes(d)) generate([...current, d]);
-        }
-      };
+      // 1. Filter candidates based on history
+      const candidates = allPermutations.current.filter((cand) => {
+        return history.every((h: GuessEntry) => {
+          const candClues = evaluateGuess(h.digits, cand);
+          const c1 = getClueCounts(candClues);
+          const c2 = getClueCounts(h.clues);
+          return c1.green === c2.green && c1.yellow === c2.yellow;
+        });
+      });
 
-      generate([]);
-
-      // 3. Pick the next guess using a smarter heuristic (Entropy/Size reduction)
+      // 2. Pick next guess
       let targetDigits: number[];
-
       if (history.length === 0) {
-        // First guess is always a diverse set for max info
         targetDigits = [0, 1, 2, 3];
-      } else if (candidates.length <= 1) {
-        targetDigits = candidates[0] || [0, 1, 2, 3];
-      } else if (candidates.length > 300) {
-        // Pool too large for full entropy calc; pick random from candidates to keep it snappy
-        targetDigits = candidates[Math.floor(Math.random() * candidates.length)];
+      } else if (candidates.length === 1) {
+        targetDigits = candidates[0];
       } else {
-        // 🚀 SMARTEST: Heuristic selection (Knuth-lite)
-        // Find the candidate that minimizes the maximum possible remaining candidate pool size
-        let bestGuess = candidates[0];
-        let minMaxRemaining = Infinity;
+        // Smarter pick: if pool is small enough, use minimax. Otherwise pick random from candidates.
+        if (candidates.length > 200) {
+          targetDigits = candidates[Math.floor(Math.random() * candidates.length)];
+        } else {
+          // Knuth-lite minimax
+          let bestGuess = candidates[0];
+          let minMaxRemaining = Infinity;
 
-        // Note: For speed, we only test candidates as potential guesses
-        for (const guess of candidates) {
-          const clueGroups: Record<string, number> = {};
+          // Optimization: sample candidates if still too many
+          const testPool = candidates.length > 50 ? candidates.slice(0, 50) : candidates;
 
-          for (const secret of candidates) {
-            const clues = evaluateGuess(guess, secret);
-            const key = JSON.stringify(clues);
-            clueGroups[key] = (clueGroups[key] || 0) + 1;
+          for (const guess of testPool) {
+            const groups: Record<string, number> = {};
+            for (const secret of candidates) {
+              const clues = evaluateGuess(guess, secret);
+              const { green, yellow } = getClueCounts(clues);
+              const key = `${green}-${yellow}`;
+              groups[key] = (groups[key] || 0) + 1;
+            }
+            const maxInGroup = Math.max(...Object.values(groups));
+            if (maxInGroup < minMaxRemaining) {
+              minMaxRemaining = maxInGroup;
+              bestGuess = guess;
+            }
           }
-
-          const maxInGroup = Math.max(...Object.values(clueGroups));
-          if (maxInGroup < minMaxRemaining) {
-            minMaxRemaining = maxInGroup;
-            bestGuess = guess;
-          }
+          targetDigits = bestGuess;
         }
-        targetDigits = bestGuess;
       }
 
-      // 4. Simulate typing
+      // 3. Simulate typing
       let typedCount = 0;
       const typeDigit = () => {
         typedCount++;
         setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: targetDigits.slice(0, typedCount) }));
 
         if (typedCount < CODE_LENGTH) {
-          oppTimerRef.current = setTimeout(typeDigit, 200);
+          oppTimerRef.current = setTimeout(typeDigit, 150 + Math.random() * 100);
         } else {
           setGs((prev: GameState) => {
             if (prev.phase !== 'playing') return prev;
@@ -265,7 +272,7 @@ export default function Home() {
             const newCount = prev.opponentGuessCount + 1;
 
             if (isWinningClues(clues)) {
-              // 1. Reveal AI's code (since game is over)
+              // Reveal AI's code and end game
               fetch('/api/games/reveal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -273,25 +280,22 @@ export default function Home() {
               })
                 .then(res => res.json())
                 .then(data => {
-                  // 2. Wait 2 seconds so player sees the winning guess on board
                   setTimeout(() => {
-                    setGs((prev: GameState) => ({
-                      ...prev,
+                    setGs((p: GameState) => ({
+                      ...p,
                       phase: 'result',
                       result: 'lose',
                       ratingDelta: -15,
                       opponentCode: data.opponentCode || []
                     }));
-                  }, 2000);
+                  }, 1500);
                 });
-
-              // Return updated state with AI's final guess
               return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
             }
 
             oppTimerRef.current = setTimeout(() => {
               setGs((p: GameState) => ({ ...p, isPlayerTurn: true, opponentCurrentInput: [] }));
-            }, 2000);
+            }, 1000);
 
             return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
           });
@@ -300,7 +304,7 @@ export default function Home() {
 
       typeDigit();
     }, thinkingDelay);
-  }, [gs.gameMode]); // eslint-disable-line
+  }, [currentGameId, address]); // eslint-disable-line
 
   // ─── Phase: Lobby → Matchmaking ───────────────────────────────────────────
 

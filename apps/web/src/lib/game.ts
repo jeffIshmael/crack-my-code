@@ -82,6 +82,13 @@ export function isWinningClues(clues: Clue[]): boolean {
   return clues.filter((c) => c === 'green').length === CODE_LENGTH;
 }
 
+export function getClueCounts(clues: Clue[]) {
+  return {
+    green: clues.filter((c) => c === 'green').length,
+    yellow: clues.filter((c) => c === 'yellow').length,
+  };
+}
+
 export function randomOpponentName(): string {
   return MOCK_OPPONENT_NAMES[Math.floor(Math.random() * MOCK_OPPONENT_NAMES.length)];
 }
