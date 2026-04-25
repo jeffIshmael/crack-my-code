@@ -14,6 +14,7 @@ import { getErrorMessage } from '@/lib/errors';
 
 interface LobbyProps {
   rating: number;
+  points: number;
   isMatchmaking: boolean;
   opponentName: string;
   onFindMatch: (mode: GameMode, stake: number) => void;
@@ -28,7 +29,7 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch, onMatchFound }: LobbyProps) {
+export default function Lobby({ rating, points, isMatchmaking, opponentName, onFindMatch, onMatchFound }: LobbyProps) {
   const { isConnected, address } = useAccount();
   const { data: usdtData } = useBalance({
     address,
@@ -136,7 +137,7 @@ export default function Lobby({ rating, isMatchmaking, opponentName, onFindMatch
           {isConnected && (
             <div className="flex items-center gap-2 rounded-full border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 px-3 py-1.5">
               <span className="font-orbitron text-xs font-black tracking-widest text-[var(--clue-yellow)]">
-                {rating} <span className="text-[10px] opacity-70">CMC</span>
+                {points} <span className="text-[10px] opacity-70">CMC</span>
               </span>
             </div>
           )}

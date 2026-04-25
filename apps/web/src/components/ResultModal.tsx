@@ -11,6 +11,7 @@ interface ResultModalProps {
   opponentName: string;
   ratingDelta: number;
   playerRating: number;
+  playerPoints: number;
   guessCount: number;
   onPlayAgain: () => void;
 }
@@ -25,6 +26,7 @@ export default function ResultModal({
   opponentName,
   ratingDelta,
   playerRating,
+  playerPoints,
   guessCount,
   onPlayAgain,
 }: ResultModalProps) {
@@ -208,26 +210,28 @@ export default function ResultModal({
             <div className="flex flex-col">
               <span className="text-xs" style={{ color: 'var(--text-2)' }}>CMC Points</span>
               <span className="font-orbitron text-xl font-bold" style={{ color: 'var(--text)' }}>
-                {playerRating}
+                {playerPoints}
               </span>
             </div>
-            <motion.div
-              className="flex items-center gap-1 rounded-lg px-3 py-1.5 font-orbitron text-lg font-bold"
-              style={{
-                background: ratingDelta >= 0 ? 'var(--clue-green-bg)' : 'var(--orange-dim)',
-                color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)',
-              }}
-              initial={{ scale: 0 }}
-              animate={{ scale: 1 }}
-              transition={{ type: 'spring', delay: 0.75, stiffness: 400 }}
-            >
-              {ratingDelta >= 0 ? '+' : ''}{ratingDelta}
-            </motion.div>
+            {gameMode !== 'ai' && (
+              <motion.div
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 font-orbitron text-lg font-bold"
+                style={{
+                  background: ratingDelta >= 0 ? 'var(--clue-green-bg)' : 'var(--orange-dim)',
+                  color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)',
+                }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', delay: 0.75, stiffness: 400 }}
+              >
+                {ratingDelta >= 0 ? '+' : ''}{ratingDelta}
+              </motion.div>
+            )}
             <div className="flex flex-col items-end">
               <span className="text-xs" style={{ color: 'var(--text-2)' }}>Updated CMC</span>
               <span className="font-orbitron text-xl font-bold"
-                style={{ color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)' }}>
-                {playerRating + ratingDelta}
+                style={{ color: gameMode === 'ai' ? 'var(--text)' : (ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)') }}>
+                {gameMode === 'ai' ? playerPoints : playerPoints + ratingDelta}
               </span>
             </div>
           </motion.div>

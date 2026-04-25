@@ -15,7 +15,8 @@ export async function POST(req: NextRequest) {
       create: {
         address: address,
         name: `Player_${address.slice(2, 6)}`,
-        rating: 1000
+        rating: 1000,
+        points: 1000
       }
     });
 

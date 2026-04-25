@@ -26,6 +26,7 @@ export interface GameState {
   timeLeft: number;              // seconds (if timer used, currently static)
   result: GameResult;
   playerRating: number;
+  playerPoints: number;
   ratingDelta: number | null;
   opponentName: string;
 }
@@ -113,7 +114,7 @@ export function getHintText(clues: Clue[]): string {
 
 
 
-export function initialGameState(rating = 1240, mode: GameMode = 'fun', stake = 0): GameState {
+export function initialGameState(rating = 1000, points = 1000, mode: GameMode = 'fun', stake = 0): GameState {
   return {
     phase: 'lobby',
     gameMode: mode,
@@ -129,6 +130,7 @@ export function initialGameState(rating = 1240, mode: GameMode = 'fun', stake = 
     timeLeft: GAME_DURATION,
     result: null,
     playerRating: rating,
+    playerPoints: points,
     ratingDelta: null,
     opponentName: 'Searching...',
   };

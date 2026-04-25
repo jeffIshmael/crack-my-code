@@ -63,6 +63,17 @@ export async function POST(req: NextRequest) {
         data: { status: 'COMPLETED', winnerAddress: playerAddress }
       });
 
+      // Update player rating (points handled separately for AI vs PVP)
+      if (playerAddress !== 'GUEST') {
+        const isAI = game.mode === 'ai';
+        await prisma.user.update({
+          where: { address: playerAddress },
+          data: {
+            rating: { increment: isAI ? 10 : 25 }
+          }
+        });
+      }
+
       // --- ON-CHAIN: Resolve Match ---
       if ((game as any).onChainMatchId && game.mode !== 'ai') {
         try {
@@ -75,6 +86,14 @@ export async function POST(req: NextRequest) {
             p1GuessCount,
             p2GuessCount
           );
+
+          // Only update points in backend AFTER successful on-chain resolution
+          if (playerAddress !== 'GUEST') {
+            await prisma.user.update({
+              where: { address: playerAddress },
+              data: { points: { increment: 50 } }
+            });
+          }
         } catch (err) {
           console.error('[Blockchain] Resolve failed:', err);
         }

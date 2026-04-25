@@ -16,6 +16,7 @@ interface GameBoardProps {
   isPlayerTurn: boolean;
   opponentName: string;
   playerRating: number;
+  playerPoints: number;
   isSubmitting?: boolean;
   onDigitPress: (d: number) => void;
   onDelete: () => void;
@@ -31,6 +32,7 @@ export default function GameBoard({
   isPlayerTurn,
   opponentName,
   playerRating,
+  playerPoints,
   isSubmitting = false,
   onDigitPress,
   onDelete,
@@ -69,7 +71,7 @@ export default function GameBoard({
         <div className="flex items-center gap-3">
            <div className="flex items-center gap-1.5 rounded-lg border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 px-2 py-1">
              <span className="font-orbitron text-[10px] font-black tracking-widest text-[var(--clue-yellow)]">
-               {playerRating} CMC
+               {playerPoints} CMC
              </span>
            </div>
            <div className="h-4 w-px bg-white/10" />

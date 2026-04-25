@@ -113,8 +113,12 @@ export default function Home() {
             body: JSON.stringify({ address })
           });
           const data = await res.json();
-          if (data.rating !== undefined) {
-            setGs(prev => ({ ...prev, playerRating: data.rating }));
+          if (data.rating !== undefined && data.points !== undefined) {
+            setGs(prev => ({ 
+              ...prev, 
+              playerRating: data.rating,
+              playerPoints: data.points 
+            }));
           }
         } catch (err) {
           console.error('Registration failed', err);
@@ -285,7 +289,7 @@ export default function Home() {
                       ...p,
                       phase: 'result',
                       result: 'lose',
-                      ratingDelta: -15,
+                      ratingDelta: -5,
                       opponentCode: data.opponentCode || []
                     }));
                   }, 1500);
@@ -497,16 +501,34 @@ export default function Home() {
                 playerGuesses: newGuesses,
                 phase: 'result',
                 result: 'win',
-                ratingDelta: +22,
+                ratingDelta: gs.gameMode === 'ai' ? 10 : 25,
                 currentInput: [],
                 opponentCode: data.opponentCode // Revealed by server
               };
             }
 
             // Max guesses exhausted?
-            // Only end if opponent has also finished their turn for this round
-            if (newGuesses.length >= MAX_GUESSES && prev.opponentGuesses.length >= newGuesses.length) {
-              return { ...prev, playerGuesses: newGuesses, phase: 'result', result: 'lose', ratingDelta: -10, currentInput: [] };
+            if (newGuesses.length >= MAX_GUESSES) {
+              const delta = gs.gameMode === 'ai' ? -5 : -15;
+              // Reveal the code even on loss
+              fetch('/api/games/reveal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' })
+              })
+                .then(res => res.json())
+                .then(data => {
+                  setGs((prev: GameState) => ({
+                    ...prev,
+                    playerGuesses: newGuesses,
+                    phase: 'result',
+                    result: 'lose',
+                    ratingDelta: delta,
+                    currentInput: [],
+                    opponentCode: data.opponentCode || []
+                  }));
+                });
+              return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false };
             }
 
             // Opponent's turn
@@ -548,8 +570,11 @@ export default function Home() {
 
   const handlePlayAgain = useCallback(() => {
     clearOppTimer();
-    setGs(initialGameState(gs.playerRating + (gs.ratingDelta ?? 0)));
-  }, [gs.playerRating, gs.ratingDelta]); // eslint-disable-line
+    setGs(initialGameState(
+      gs.playerRating + (gs.ratingDelta ?? 0),
+      gs.playerPoints + (gs.gameMode === 'ai' ? 0 : (gs.ratingDelta ?? 0) * 2) // Rough points logic for now
+    ));
+  }, [gs.playerRating, gs.playerPoints, gs.ratingDelta, gs.gameMode]); // eslint-disable-line
 
   // ─── Cleanup on unmount ───────────────────────────────────────────────────
 
@@ -577,6 +602,7 @@ export default function Home() {
 
         <Lobby
           rating={gs.playerRating}
+          points={gs.playerPoints}
           isMatchmaking={gs.phase === 'matchmaking'}
           opponentName={gs.opponentName}
           onFindMatch={handleFindMatch}
@@ -602,6 +628,7 @@ export default function Home() {
           isPlayerTurn={gs.isPlayerTurn}
           opponentName={gs.opponentName}
           playerRating={gs.playerRating}
+          playerPoints={gs.playerPoints}
           isSubmitting={isSubmitting}
           onDigitPress={handleDigitPress}
           onDelete={handleDeleteDigit}
@@ -617,6 +644,7 @@ export default function Home() {
               opponentName={gs.opponentName}
               ratingDelta={gs.ratingDelta ?? 0}
               playerRating={gs.playerRating}
+              playerPoints={gs.playerPoints}
               guessCount={gs.playerGuesses.length}
               onPlayAgain={handlePlayAgain}
             />

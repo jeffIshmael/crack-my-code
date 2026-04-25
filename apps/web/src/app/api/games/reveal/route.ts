@@ -19,9 +19,27 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    // Only allow revealing if game is COMPLETED
+    // Allow revealing if game is COMPLETED OR if it's an ACTIVE AI game
     if (game.status !== 'COMPLETED') {
+      if (game.mode === 'ai' && game.status === 'ACTIVE') {
+        // AI won, mark game as COMPLETED
+        await prisma.game.update({
+          where: { id: gameId },
+          data: { status: 'COMPLETED', winnerAddress: 'AI' }
+        });
+
+        // Update player points (-5 for AI loss)
+        if (address !== 'GUEST') {
+          await prisma.user.update({
+            where: { address: address },
+            data: { 
+              rating: { decrement: 5 }
+            }
+          });
+        }
+      } else {
         return NextResponse.json({ error: 'Game is not completed' }, { status: 403 });
+      }
     }
 
     // Return the code that the requesting user was trying to guess
