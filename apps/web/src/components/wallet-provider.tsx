@@ -58,10 +58,31 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
+  const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+
+  // During SSR (prerendering), we return a null or a simple div to avoid 
+  // executing children that rely on Privy/Wagmi hooks, which would crash the build.
+  if (!mounted) {
+    return (
+      <div style={{ visibility: 'hidden' }} />
+    );
+  }
+
+  // If we are on the client but the appId is missing, we log a warning 
+  // but still render the children so the app doesn't stay blank.
+  if (!appId) {
+    console.warn("NEXT_PUBLIC_PRIVY_APP_ID is missing. Wallet functionality will be disabled.");
+    return (
+      <QueryClientProvider client={queryClient}>
+        {children}
+      </QueryClientProvider>
+    );
+  }
+
   return (
     <QueryClientProvider client={queryClient}>
       <PrivyProvider
-        appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ""}
+        appId={appId}
         config={{
           appearance: {
             theme: 'dark',
@@ -79,11 +100,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
       >
         <WagmiProvider config={wagmiConfig}>
           <RainbowKitProvider>
-            {!mounted ? (
-              <div style={{ visibility: 'hidden' }}>{children}</div>
-            ) : (
-              <WalletProviderInner>{children}</WalletProviderInner>
-            )}
+            <WalletProviderInner>{children}</WalletProviderInner>
           </RainbowKitProvider>
         </WagmiProvider>
       </PrivyProvider>
