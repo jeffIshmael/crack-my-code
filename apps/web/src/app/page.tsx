@@ -18,6 +18,7 @@ import {
 } from '@/lib/game';
 import type { GameMode, GuessEntry, GameState } from '@/lib/game';
 import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
+import { usePrivy } from '@privy-io/react-auth';
 import { parseUnits, parseEventLogs } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../../blockchain/constants';
 import { useGuessMyCode } from '../../blockchain/hooks';
@@ -38,6 +39,7 @@ import { pusherClient } from '@/lib/pusher-client';
 
 export default function Home() {
   const { address, isConnected } = useAccount();
+  const { login } = usePrivy();
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
   const [gs, setGs] = useState(() => initialGameState());
@@ -686,7 +688,6 @@ export default function Home() {
       setIsJoining(null);
     }
   };
-
   const renderOpenGames = () => (
     <motion.div key="games" className="flex w-full flex-col gap-10 px-5 pt-12 pb-48 text-left" {...screenVariants}>
       {!isConnected ? (
@@ -697,13 +698,10 @@ export default function Home() {
             <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest max-w-[200px] mx-auto">Connect your wallet to view active challenges and accept duels</p>
           </div>
           <button 
-            onClick={() => {
-              // Trigger RainbowKit connect if possible, or just scroll to top
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
+            onClick={() => login()}
             className="rounded-full bg-[var(--accent)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[#030C15]"
           >
-            Connect Wallet
+            Sign In
           </button>
         </div>
       ) : (

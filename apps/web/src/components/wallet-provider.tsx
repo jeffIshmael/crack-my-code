@@ -5,9 +5,10 @@ import "@rainbow-me/rainbowkit/styles.css";
 import { injectedWallet } from "@rainbow-me/rainbowkit/wallets";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { WagmiProvider, createConfig, http, useConnect } from "wagmi";
+import { createConfig, http, useConnect } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
-import { ConnectButton } from "./connect-button";
+import { PrivyProvider } from "@privy-io/react-auth";
+import { WagmiProvider } from "@privy-io/wagmi";
 
 const connectors = connectorsForWallets(
   [
@@ -23,7 +24,7 @@ const connectors = connectorsForWallets(
 );
 
 const wagmiConfig = createConfig({
-  chains: [celo,celoSepolia],
+  chains: [celo, celoSepolia],
   connectors,
   transports: {
     [celo.id]: http(),
@@ -38,9 +39,11 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
   const { connect, connectors } = useConnect();
 
   useEffect(() => {
-    // Check if the app is running inside MiniPay
-    if (window.ethereum && window.ethereum.isMiniPay) {
-      // Find the injected connector, which is what MiniPay uses
+    // Auto-connect for mini-app environments (MiniPay, Farcaster, etc.)
+    const isMiniPay = (window as any).ethereum?.isMiniPay;
+    const isFarcaster = (window as any).ethereum?.isFarcaster || (window as any).farcaster;
+
+    if (isMiniPay || isFarcaster) {
       const injectedConnector = connectors.find((c) => c.id === "injected");
       if (injectedConnector) {
         connect({ connector: injectedConnector });
@@ -56,16 +59,34 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => setMounted(true), []);
 
   return (
-    <WagmiProvider config={wagmiConfig}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
-          {!mounted ? (
-            <div style={{ visibility: 'hidden' }}>{children}</div>
-          ) : (
-            <WalletProviderInner>{children}</WalletProviderInner>
-          )}
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <QueryClientProvider client={queryClient}>
+      <PrivyProvider
+        appId={process.env.NEXT_PUBLIC_PRIVY_APP_ID || ""}
+        config={{
+          appearance: {
+            theme: 'dark',
+            accentColor: '#00CFFF',
+            showWalletLoginFirst: false,
+          },
+          embeddedWallets: {
+            ethereum: {
+              createOnLogin: 'users-without-wallets'
+            }
+          },
+          defaultChain: celo,
+          supportedChains: [celo, celoSepolia],
+        }}
+      >
+        <WagmiProvider config={wagmiConfig}>
+          <RainbowKitProvider>
+            {!mounted ? (
+              <div style={{ visibility: 'hidden' }}>{children}</div>
+            ) : (
+              <WalletProviderInner>{children}</WalletProviderInner>
+            )}
+          </RainbowKitProvider>
+        </WagmiProvider>
+      </PrivyProvider>
+    </QueryClientProvider>
   );
 }
