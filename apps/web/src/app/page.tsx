@@ -17,13 +17,14 @@ import {
   MAX_GUESSES,
 } from '@/lib/game';
 import type { GameMode, GuessEntry, GameState } from '@/lib/game';
-import { useAccount, useWriteContract, usePublicClient } from 'wagmi';
+import { useAccount, useWriteContract, usePublicClient, useBalance } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
 import { parseUnits, parseEventLogs } from 'viem';
-import { CONTRACT_ABI, CONTRACT_ADDRESS } from '../../blockchain/constants';
+import { CONTRACT_ABI, CONTRACT_ADDRESS, USDT_ADDRESS } from '../../blockchain/constants';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
+import { Wallet, LogOut, ExternalLink, ShieldCheck } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -38,10 +39,16 @@ const screenVariants = {
 import { pusherClient } from '@/lib/pusher-client';
 
 export default function Home() {
-  const { address, isConnected } = useAccount();
-  const { login } = usePrivy();
+  const { address: wagmiAddress, isConnected } = useAccount();
+  const { login, logout, authenticated, user } = usePrivy();
+  const address = wagmiAddress || user?.wallet?.address;
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+
+  const { data: usdtData } = useBalance({
+    address: address as `0x${string}` | undefined,
+    token: USDT_ADDRESS as `0x${string}`,
+  });
   const [gs, setGs] = useState(() => initialGameState());
   const gsRef = useRef(gs);
   useEffect(() => { gsRef.current = gs; }, [gs]);
@@ -90,7 +97,7 @@ export default function Home() {
 
   // 1.2 Fetch my active challenges
   const fetchMyActive = useCallback(async () => {
-    if (!isConnected || !address) return;
+    if (!authenticated || !address) return;
     try {
       const res = await fetch(`/api/games/my-active?address=${address}`);
       const data = await res.json();
@@ -98,7 +105,7 @@ export default function Home() {
     } catch (err) {
       console.error('My active games fetch failed', err);
     }
-  }, [isConnected, address]);
+  }, [authenticated, address]);
 
   useEffect(() => {
     fetchMyActive();
@@ -106,7 +113,7 @@ export default function Home() {
 
   // 1.5 User Registration / Fetch Rating
   useEffect(() => {
-    if (isConnected && address) {
+    if (authenticated && address) {
       const register = async () => {
         try {
           const res = await fetch('/api/users/register', {
@@ -128,7 +135,7 @@ export default function Home() {
       };
       register();
     }
-  }, [isConnected, address]);
+  }, [authenticated, address]);
 
   // 2. Subscribe to Lobby events
   useEffect(() => {
@@ -609,6 +616,7 @@ export default function Home() {
           opponentName={gs.opponentName}
           onFindMatch={handleFindMatch}
           onMatchFound={handleMatchFound}
+          onWalletClick={() => setActiveTab('wallet')}
         />
       </motion.div>
     ) : gs.phase === 'setCode' ? (
@@ -821,11 +829,103 @@ export default function Home() {
     </motion.div>
   );
 
+  const renderWalletContent = () => (
+    <motion.div key="wallet" className="flex w-full flex-col gap-8 px-5 pt-24 pb-32 text-left" {...screenVariants}>
+      <div className="flex flex-col gap-2 text-center">
+        <h2 className="font-orbitron text-2xl font-black tracking-widest text-[var(--text)] uppercase">My Account</h2>
+        <p className="text-xs text-[var(--text-dim)] uppercase tracking-widest">Secure Account & Assets</p>
+      </div>
+
+      {!authenticated ? (
+        <div className="flex flex-col items-center justify-center gap-6 py-12 text-center bg-white/5 rounded-[2.5rem] border border-white/10 p-10">
+          <div className="text-6xl grayscale opacity-30">🛡️</div>
+          <div className="flex flex-col gap-2">
+            <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Not Signed In</h2>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest max-w-[200px] mx-auto">Connect your wallet to manage your assets and points</p>
+          </div>
+          <button 
+            onClick={() => login()}
+            className="rounded-full bg-[var(--accent)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[#030C15]"
+          >
+            Sign In Now
+          </button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {/* Main Card */}
+          <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#03111C] p-8 shadow-2xl">
+            {/* Background Glow */}
+            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[var(--accent)]/10 blur-3xl" />
+            
+            <div className="relative z-10 flex flex-col gap-8">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                    <Wallet size={24} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">Connected Wallet</span>
+                    <span className="font-code text-sm font-bold text-[var(--text)]">{address?.slice(0, 10)}...{address?.slice(-10)}</span>
+                  </div>
+                </div>
+                <a 
+                  href={`https://celoscan.io/address/${address}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-xl bg-white/5 p-3 text-[var(--text-dim)] hover:bg-white/10 transition-colors"
+                >
+                  <ExternalLink size={18} />
+                </a>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-6">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">USDT Balance</span>
+                    <span className="text-3xl font-black text-[var(--accent)]">
+                      {usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between rounded-2xl border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 p-6">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--clue-yellow)]/50">Points</span>
+                    <span className="text-3xl font-black text-[var(--clue-yellow)]">
+                      {gs.playerPoints} <span className="text-[20px] font-black text-[var(--clue-yellow)]/20">CMC</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+        
+
+          {/* Logout (Non-miniapp) */}
+          {!(typeof window !== 'undefined' && ((window as any).ethereum?.isMiniPay || (window as any).ethereum?.isFarcaster)) && (
+            <button
+              onClick={() => {
+                logout();
+                setActiveTab('home');
+              }}
+              className="flex w-full items-center justify-center gap-3 rounded-[2rem] border border-red-500/20 bg-red-500/5 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-red-400 hover:bg-red-500/10 transition-all active:scale-95"
+            >
+              <LogOut size={18} />
+              Sign Out
+            </button>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
+
   return (
     <main className="relative flex min-h-dvh flex-col items-center justify-start overflow-y-auto overflow-x-hidden">
       <div className="w-full max-w-xl px-4 relative">
         {activeTab === 'home' ? renderHomeContent() :
           activeTab === 'games' ? renderOpenGames() :
+          activeTab === 'wallet' ? renderWalletContent() :
             renderAbout()}
             
         {/* Debug fallback to ensure component is rendering */}

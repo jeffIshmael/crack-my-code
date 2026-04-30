@@ -1,9 +1,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Home, LayoutGrid, Info } from 'lucide-react';
+import { Home, LayoutGrid, Info, User } from 'lucide-react';
 
-export type NavTab = 'home' | 'games' | 'about';
+export type NavTab = 'home' | 'games' | 'about' | 'wallet';
 
 interface BottomNavProps {
   activeTab: NavTab;
@@ -18,6 +18,7 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
     { id: 'games' as const, label: 'Open', icon: LayoutGrid },
     { id: 'home' as const, label: 'Home', icon: Home },
     { id: 'about' as const, label: 'About', icon: Info },
+    { id: 'wallet' as const, label: 'Account', icon: User },
   ];
 
   return (

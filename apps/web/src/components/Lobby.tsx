@@ -19,6 +19,7 @@ interface LobbyProps {
   opponentName: string;
   onFindMatch: (mode: GameMode, stake: number) => void;
   onMatchFound: (gameId: string, opponentAddress: string) => void;
+  onWalletClick?: () => void;
 }
 
 const stagger = {
@@ -29,7 +30,7 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export default function Lobby({ rating, points, isMatchmaking, opponentName, onFindMatch, onMatchFound }: LobbyProps) {
+export default function Lobby({ rating, points, isMatchmaking, opponentName, onFindMatch, onMatchFound, onWalletClick }: LobbyProps) {
   const { isConnected, address } = useAccount();
   const { data: usdtData } = useBalance({
     address,
@@ -128,45 +129,12 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
 
       {/* ── Top status bar ── */}
       <motion.div
-        className="absolute top-8 left-0 right-0 px-8 flex items-center justify-between z-20"
+        className="absolute top-8 left-0 right-0 px-8 flex items-center z-20"
         initial={{ opacity: 0, y: -10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div className="flex items-center gap-2.5">
-          {isConnected && (
-            <div className="flex items-center gap-2 rounded-full border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 px-3 py-1.5">
-              <span className="font-orbitron text-xs font-black tracking-widest text-[var(--clue-yellow)]">
-                {points} <span className="text-[10px] opacity-70">CMC</span>
-              </span>
-            </div>
-          )}
-        </div>
-        {isConnected ? (
-          <div className="flex items-center gap-2">
-            {/* <div className="flex items-center gap-1.5 mr-2">
-                <span
-                  className="inline-block h-1.5 w-1.5 rounded-full"
-                  style={{ background: 'var(--clue-green)', boxShadow: '0 0 6px var(--clue-green)' }}
-                />
-                <span className="text-[8px] font-black uppercase tracking-tighter text-[var(--text-dim)]">Celo Mainnet</span>
-             </div> */}
-            <div
-              className="rounded-full px-3 py-1.5 text-[10px] font-black tracking-widest border border-white/10 bg-white/5"
-              style={{ color: 'var(--accent)' }}
-            >
-              {usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)} USDT` : '...'}
-            </div>
-          </div>
-        ) : (
-          <div className="flex items-center gap-3">
-            {/* <div className="flex flex-col items-end gap-0.5 mr-1">
-               <span className="text-[8px] font-black uppercase tracking-wider text-[var(--accent)]">Training Mode</span>
-               <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">0 CMC</span>
-             </div> */}
-            <ConnectButton />
-          </div>
-        )}
+        <ConnectButton onWalletClick={onWalletClick} />
       </motion.div>
 
       {/* ── Hero / Logo ── */}
