@@ -17,7 +17,7 @@ interface LobbyProps {
   points: number;
   isMatchmaking: boolean;
   opponentName: string;
-  onFindMatch: (mode: GameMode, stake: number) => void;
+  onFindMatch: (mode: GameMode, stake: number) => Promise<void>;
   onMatchFound: (gameId: string, opponentAddress: string) => void;
   onWalletClick?: () => void;
 }
@@ -41,6 +41,7 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
   const [pvpStep, setPvpStep] = useState<'selection' | 'config'>('selection');
   const [selectedMode, setSelectedMode] = useState<GameMode>('fun');
   const [stake, setStake] = useState<string>('5');
+  const [isCreating, setIsCreating] = useState(false);
 
   const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
     address: USDT_ADDRESS,
@@ -108,15 +109,25 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
     };
   }, [address, onMatchFound]);
 
-  const handleStartPvP = (mode: GameMode) => {
-    setShowPvPModal(false);
-    setPvpStep('selection'); // Reset for next time
-    onFindMatch(mode, mode === 'cash' ? parseFloat(stake) || 0 : 0);
+  const handleStartPvP = async (mode: GameMode) => {
+    setIsCreating(true);
+    try {
+      await onFindMatch(mode, mode === 'cash' ? parseFloat(stake) || 0 : 0);
+      setShowPvPModal(false);
+      setPvpStep('selection'); // Reset for next time
+    } finally {
+      setIsCreating(false);
+    }
   };
 
-  const handleStartAI = () => {
+  const handleStartAI = async () => {
+    setIsCreating(true);
     setSelectedMode('ai');
-    onFindMatch('ai', 0);
+    try {
+      await onFindMatch('ai', 0);
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   const openPvPModal = () => {
@@ -158,10 +169,13 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
             <>
               <button
                 onClick={handleStartAI}
-                className="group relative flex items-center justify-between rounded-[2.5rem] bg-[var(--bg-elevated)] p-10 transition-all hover:scale-[1.02] border border-white/10 active:scale-[0.98] shadow-2xl"
+                disabled={isCreating}
+                className="group relative flex items-center justify-between rounded-[2.5rem] bg-[var(--bg-elevated)] p-10 transition-all hover:scale-[1.02] border border-white/10 active:scale-[0.98] shadow-2xl disabled:opacity-50"
               >
                 <div className="flex flex-col gap-2 text-left">
-                  <span className="font-orbitron text-base font-black tracking-[0.25em] text-[var(--text)]">PLAY WITH AI</span>
+                  <span className="font-orbitron text-base font-black tracking-[0.25em] text-[var(--text)]">
+                    {isCreating && selectedMode === 'ai' ? 'STARTING...' : 'PLAY WITH AI'}
+                  </span>
                   <span className="text-xs font-bold text-white/50 uppercase tracking-[0.15em]">Sharpen your strategy</span>
                 </div>
                 <div className="text-5xl opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">🤖</div>
@@ -332,7 +346,7 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
                             onClick={async () => {
                               await handleApprove(stakeBigInt);
                             }}
-                            disabled={isApproving}
+                            disabled={isApproving || isCreating}
                             className="flex-[2] rounded-2xl bg-gradient-to-r from-[var(--orange)] to-[#FF8A00] py-5 font-orbitron font-black text-xs tracking-widest text-[#030C15] disabled:opacity-50"
                             style={{ boxShadow: '0 8px 25px rgba(255,138,0,0.3)' }}
                           >
@@ -341,10 +355,11 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
                         ) : (
                           <button
                             onClick={() => handleStartPvP('cash')}
-                            className="flex-[2] rounded-2xl bg-gradient-to-r from-[var(--orange)] to-[#FF8A00] py-5 font-orbitron font-black text-xs tracking-widest text-[#030C15]"
+                            disabled={isCreating}
+                            className="flex-[2] rounded-2xl bg-gradient-to-r from-[var(--orange)] to-[#FF8A00] py-5 font-orbitron font-black text-xs tracking-widest text-[#030C15] disabled:opacity-50"
                             style={{ boxShadow: '0 8px 25px rgba(255,138,0,0.3)' }}
                           >
-                            SEARCH OPPONENT
+                            {isCreating ? 'CREATING...' : 'SEARCH OPPONENT'}
                           </button>
                         )}
                       </div>

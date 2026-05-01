@@ -19,8 +19,9 @@ import {
 import type { GameMode, GuessEntry, GameState } from '@/lib/game';
 import { useAccount, useWriteContract, usePublicClient, useBalance } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
-import { parseUnits, parseEventLogs } from 'viem';
+import { parseUnits, parseEventLogs, encodeFunctionData } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS, USDT_ADDRESS } from '../../blockchain/constants';
+import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
@@ -44,6 +45,7 @@ export default function Home() {
   const address = wagmiAddress || user?.wallet?.address;
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const { client: smartWalletClient } = useSmartWallets();
 
   const { data: usdtData } = useBalance({
     address: address as `0x${string}` | undefined,
@@ -345,7 +347,22 @@ export default function Home() {
     try {
       if (onChainMatchId) {
         // --- ON-CHAIN: Cancel Challenge ---
-        await cancelChallenge(onChainMatchId as `0x${string}`);
+        if (smartWalletClient) {
+          const data = encodeFunctionData({
+            abi: CONTRACT_ABI,
+            functionName: 'cancelChallenge',
+            args: [onChainMatchId as `0x${string}`]
+          });
+          const txHash = await smartWalletClient.sendTransaction({
+            to: CONTRACT_ADDRESS as `0x${string}`,
+            data: data,
+            value: BigInt(0)
+          });
+          if (!publicClient) throw new Error("Public client not available");
+          await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+        } else {
+          await cancelChallenge(onChainMatchId as `0x${string}`);
+        }
       }
 
       const res = await fetch('/api/games/cancel', {
@@ -382,14 +399,6 @@ export default function Home() {
 
     const effectiveAddress = address || 'GUEST';
 
-    setGs((prev: GameState) => ({
-      ...prev,
-      phase: 'matchmaking',
-      gameMode: mode,
-      stakeAmount: stake,
-      opponentName: mode === 'ai' ? 'Cipher' : 'Searching...'
-    }));
-
     try {
       let onChainMatchId: string | undefined;
 
@@ -399,15 +408,31 @@ export default function Home() {
         const stakeAmt = parseUnits(stake.toString(), 6);
         console.log("the paid status", isPaid);
 
-        const hash = await writeContractAsync({
-          address: CONTRACT_ADDRESS,
-          abi: CONTRACT_ABI,
-          functionName: 'createChallenge',
-          args: [isPaid, stakeAmt],
-        });
+        let receipt;
 
-        if (!publicClient) throw new Error("Public client not available");
-        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (smartWalletClient) {
+          const data = encodeFunctionData({
+            abi: CONTRACT_ABI,
+            functionName: 'createChallenge',
+            args: [isPaid, stakeAmt]
+          });
+          const txHash = await smartWalletClient.sendTransaction({
+            to: CONTRACT_ADDRESS as `0x${string}`,
+            data: data,
+            value: BigInt(0)
+          });
+          if (!publicClient) throw new Error("Public client not available");
+          receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+        } else {
+          const hash = await writeContractAsync({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'createChallenge',
+            args: [isPaid, stakeAmt],
+          });
+          if (!publicClient) throw new Error("Public client not available");
+          receipt = await publicClient.waitForTransactionReceipt({ hash });
+        }
 
         const logs = parseEventLogs({
           abi: CONTRACT_ABI,
@@ -439,13 +464,21 @@ export default function Home() {
 
       if (data.status === 'matched') {
         handleMatchFound(data.gameId, data.opponentAddress || 'AI_BOT');
+      } else {
+        setGs((prev: GameState) => ({
+          ...prev,
+          phase: 'matchmaking',
+          gameMode: mode,
+          stakeAmount: stake,
+          opponentName: mode === 'ai' ? 'Cipher' : 'Searching...'
+        }));
       }
     } catch (err: any) {
       console.error('Matchmaking failed', err);
       toast.error('Matchmaking Error', { description: getErrorMessage(err) });
       setGs(prev => ({ ...prev, phase: 'lobby' }));
     }
-  }, [address, isConnected, publicClient, writeContractAsync, handleMatchFound]);
+  }, [address, isConnected, publicClient, writeContractAsync, smartWalletClient, handleMatchFound]);
 
   // ─── Phase: SetCode → Playing ─────────────────────────────────────────────
 
@@ -669,15 +702,29 @@ export default function Home() {
     setIsJoining(gameId);
     try {
       // --- ON-CHAIN: Join Challenge ---
-      const hash = await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: 'joinChallenge',
-        args: [challengerAddress as `0x${string}`],
-      });
-
-      if (!publicClient) throw new Error("Public client not available");
-      await publicClient.waitForTransactionReceipt({ hash });
+      if (smartWalletClient) {
+        const data = encodeFunctionData({
+          abi: CONTRACT_ABI,
+          functionName: 'joinChallenge',
+          args: [challengerAddress as `0x${string}`]
+        });
+        const txHash = await smartWalletClient.sendTransaction({
+          to: CONTRACT_ADDRESS as `0x${string}`,
+          data: data,
+          value: BigInt(0)
+        });
+        if (!publicClient) throw new Error("Public client not available");
+        await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+      } else {
+        const hash = await writeContractAsync({
+          address: CONTRACT_ADDRESS,
+          abi: CONTRACT_ABI,
+          functionName: 'joinChallenge',
+          args: [challengerAddress as `0x${string}`],
+        });
+        if (!publicClient) throw new Error("Public client not available");
+        await publicClient.waitForTransactionReceipt({ hash });
+      }
 
       const res = await fetch('/api/games/join', {
         method: 'POST',
