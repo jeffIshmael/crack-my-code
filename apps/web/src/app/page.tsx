@@ -220,6 +220,19 @@ export default function Home() {
     };
   }, [address]);
 
+  const updateBackendPoints = useCallback(async (rDelta: number, pDelta: number) => {
+    if (!address) return;
+    try {
+      await fetch('/api/users/update-points', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address, ratingDelta: rDelta, pointsDelta: pDelta })
+      });
+    } catch (err) {
+      console.error('Failed to update points on backend', err);
+    }
+  }, [address]);
+
   // ─── Real-time Gameplay Logic ───────────────────────────────────────────
 
   useEffect(() => {
@@ -237,12 +250,33 @@ export default function Home() {
         const newGuesses = [...prev.opponentGuesses, entry];
 
         if (isWinningClues(data.clues)) {
+          const delta = prev.gameMode === 'ai' ? -5 : -15;
+          const pointsDelta = delta * 2;
+          
+          updateBackendPoints(delta, pointsDelta);
+
+          // Reveal code on loss
+          fetch('/api/games/reveal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' })
+          })
+            .then(res => res.json())
+            .then(revealData => {
+              setGs(curr => ({
+                ...curr,
+                opponentGuesses: newGuesses,
+                phase: 'result',
+                result: 'lose',
+                ratingDelta: delta,
+                opponentCurrentInput: [],
+                opponentCode: revealData.opponentCode || []
+              }));
+            });
+
           return {
             ...prev,
             opponentGuesses: newGuesses,
-            phase: 'result',
-            result: 'lose',
-            ratingDelta: -15,
             opponentCurrentInput: []
           };
         }
@@ -269,8 +303,9 @@ export default function Home() {
 
   const emitTyping = (input: number[]) => {
     if (!currentGameId || gs.gameMode === 'ai') return;
-    const channel = pusherClient.channel(`private-game-${currentGameId}`);
+    const channel = pusherClient.subscribe(`private-game-${currentGameId}`);
     if (channel) {
+      // Trigger client event (must start with client-)
       channel.trigger('client-typing', { input });
     }
   };
@@ -452,14 +487,6 @@ export default function Home() {
       return;
     }
 
-    // Check if user has active challenges
-    if (mode !== 'ai' && myActiveGames.length > 0) {
-      toast.error("Active Challenge Detected", {
-        description: "You already have an active challenge. Cancel it to create a new one."
-      });
-      setActiveTab('games');
-      return;
-    }
 
     const effectiveAddress = address || 'GUEST';
     setCurrentGameId(null);
@@ -619,12 +646,16 @@ export default function Home() {
             // Win check
             if (isWinningClues(clues)) {
               clearOppTimer();
+              const delta = gs.gameMode === 'ai' ? 10 : 25;
+              const pointsDelta = delta * 2;
+              updateBackendPoints(delta, pointsDelta);
+              
               return {
                 ...prev,
                 playerGuesses: newGuesses,
                 phase: 'result',
                 result: 'win',
-                ratingDelta: gs.gameMode === 'ai' ? 10 : 25,
+                ratingDelta: delta,
                 currentInput: [],
                 opponentCode: data.opponentCode // Revealed by server
               };
@@ -633,6 +664,9 @@ export default function Home() {
             // Max guesses exhausted?
             if (newGuesses.length >= MAX_GUESSES) {
               const delta = gs.gameMode === 'ai' ? -5 : -15;
+              const pointsDelta = delta * 2;
+              updateBackendPoints(delta, pointsDelta);
+
               // Reveal the code even on loss
               fetch('/api/games/reveal', {
                 method: 'POST',
@@ -693,11 +727,18 @@ export default function Home() {
 
   const handlePlayAgain = useCallback(() => {
     clearOppTimer();
-    setGs(initialGameState(
-      gs.playerRating + (gs.ratingDelta ?? 0),
-      gs.playerPoints + (gs.gameMode === 'ai' ? 0 : (gs.ratingDelta ?? 0) * 2) // Rough points logic for now
-    ));
-  }, [gs.playerRating, gs.playerPoints, gs.ratingDelta, gs.gameMode]); // eslint-disable-line
+    const nextRating = gs.playerRating + (gs.ratingDelta ?? 0);
+    const nextPoints = gs.playerPoints + (gs.gameMode === 'ai' ? 0 : (gs.ratingDelta ?? 0) * 2);
+    
+    setGs(initialGameState(nextRating, nextPoints));
+    
+    // If it was an AI game, we can go straight back to setCode
+    if (gs.gameMode === 'ai') {
+      setTimeout(() => {
+        handleFindMatch('ai', 0, true);
+      }, 100);
+    }
+  }, [gs.playerRating, gs.playerPoints, gs.ratingDelta, gs.gameMode, handleFindMatch]);
 
   // ─── Cleanup on unmount ───────────────────────────────────────────────────
 
@@ -739,12 +780,56 @@ export default function Home() {
         />
       </motion.div>
     ) : gs.phase === 'setCode' ? (
-      <motion.div key="setcode" className="w-full" {...screenVariants}>
+      <motion.div key="setcode" className="w-full relative" {...screenVariants}>
         <SetCode
           opponentName={gs.opponentName}
           onLockCode={handleLockCode}
           isWaiting={isWaiting}
         />
+        <AnimatePresence>
+          {isWaiting && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#030C15]/80 backdrop-blur-xl p-8 text-center"
+            >
+              <div className="relative mb-8 h-24 w-24">
+                <motion.div
+                  className="absolute inset-0 rounded-full border-4 border-[var(--accent)]/20"
+                />
+                <motion.div
+                  className="absolute inset-0 rounded-full border-4 border-t-[var(--accent)]"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
+                />
+                <motion.div
+                  className="absolute inset-0 flex items-center justify-center"
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  <ShieldCheck size={40} className="text-[var(--accent)]" />
+                </motion.div>
+              </div>
+              
+              <h3 className="font-orbitron text-2xl font-black tracking-widest text-white uppercase mb-2">Synchronizing...</h3>
+              <p className="text-sm text-[var(--text-dim)] uppercase tracking-widest max-w-xs mx-auto mb-8">
+                Waiting for <span className="text-[var(--accent)]">{gs.opponentName}</span> to finalize their encryption code.
+              </p>
+              
+              <div className="flex gap-2">
+                {[0, 1, 2].map((i) => (
+                  <motion.div
+                    key={i}
+                    className="h-2 w-2 rounded-full bg-[var(--accent)]"
+                    animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
+                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
+                  />
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     ) : (gs.phase === 'playing' || gs.phase === 'result' || gs.phase === 'countdown') ? (
       <motion.div key="game" className="w-full h-full pb-10" {...screenVariants}>
@@ -810,6 +895,13 @@ export default function Home() {
 
   const handleJoinChallenge = async (gameId: string, challengerAddress: string) => {
     if (!isConnected || !address) return;
+    
+    // Prevent joining own challenge
+    if (challengerAddress.toLowerCase() === address.toLowerCase()) {
+      toast.error("Invalid Action", { description: "You cannot join your own challenge." });
+      return;
+    }
+
     setIsJoining(gameId);
     try {
       let actualChallenger = challengerAddress;
@@ -954,7 +1046,7 @@ export default function Home() {
                           <span className="text-sm font-black text-[var(--orange)]">{game.stake} USDT</span>
                         </div>
                       )}
-                      {game.player1Address === address ? (
+                      {game.player1Address.toLowerCase() === address.toLowerCase() ? (
                         <div className="rounded-xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-[var(--orange)] opacity-80">
                           Hosting
                         </div>

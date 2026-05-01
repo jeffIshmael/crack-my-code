@@ -148,8 +148,9 @@ contract GuessMyCode is
     {
         if (players[msg.sender].registeredAt == 0) register();
 
-        require(activeMatchOf[msg.sender]   == bytes32(0), "CB: finish current match first");
-        require(challengeBoard[msg.sender]  == bytes32(0), "CB: cancel existing challenge first");
+        // Restrictions removed: multiple concurrent matches and challenges allowed
+        // require(activeMatchOf[msg.sender]   == bytes32(0), "CB: finish current match first");
+        // require(challengeBoard[msg.sender]  == bytes32(0), "CB: cancel existing challenge first");
 
         if (isPaid) {
             require(stakeAmt >= MIN_STAKE, "CB: stake below 0.1 USDT minimum");
@@ -188,7 +189,8 @@ contract GuessMyCode is
         if (players[msg.sender].registeredAt == 0) register();
 
         require(msg.sender != challenger,                   "CB: cannot join own challenge");
-        require(activeMatchOf[msg.sender] == bytes32(0),    "CB: finish current match first");
+        // Restriction removed: multiple concurrent matches allowed
+        // require(activeMatchOf[msg.sender] == bytes32(0),    "CB: finish current match first");
 
         bytes32 matchId = challengeBoard[challenger];
         require(matchId != bytes32(0),                                  "CB: no open challenge");
@@ -206,8 +208,9 @@ contract GuessMyCode is
         m.status    = MatchStatus.Active;
         m.startedAt = block.timestamp;
 
-        activeMatchOf[challenger] = matchId;
-        activeMatchOf[msg.sender] = matchId;
+        // activeMatchOf is deprecated
+        // activeMatchOf[challenger] = matchId;
+        // activeMatchOf[msg.sender] = matchId;
 
         players[challenger].matchIds.push(matchId);
         players[msg.sender].matchIds.push(matchId);
@@ -290,8 +293,9 @@ contract GuessMyCode is
         m.status  = MatchStatus.Completed;
         m.endedAt = block.timestamp;
 
-        delete activeMatchOf[m.player1];
-        delete activeMatchOf[m.player2];
+        // activeMatchOf is deprecated
+        // delete activeMatchOf[m.player1];
+        // delete activeMatchOf[m.player2];
 
         emit MatchCompleted(matchId, winner, loser, payout, fee, m.matchType);
     }
@@ -326,8 +330,9 @@ contract GuessMyCode is
         m.status  = MatchStatus.Abandoned;
         m.endedAt = block.timestamp;
 
-        delete activeMatchOf[m.player1];
-        delete activeMatchOf[m.player2];
+        // activeMatchOf is deprecated
+        // delete activeMatchOf[m.player1];
+        // delete activeMatchOf[m.player2];
 
         emit MatchAbandoned(matchId, quitter, opponent);
     }
