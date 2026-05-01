@@ -917,7 +917,11 @@ export default function Home() {
         }
       }
 
-      // --- ON-CHAIN: Join Challenge ---
+      console.log("DEBUG: Bypassing on-chain joinChallenge for debugging. Challenger:", actualChallenger);
+      toast.info("Debug: Bypassing on-chain transaction");
+
+      // --- ON-CHAIN: Join Challenge (BYPASSED) ---
+      /*
       let receipt;
       if (smartWalletClient) {
         console.log("Using Smart Wallet for joining challenge");
@@ -944,6 +948,7 @@ export default function Home() {
         if (!publicClient) throw new Error("Public client not available");
         receipt = await publicClient.waitForTransactionReceipt({ hash });
       }
+      */
 
       const res = await fetch('/api/games/join', {
         method: 'POST',
