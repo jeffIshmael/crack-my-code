@@ -7,6 +7,7 @@ import { createConfig, WagmiProvider } from "@privy-io/wagmi";
 import { http, useConnect } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
+import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 
 
 
@@ -59,7 +60,9 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           supportedChains: [celo, celoSepolia],
         }}
       >
-        <WagmiProviderWrapper>{children}</WagmiProviderWrapper>
+        <SmartWalletsProvider>
+          <WagmiProviderWrapper>{children}</WagmiProviderWrapper>
+        </SmartWalletsProvider>
       </PrivyProvider>
     </QueryClientProvider>
   );

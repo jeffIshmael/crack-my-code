@@ -326,7 +326,7 @@ export default function Home() {
     setGs((prev: GameState) => ({
       ...prev,
       phase: 'setCode',
-      opponentName: opponentAddress === 'AI_BOT' ? 'Neural_X' : opponentAddress.slice(0, 6),
+      opponentName: opponentAddress === 'AI_BOT' ? 'Cipher' : opponentAddress.slice(0, 6),
       playerCode: [],
       playerGuesses: [],
       opponentGuesses: [],
@@ -387,7 +387,7 @@ export default function Home() {
       phase: 'matchmaking',
       gameMode: mode,
       stakeAmount: stake,
-      opponentName: mode === 'ai' ? 'Neural_X' : 'Searching...'
+      opponentName: mode === 'ai' ? 'Cipher' : 'Searching...'
     }));
 
     try {
