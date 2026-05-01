@@ -264,43 +264,63 @@ export default function Lobby({
             </>
           )}
 
-          {/* Incoming Invite Alert (for unauthenticated or just landed) */}
-          {!isMatchmaking && gameId && !isCreating && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="mt-4 rounded-[2rem] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-8 text-center shadow-[0_0_30px_rgba(0,207,255,0.1)]"
-            >
-              <div className="flex flex-col items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
-                  <ShieldCheck size={24} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <h3 className="font-orbitron text-sm font-black tracking-widest text-white uppercase">Duel Invitation</h3>
-                  <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">
-                    You've been invited to a private codebreaking match.
-                  </p>
-                </div>
-                {!isConnected ? (
-                  <button
-                    onClick={() => login()}
-                    className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[#030C15] transition-transform active:scale-95 shadow-[0_0_20px_rgba(0,207,255,0.2)]"
-                  >
-                    SIGN IN TO JOIN
-                  </button>
-                ) : (
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="h-1 w-12 rounded-full bg-[var(--accent)]/20 animate-pulse" />
-                    <span className="text-[8px] font-black text-[var(--accent)] uppercase tracking-widest">Auto-joining match...</span>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          )}
         </motion.div>
       </motion.div>
 
       <div className="h-2" />
+
+      {/* ── Incoming Invite Modal ── */}
+      <AnimatePresence>
+        {!isMatchmaking && gameId && !isCreating && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="absolute inset-0 bg-[#030C15]/90 backdrop-blur-xl"
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.9, y: 20 }}
+              className="relative w-full max-w-sm rounded-[2.5rem] border border-[var(--accent)]/30 bg-[#0A121A] p-8 shadow-[0_0_50px_rgba(0,207,255,0.2)]"
+            >
+              <div className="flex flex-col items-center gap-6 text-center">
+                <div className="relative">
+                  <div className="absolute inset-0 animate-pulse bg-[var(--accent)]/20 blur-2xl rounded-full" />
+                  <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                    <ShieldCheck size={32} />
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <h2 className="font-orbitron text-xl font-black tracking-widest text-white uppercase">Duel Invitation</h2>
+                  <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">
+                    You have been summoned to a private codebreaking match.
+                  </p>
+                </div>
+
+                {!isConnected ? (
+                  <button
+                    onClick={() => login()}
+                    className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[#030C15] transition-transform active:scale-95 shadow-[0_0_20px_rgba(0,207,255,0.3)]"
+                  >
+                    SIGN IN TO ACCEPT
+                  </button>
+                ) : (
+                  <div className="flex flex-col items-center gap-4 py-2">
+                    <div className="flex items-center gap-2">
+                      <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-ping" />
+                      <span className="text-[10px] font-black text-[var(--accent)] uppercase tracking-[0.2em]">Authenticating...</span>
+                    </div>
+                    <span className="text-[8px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Initializing secure connection</span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ── PvP Mode Selection Bottom Sheet ── */}
       <AnimatePresence>
@@ -327,7 +347,26 @@ export default function Lobby({
               <div className="absolute top-3 left-1/2 h-1.5 w-12 -translate-x-1/2 rounded-full bg-white/10" />
 
               <AnimatePresence mode="wait">
-                {pvpStep === 'selection' ? (
+                {isCreating ? (
+                  <motion.div
+                    key="creating-loader"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col items-center justify-center py-12 gap-6"
+                  >
+                    <div className="relative h-20 w-20">
+                      <div className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/20" />
+                      <div className="absolute inset-0 rounded-full border-t-2 border-[var(--accent)] animate-spin" />
+                      <div className="absolute inset-4 rounded-full border-2 border-[var(--orange)]/20" />
+                      <div className="absolute inset-4 rounded-full border-b-2 border-[var(--orange)] animate-spin-slow" />
+                    </div>
+                    <div className="flex flex-col items-center gap-2">
+                      <span className="font-orbitron text-xs font-black tracking-[0.3em] text-white">INITIALIZING ON-CHAIN</span>
+                      <span className="text-[8px] font-bold text-[var(--text-dim)] uppercase tracking-widest animate-pulse">Waiting for network confirmation...</span>
+                    </div>
+                  </motion.div>
+                ) : pvpStep === 'selection' ? (
                   <motion.div
                     key="step-selection"
                     initial={{ opacity: 0, x: -10 }}

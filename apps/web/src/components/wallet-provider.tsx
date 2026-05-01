@@ -60,7 +60,14 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
           supportedChains: [celo, celoSepolia],
         }}
       >
-        <SmartWalletsProvider>
+        <SmartWalletsProvider
+          config={{
+            paymasterContext: {
+              mode: 'SPONSORED',
+              calculateGasLimits: true,
+            }
+          }}
+        >
           <WagmiProviderWrapper>{children}</WagmiProviderWrapper>
         </SmartWalletsProvider>
       </PrivyProvider>

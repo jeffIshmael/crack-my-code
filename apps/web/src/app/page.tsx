@@ -174,10 +174,13 @@ export default function Home() {
   useEffect(() => {
     const inviteId = searchParams.get('invite');
     if (inviteId && address && isConnected && gs.phase === 'lobby') {
+      // If using Privy, wait for smartWalletClient to be ready if it's supposed to be there
+      if (authenticated && !smartWalletClient) return;
+      
       // Auto-join if user is connected
       handleJoinChallenge(inviteId, 'INVITE_LINK');
     }
-  }, [searchParams, address, isConnected]); // eslint-disable-line
+  }, [searchParams, address, isConnected, smartWalletClient, authenticated]); // eslint-disable-line
 
   // 1.8 Countdown Timer
   useEffect(() => {
@@ -823,7 +826,9 @@ export default function Home() {
       }
 
       // --- ON-CHAIN: Join Challenge ---
+      let receipt;
       if (smartWalletClient) {
+        console.log("Using Smart Wallet for joining challenge");
         const data = encodeFunctionData({
           abi: CONTRACT_ABI,
           functionName: 'joinChallenge',
@@ -835,8 +840,9 @@ export default function Home() {
           value: BigInt(0)
         });
         if (!publicClient) throw new Error("Public client not available");
-        await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+        receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
       } else {
+        console.log("Using Standard Wallet for joining challenge");
         const hash = await writeContractAsync({
           address: CONTRACT_ADDRESS,
           abi: CONTRACT_ABI,
@@ -844,7 +850,7 @@ export default function Home() {
           args: [actualChallenger as `0x${string}`],
         });
         if (!publicClient) throw new Error("Public client not available");
-        await publicClient.waitForTransactionReceipt({ hash });
+        receipt = await publicClient.waitForTransactionReceipt({ hash });
       }
 
       const res = await fetch('/api/games/join', {
@@ -866,7 +872,7 @@ export default function Home() {
   };
   const renderOpenGames = () => (
     <motion.div key="games" className="flex w-full flex-col gap-10 px-5 pt-12 pb-48 text-left" {...screenVariants}>
-      {!isConnected ? (
+      {!address ? (
         <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
           <div className="text-6xl grayscale opacity-30">🛡️</div>
           <div className="flex flex-col gap-2">
@@ -1068,7 +1074,7 @@ export default function Home() {
         <p className="text-xs text-[var(--text-dim)] uppercase tracking-widest">Secure Account & Assets</p>
       </div>
 
-      {!authenticated ? (
+      {!address ? (
         <div className="flex flex-col items-center justify-center gap-6 py-12 text-center bg-white/5 rounded-[2.5rem] border border-white/10 p-10">
           <div className="text-6xl grayscale opacity-30">🛡️</div>
           <div className="flex flex-col gap-2">
