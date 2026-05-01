@@ -23,9 +23,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Identify target code (guessing against the OTHER player)
-    const opponentCodeStr = game.player1Address === playerAddress 
-        ? game.player2Code 
-        : game.player1Code;
+    const opponentCodeStr = game.player1Address === playerAddress
+      ? game.player2Code
+      : game.player1Code;
 
     if (!opponentCodeStr) {
       return NextResponse.json({ error: 'Opponent has not set their code yet' }, { status: 400 });
@@ -44,12 +44,7 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    // Notify the opponent
-    await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
-      digits,
-      clues,
-      sender: playerAddress
-    });
+
 
     const isWin = clues.filter(c => c === 'green').length === 4;
     let revealCode = null;
@@ -74,12 +69,23 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // Decrement opponent rating in PVP
+      const opponentAddress = game.player1Address === playerAddress ? game.player2Address : game.player1Address;
+      if (opponentAddress && opponentAddress !== 'GUEST' && opponentAddress !== 'AI_BOT') {
+        await prisma.user.update({
+          where: { address: opponentAddress },
+          data: {
+            rating: { decrement: 15 }
+          }
+        });
+      }
+
       // --- ON-CHAIN: Resolve Match ---
       if ((game as any).onChainMatchId && game.mode !== 'ai') {
         try {
           const p1GuessCount = await prisma.guess.count({ where: { gameId, isPlayer: true } });
           const p2GuessCount = await prisma.guess.count({ where: { gameId, isPlayer: false } });
-          
+
           await resolveMatchOnChain(
             (game as any).onChainMatchId as `0x${string}`,
             playerAddress as `0x${string}`,
@@ -100,9 +106,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    return NextResponse.json({ 
-      success: true, 
-      clues, 
+    // Notify the opponent
+    await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
+      digits,
+      clues,
+      sender: playerAddress,
+      revealCode: isWin ? opponentCode : undefined
+    });
+
+    return NextResponse.json({
+      success: true,
+      clues,
       opponentCode: revealCode,
       winnerAddress: winner
     });
@@ -111,3 +125,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to sync guess' }, { status: 500 });
   }
 }
+
+ 

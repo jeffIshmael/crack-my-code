@@ -5,6 +5,16 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest) {
   try {
+    const { searchParams } = new URL(req.url);
+    const id = searchParams.get('id');
+
+    if (id) {
+      const game = await prisma.game.findUnique({
+        where: { id }
+      });
+      return NextResponse.json(game);
+    }
+
     const games = await prisma.game.findMany({
       where: {
         status: 'PENDING',

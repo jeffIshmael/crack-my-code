@@ -39,10 +39,12 @@ export function ConnectButton({ onWalletClick }: ConnectButtonProps) {
   }, [address]);
 
   useEffect(() => {
-    if (authenticated && address) {
+    if ((authenticated || isConnected) && address) {
       fetchPoints();
     }
-  }, [authenticated, address, fetchPoints]);
+  }, [authenticated, isConnected, address, fetchPoints]);
+
+  const isSyncIssue = authenticated && isConnected && wagmiAddress !== user?.wallet?.address;
 
   if (!authenticated && !isConnected) {
     return (
@@ -66,18 +68,24 @@ export function ConnectButton({ onWalletClick }: ConnectButtonProps) {
         </span>
       </div>
 
+      {isSyncIssue && (
+        <div className="flex items-center gap-2 rounded-full bg-red-500/10 px-3 py-1 border border-red-500/20">
+          <span className="text-[8px] font-black text-red-400 uppercase tracking-tighter">Sync Required</span>
+        </div>
+      )}
+
       {/* USDT Balance (Right Side) */}
-      <div 
+      <div
         onClick={onWalletClick}
         className="flex items-center gap-3 rounded-full border border-white/10 bg-white/5 px-4 py-2 cursor-pointer transition-colors hover:bg-white/10 group"
       >
-         <span className="text-[10px] font-black tracking-widest text-[var(--accent)]">
-            {usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)}` : '...'} <span className="text-[8px] opacity-70 text-white">USDT</span>
-         </span>
-         {/* Wallet Icon */}
-         <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)] transition-transform group-hover:scale-110">
-           <Wallet size={12} />
-         </div>
+        <span className="text-[10px] font-black tracking-widest text-[var(--accent)]">
+          {usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)}` : '...'} <span className="text-[8px] opacity-70 text-white">USDT</span>
+        </span>
+        {/* Wallet Icon */}
+        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)]/10 text-[var(--accent)] transition-transform group-hover:scale-110">
+          <Wallet size={12} />
+        </div>
       </div>
     </div>
   );

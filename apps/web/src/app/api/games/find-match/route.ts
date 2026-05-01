@@ -6,7 +6,7 @@ import { pusherServer } from '@/lib/pusher-server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { address, mode, stake, onChainMatchId } = await req.json();
+    const { address, mode, stake, onChainMatchId, isPublic = true } = await req.json();
 
     const isAI = mode === 'ai';
     const effectiveAddress = address || (isAI ? 'GUEST' : null);
@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
         where: {
           status: 'PENDING',
           mode: 'fun',
+          isPublic: true,
           player2Address: null,
           player1Address: { not: address }
         }
@@ -89,13 +90,13 @@ export async function POST(req: NextRequest) {
         stake: parseFloat(stake) || 0,
         onChainMatchId: onChainMatchId || null,
         status: isAI ? 'ACTIVE' : 'PENDING',
-        isPublic: !isAI,
+        isPublic: isAI ? false : isPublic,
         player2Address: isAI ? 'AI' : null,
         player2Code: aiCode
       }
     });
-
-    if (!isAI) {
+    
+    if (!isAI && isPublic) {
        // Broadcast to everyone that a new challenge is on the board
        try {
          await pusherServer.trigger('lobby-channel', 'challenge-created', {

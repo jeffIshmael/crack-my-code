@@ -1,7 +1,8 @@
-// ─── Types ───────────────────────────────────────────────────────────────────
+// ─── Types and Interfaces ───────────────────────────────────────────────────────
+// Added countdown phase for better pre-game sync.
 
 export type Clue = 'green' | 'yellow' | 'gray';
-export type GamePhase = 'lobby' | 'matchmaking' | 'setCode' | 'playing' | 'result';
+export type GamePhase = 'lobby' | 'matchmaking' | 'setCode' | 'playing' | 'result' | 'countdown';
 export type GameMode = 'ai' | 'fun' | 'cash';
 export type GameResult = 'win' | 'lose' | 'draw' | null;
 

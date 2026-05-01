@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { usePrivy } from "@privy-io/react-auth";
 import { ConnectButton } from "@/components/connect-button";
 import type { GameMode } from '@/lib/game';
 import { pusherClient } from '@/lib/pusher-client';
@@ -11,15 +12,19 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../b
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
+import { ShieldCheck } from 'lucide-react';
 
 interface LobbyProps {
   rating: number;
   points: number;
   isMatchmaking: boolean;
   opponentName: string;
-  onFindMatch: (mode: GameMode, stake: number) => Promise<void>;
+  onFindMatch: (mode: GameMode, stake: number, isPublic?: boolean) => Promise<void>;
   onMatchFound: (gameId: string, opponentAddress: string) => void;
   onWalletClick?: () => void;
+  searchTime?: number;
+  onCancelMatchmaking?: () => void;
+  gameId?: string;
 }
 
 const stagger = {
@@ -30,15 +35,27 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export default function Lobby({ rating, points, isMatchmaking, opponentName, onFindMatch, onMatchFound, onWalletClick }: LobbyProps) {
+export default function Lobby({ 
+  rating, 
+  points, 
+  isMatchmaking, 
+  opponentName, 
+  onFindMatch, 
+  onMatchFound, 
+  onWalletClick, 
+  searchTime = 0, 
+  onCancelMatchmaking,
+  gameId
+}: LobbyProps) {
   const { isConnected, address } = useAccount();
+  const { login } = usePrivy();
   const { data: usdtData } = useBalance({
     address,
     token: USDT_ADDRESS as `0x${string}`,
   });
 
   const [showPvPModal, setShowPvPModal] = useState(false);
-  const [pvpStep, setPvpStep] = useState<'selection' | 'config'>('selection');
+  const [pvpStep, setPvpStep] = useState<'selection' | 'config' | 'visibility'>('selection');
   const [selectedMode, setSelectedMode] = useState<GameMode>('fun');
   const [stake, setStake] = useState<string>('5');
   const [isCreating, setIsCreating] = useState(false);
@@ -87,14 +104,10 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
     try {
       return parseUnits(stake || '0', 6);
     } catch {
-      return BigInt(0);
+      return 0n;
     }
   }, [stake]);
 
-  const needsApproval = useMemo(() => {
-    if (selectedMode !== 'cash') return false;
-    return allowance < stakeBigInt;
-  }, [selectedMode, allowance, stakeBigInt]);
   // 3. Subscribe to User-specific Match Found events
   useEffect(() => {
     if (!address) return;
@@ -109,10 +122,20 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
     };
   }, [address, onMatchFound]);
 
-  const handleStartPvP = async (mode: GameMode) => {
+  const handleStartPvP = (mode: GameMode) => {
+    setSelectedMode(mode);
+    if (mode === 'cash') {
+      setPvpStep('config');
+    } else {
+      setPvpStep('visibility');
+    }
+  };
+
+  const handleFinalizeChallenge = async (isPublic: boolean) => {
     setIsCreating(true);
     try {
-      await onFindMatch(mode, mode === 'cash' ? parseFloat(stake) || 0 : 0);
+      const stakeAmount = selectedMode === 'cash' ? parseFloat(stake) || 0 : 0;
+      await onFindMatch(selectedMode, stakeAmount, isPublic);
       setShowPvPModal(false);
       setPvpStep('selection'); // Reset for next time
     } finally {
@@ -164,7 +187,34 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
         {/* Primary CTA Buttons */}
         <motion.div variants={fadeUp} className="flex w-full max-w-sm flex-col gap-10 pt-16">
           {isMatchmaking ? (
-            <MatchmakingPulse opponentName={opponentName} mode={selectedMode} />
+            opponentName === 'WAITING' ? (
+              gameId ? (
+                <InviteWaiting 
+                  searchTime={searchTime}
+                  onCancel={onCancelMatchmaking}
+                  gameId={gameId} 
+                  isCreating={isCreating}
+                />
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                  <div className="relative h-16 w-16">
+                    <div className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/20" />
+                    <div className="absolute inset-0 rounded-full border-t-2 border-[var(--accent)] animate-spin" />
+                  </div>
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-orbitron text-[10px] font-black tracking-[0.2em] text-[var(--accent)]">GENERATING LINK</span>
+                    <span className="text-[8px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Encrypting match parameters...</span>
+                  </div>
+                </div>
+              )
+            ) : (
+              <MatchmakingPulse 
+                opponentName={opponentName} 
+                mode={selectedMode} 
+                searchTime={searchTime}
+                onCancel={onCancelMatchmaking}
+              />
+            )
           ) : (
             <>
               <button
@@ -212,6 +262,40 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
                 )}
               </button>
             </>
+          )}
+
+          {/* Incoming Invite Alert (for unauthenticated or just landed) */}
+          {!isMatchmaking && gameId && !isCreating && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mt-4 rounded-[2rem] border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-8 text-center shadow-[0_0_30px_rgba(0,207,255,0.1)]"
+            >
+              <div className="flex flex-col items-center gap-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                  <ShieldCheck size={24} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <h3 className="font-orbitron text-sm font-black tracking-widest text-white uppercase">Duel Invitation</h3>
+                  <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">
+                    You've been invited to a private codebreaking match.
+                  </p>
+                </div>
+                {!isConnected ? (
+                  <button
+                    onClick={() => login()}
+                    className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[#030C15] transition-transform active:scale-95 shadow-[0_0_20px_rgba(0,207,255,0.2)]"
+                  >
+                    SIGN IN TO JOIN
+                  </button>
+                ) : (
+                  <div className="flex flex-col items-center gap-2">
+                    <div className="h-1 w-12 rounded-full bg-[var(--accent)]/20 animate-pulse" />
+                    <span className="text-[8px] font-black text-[var(--accent)] uppercase tracking-widest">Auto-joining match...</span>
+                  </div>
+                )}
+              </div>
+            </motion.div>
           )}
         </motion.div>
       </motion.div>
@@ -271,7 +355,7 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
 
                       {/* Paid Option */}
                       <button
-                        onClick={() => { setSelectedMode('cash'); setPvpStep('config'); }}
+                        onClick={() => handleStartPvP('cash')}
                         className="group flex flex-col gap-2 rounded-2xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 p-5 text-left transition-all hover:bg-[var(--orange)]/10"
                       >
                         <div className="flex items-center justify-between">
@@ -282,7 +366,7 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
                       </button>
                     </div>
                   </motion.div>
-                ) : (
+                ) : pvpStep === 'config' ? (
                   <motion.div
                     key="step-config"
                     initial={{ opacity: 0, x: 10 }}
@@ -334,35 +418,67 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
                         </div>
                       </div>
 
-                      <div className="flex gap-3">
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={() => allowance < stakeBigInt ? handleApprove(stakeBigInt) : setPvpStep('visibility')}
+                          disabled={isApproving || isCreating}
+                          className="w-full rounded-2xl bg-[var(--orange)] py-4 text-[10px] font-black uppercase tracking-widest text-[#030C15] shadow-[0_0_20px_rgba(255,107,43,0.2)] disabled:opacity-50"
+                        >
+                          {isApproving ? 'APPROVING...' : (allowance < stakeBigInt ? 'APPROVE USDT' : 'SET VISIBILITY')}
+                        </button>
                         <button
                           onClick={() => setPvpStep('selection')}
-                          className="flex-1 rounded-2xl border border-white/10 bg-white/5 py-5 font-black text-[10px] uppercase tracking-widest hover:bg-white/10 transition-colors"
+                          className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/10"
                         >
-                          Back
+                          GO BACK
                         </button>
-                        {needsApproval ? (
-                          <button
-                            onClick={async () => {
-                              await handleApprove(stakeBigInt);
-                            }}
-                            disabled={isApproving || isCreating}
-                            className="flex-[2] rounded-2xl bg-gradient-to-r from-[var(--orange)] to-[#FF8A00] py-5 font-orbitron font-black text-xs tracking-widest text-[#030C15] disabled:opacity-50"
-                            style={{ boxShadow: '0 8px 25px rgba(255,138,0,0.3)' }}
-                          >
-                            {isApproving ? 'APPROVING...' : 'APPROVE USDT'}
-                          </button>
-                        ) : (
-                          <button
-                            onClick={() => handleStartPvP('cash')}
-                            disabled={isCreating}
-                            className="flex-[2] rounded-2xl bg-gradient-to-r from-[var(--orange)] to-[#FF8A00] py-5 font-orbitron font-black text-xs tracking-widest text-[#030C15] disabled:opacity-50"
-                            style={{ boxShadow: '0 8px 25px rgba(255,138,0,0.3)' }}
-                          >
-                            {isCreating ? 'CREATING...' : 'SEARCH OPPONENT'}
-                          </button>
-                        )}
                       </div>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="step-visibility"
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="flex flex-col gap-8"
+                  >
+                    <div className="text-center">
+                      <h2 className="font-orbitron text-lg font-black tracking-[0.2em] text-[var(--accent)]">CHALLENGE VISIBILITY</h2>
+                      <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest pt-1">Who can accept this duel?</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4">
+                      <button
+                        onClick={() => handleFinalizeChallenge(true)}
+                        disabled={isCreating}
+                        className="group flex flex-col gap-2 rounded-2xl border border-white/5 bg-white/5 p-5 text-left transition-all hover:bg-white/[0.08] disabled:opacity-50"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-orbitron text-sm font-black tracking-wider text-white">ANYONE CAN JOIN</span>
+                          <span className="text-xl">🌍</span>
+                        </div>
+                        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Public challenge • Visible on Global Board</p>
+                      </button>
+
+                      <button
+                        onClick={() => handleFinalizeChallenge(false)}
+                        disabled={isCreating}
+                        className="group flex flex-col gap-2 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-5 text-left transition-all hover:bg-[var(--accent)]/10 disabled:opacity-50"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="font-orbitron text-sm font-black tracking-wider text-[var(--accent)]">INVITE ONLY</span>
+                          <span className="text-xl">🔐</span>
+                        </div>
+                        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Private challenge • Generate secret link</p>
+                      </button>
+
+                      <button 
+                        onClick={() => selectedMode === 'cash' ? setPvpStep('config') : setPvpStep('selection')}
+                        className="mt-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] hover:text-white transition-colors"
+                      >
+                        GO BACK
+                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -380,7 +496,17 @@ export default function Lobby({ rating, points, isMatchmaking, opponentName, onF
 
 // ─── Radar matchmaking animation ────────────────────────────────────────────
 
-function MatchmakingPulse({ opponentName, mode }: { opponentName: string, mode: GameMode }) {
+function MatchmakingPulse({ 
+  opponentName, 
+  mode, 
+  searchTime = 0, 
+  onCancel 
+}: { 
+  opponentName: string, 
+  mode: GameMode, 
+  searchTime?: number, 
+  onCancel?: () => void 
+}) {
   const isAI = mode === 'ai';
 
   return (
@@ -417,17 +543,35 @@ function MatchmakingPulse({ opponentName, mode }: { opponentName: string, mode: 
           {isAI ? 'INITIALIZING AI' : 'FINDING OPPONENT'}
         </p>
         <motion.p
-          className="text-xs"
-          style={{ color: 'var(--text-2)' }}
-          animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1.4, repeat: Infinity }}
-        >
-          {isAI ? 'Booting logical engine' : 'Scanning for challengers'}
-          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}>.</motion.span>
-          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.6 }}>.</motion.span>
-          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.8 }}>.</motion.span>
-        </motion.p>
-      </div>
+           className="text-xs"
+           style={{ color: 'var(--text-2)' }}
+           animate={{ opacity: [0.4, 1, 0.4] }}
+           transition={{ duration: 1.4, repeat: Infinity }}
+         >
+           {isAI ? 'Booting logical engine' : 'Scanning for challengers'}
+           <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}>.</motion.span>
+           <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.6 }}>.</motion.span>
+           <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.8 }}>.</motion.span>
+         </motion.p>
+ 
+         {/* Live Timer */}
+         {!isAI && (
+           <div className="mt-4 flex flex-col items-center gap-4">
+             <div className="rounded-full border border-white/10 bg-white/5 px-4 py-1">
+               <span className="font-code text-sm font-black text-[var(--accent)]">
+                 {Math.floor(searchTime / 60)}:{(searchTime % 60).toString().padStart(2, '0')}
+               </span>
+             </div>
+             
+             <button
+               onClick={onCancel}
+               className="rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 active:scale-95"
+             >
+               CANCEL SEARCH
+             </button>
+           </div>
+         )}
+       </div>
 
       {/* Found opponent indicator */}
       {!isAI && (
@@ -450,6 +594,69 @@ function MatchmakingPulse({ opponentName, mode }: { opponentName: string, mode: 
           <span className="text-xs" style={{ color: 'var(--text-2)' }}>found</span>
         </motion.div>
       )}
+    </div>
+  );
+}
+
+function InviteWaiting({ 
+  searchTime, 
+  onCancel,
+  gameId,
+  isCreating
+}: { 
+  searchTime: number, 
+  onCancel?: () => void,
+  gameId: string,
+  isCreating?: boolean
+}) {
+  const [copied, setCopied] = useState(false);
+  const inviteUrl = typeof window !== 'undefined' ? `${window.location.origin}/?invite=${gameId}` : '';
+  const timeLeft = Math.max(0, 300 - searchTime); // 5 minutes
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(inviteUrl);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+    toast.success("Link Copied!");
+  };
+
+  return (
+    <div className="flex flex-col items-center gap-8 py-4">
+      <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-[var(--accent)]/10">
+         <span className="text-4xl animate-bounce">⏳</span>
+         <motion.div 
+           className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/30 border-t-[var(--accent)]"
+           animate={{ rotate: 360 }}
+           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+         />
+      </div>
+
+      <div className="flex flex-col items-center gap-2 text-center">
+        <h3 className="font-orbitron text-base font-black tracking-widest text-[var(--accent)] uppercase">Waiting for Friend</h3>
+        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest max-w-[200px]">
+          Share the link below. The match will expire in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}.
+        </p>
+      </div>
+
+      <div className="flex w-full max-w-[300px] flex-col gap-3">
+        <div 
+          onClick={handleCopy}
+          className="relative flex cursor-pointer items-center justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 transition-all hover:bg-white/10"
+        >
+          <span className="truncate pr-4 text-[10px] font-bold text-[var(--text-dim)]">{inviteUrl}</span>
+          <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">
+            {copied ? 'COPIED' : 'COPY'}
+          </span>
+        </div>
+
+        <button
+          onClick={onCancel}
+          disabled={isCreating}
+          className="rounded-2xl border border-red-500/30 bg-red-500/10 py-4 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 disabled:opacity-50"
+        >
+          {isCreating ? 'CANCELLING...' : 'CANCEL INVITE'}
+        </button>
+      </div>
     </div>
   );
 }
