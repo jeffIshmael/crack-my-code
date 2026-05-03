@@ -5,6 +5,7 @@ export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
 import { evaluateGuess } from '@/lib/game';
 import { resolveMatchOnChain } from '../../../../../blockchain/AgentFunctions';
+import { uploadToIPFS } from '@/lib/pinata';
 
 export async function POST(req: NextRequest) {
   try {
@@ -92,6 +93,22 @@ export async function POST(req: NextRequest) {
           });
           const guessArray = allGuesses.map(g => g.digits);
 
+          // Upload game history to IPFS via Pinata
+          const ipfsHash = await uploadToIPFS({
+            gameId,
+            player1: game.player1Address,
+            player2: game.player2Address,
+            player1Code: game.player1Code,
+            player2Code: game.player2Code,
+            winner: playerAddress,
+            guesses: allGuesses.map(g => ({
+              digits: g.digits,
+              clues: JSON.parse(g.clues),
+              isPlayer: g.isPlayer,
+              createdAt: g.createdAt
+            }))
+          });
+
           await resolveMatchOnChain(
             (game as any).onChainMatchId as `0x${string}`,
             playerAddress as `0x${string}`,
@@ -100,7 +117,7 @@ export async function POST(req: NextRequest) {
             p2GuessCount,
             game.player1Code || '',
             game.player2Code || '',
-            '', // historyHash (IPFS) - could be added here
+            ipfsHash || '', 
             guessArray
           );
 
