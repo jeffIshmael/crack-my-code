@@ -8,6 +8,7 @@ import { http, useConnect } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
+import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
 
 
 
@@ -77,6 +78,17 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 
 function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
   const { ready } = usePrivy();
+  const [isAutoConnectEnv, setIsAutoConnectEnv] = useState(false);
+
+  useEffect(() => {
+    const checkEnv = () => {
+      const isMiniPay = (window as any).ethereum?.isMiniPay;
+      const isFarcaster = (window as any).ethereum?.isFarcaster || (window as any).farcaster;
+      const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
+      setIsAutoConnectEnv(!!(isMiniPay || isFarcaster || isFarcasterUrl));
+    };
+    checkEnv();
+  }, []);
   
   const wagmiConfig = useMemo(() => {
     return createConfig({
@@ -85,11 +97,14 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
         [celo.id]: http(),
         [celoSepolia.id]: http(),
       },
+      connectors: [farcasterMiniApp()],
       ssr: true,
     });
   }, []);
 
-  if (!ready) {
+  // If we are in an auto-connect environment, we don't want to block rendering 
+  // on Privy being ready, as we'll be using the injected/farcaster provider.
+  if (!ready && !isAutoConnectEnv) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-[#03111C]">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
@@ -109,18 +124,18 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
   const { connect, connectors } = useConnect();
 
   useEffect(() => {
-    if (!ready) return;
-    
     const isMiniPay = (window as any).ethereum?.isMiniPay;
     const isFarcaster = (window as any).ethereum?.isFarcaster || (window as any).farcaster;
+    const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
 
-    if (isMiniPay || isFarcaster) {
-      const injectedConnector = connectors.find((c) => c.id === "injected");
-      if (injectedConnector) {
-        connect({ connector: injectedConnector });
+    if (isMiniPay || isFarcaster || isFarcasterUrl) {
+      const connectorId = (isFarcaster || isFarcasterUrl) ? "farcasterMiniApp" : "injected";
+      const targetConnector = connectors.find((c) => c.id === connectorId);
+      if (targetConnector) {
+        connect({ connector: targetConnector });
       }
     }
-  }, [ready, connect, connectors]);
+  }, [connect, connectors]);
 
   return <>{children}</>;
 }

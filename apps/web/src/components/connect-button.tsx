@@ -44,9 +44,31 @@ export function ConnectButton({ onWalletClick }: ConnectButtonProps) {
     }
   }, [authenticated, isConnected, address, fetchPoints]);
 
+  const [isAutoConnectEnv, setIsAutoConnectEnv] = useState(false);
+
+  useEffect(() => {
+    const isMiniPay = (window as any).ethereum?.isMiniPay;
+    const isFarcaster = (window as any).ethereum?.isFarcaster || (window as any).farcaster;
+    const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
+    setIsAutoConnectEnv(!!(isMiniPay || isFarcaster || isFarcasterUrl));
+  }, []);
+
   const isSyncIssue = authenticated && isConnected && wagmiAddress !== user?.wallet?.address;
 
   if (!authenticated && !isConnected) {
+    if (isAutoConnectEnv) {
+      return (
+        <div className="flex w-full justify-end">
+          <div className="flex items-center gap-2 rounded-full border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-6 py-2.5">
+            <div className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+            <span className="font-orbitron text-[8px] font-black tracking-widest text-[var(--accent)]">
+              CONNECTING...
+            </span>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex w-full justify-end">
         <button
