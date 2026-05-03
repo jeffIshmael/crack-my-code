@@ -1,18 +1,27 @@
 {
   "accountAssociation": {
-    "header": "eyJmaWQiOjkxNTIsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHgwMmVmNzkwRGQ3OTkzQTM1ZkQ4NDdDMDUzRURkQUU5NDBEMDU1NTk2In0",
+    "header": "eyJmaWQiOjEwNzc5MzIsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHhiYzM1OGM5OEI4OEI5Mjg4NjRlMmMzYzVkMTc2NjcxMzU0MTAzNTg3In0",
     "payload": "eyJkb21haW4iOiJjcmFjay1teS1jb2RlLnZlcmNlbC5hcHAifQ",
-    "signature": "MHgxMGQwZGU4ZGYwZDUwZTdmMGIxN2YxMTU2NDI1MjRmZTY0MTUyZGU4ZGU1MWU0MThiYjU4ZjVmZmQxYjRjNDBiNGVlZTRhNDcwNmVmNjhlMzQ0ZGQ5MDBkYmQyMmNlMmVlZGY5ZGQ0N2JlNWRmNzMwYzUxNjE4OWVjZDJjY2Y0MDFj"
+    "signature": "bEr7w6Id7aj2Qen3XJRt/0I5QgaZz0wsrOtTRB1KlQUJE/1cZEJEK4nRo4QBrSK8WwXtbqV/ijwjRLllwCU5dhs="
   },
   "miniapp": {
     "version": "1",
     "name": "Crack-My-Code",
+    "subtitle": "Crack the code and win.",
+    "description": "Set your secret code and try to crack theirs first in this fast-paced strategy game on Celo.",
     "iconUrl": "https://crack-my-code.vercel.app/logo.png",
     "homeUrl": "https://crack-my-code.vercel.app",
     "imageUrl": "https://crack-my-code.vercel.app/logo.png",
     "buttonTitle": "Play Now",
     "splashImageUrl": "https://crack-my-code.vercel.app/logo.png",
     "splashBackgroundColor": "#03111C",
+    "primaryCategory": "games",
+    "tags": [
+      "games",
+      "strategy",
+      "celo",
+      "pvp"
+    ],
     "requiredChains": [
       "eip155:42220"
     ],
