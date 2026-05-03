@@ -21,6 +21,7 @@ interface GameBoardProps {
   onDigitPress: (d: number) => void;
   onDelete: () => void;
   onSubmit: () => void;
+  turnNotification?: 'player' | 'opponent' | null;
 }
 
 export default function GameBoard({
@@ -37,20 +38,35 @@ export default function GameBoard({
   onDigitPress,
   onDelete,
   onSubmit,
+  turnNotification = null,
 }: GameBoardProps) {
   const historyRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<'player' | 'opponent'>('player');
   const canSubmit = isPlayerTurn && currentInput.length === CODE_LENGTH;
 
-  // Auto-switch view to opponent when it's their turn and they start typing
+  // Auto-switch view logic
   useEffect(() => {
     if (!isPlayerTurn && opponentCurrentInput.length > 0) {
       setView('opponent');
     }
+    // When it becomes player's turn, wait a bit before switching back
+    // so they can see the opponent's last guess result.
     if (isPlayerTurn) {
-      setView('player');
+      const timer = setTimeout(() => setView('player'), 2000);
+      return () => clearTimeout(timer);
     }
   }, [isPlayerTurn, opponentCurrentInput.length]);
+
+  // Handle turn notification transitions
+  useEffect(() => {
+    if (turnNotification === 'opponent') {
+      const timer = setTimeout(() => setView('opponent'), 800);
+      return () => clearTimeout(timer);
+    }
+    if (turnNotification === 'player') {
+      setView('player');
+    }
+  }, [turnNotification]);
 
   // Auto-scroll history to bottom
   useEffect(() => {
@@ -62,9 +78,41 @@ export default function GameBoard({
 
   return (
     <div
-      className="flex min-h-dvh flex-col"
+      className="flex min-h-dvh flex-col relative"
       style={{ maxWidth: '420px', margin: '0 auto', padding: '0 16px' }}
     >
+      <AnimatePresence>
+        {turnNotification && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 1.1, y: -20 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center pointer-events-none p-6"
+          >
+            <div 
+              className="rounded-3xl px-8 py-6 backdrop-blur-xl border shadow-2xl flex flex-col items-center gap-3 w-full max-w-[280px]"
+              style={{
+                background: turnNotification === 'player' ? 'rgba(0, 207, 255, 0.1)' : 'rgba(255, 107, 43, 0.1)',
+                borderColor: turnNotification === 'player' ? 'rgba(0, 207, 255, 0.4)' : 'rgba(255, 107, 43, 0.4)',
+                boxShadow: turnNotification === 'player' ? '0 0 40px rgba(0, 207, 255, 0.2)' : '0 0 40px rgba(255, 107, 43, 0.2)',
+              }}
+            >
+              <motion.div 
+                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 1, 0.5] }}
+                transition={{ duration: 1, repeat: Infinity }}
+                className="h-4 w-4 rounded-full"
+                style={{ background: turnNotification === 'player' ? 'var(--accent)' : 'var(--orange)' }}
+              />
+              <span className="font-orbitron text-xl font-black tracking-[0.2em] uppercase text-center" style={{ color: turnNotification === 'player' ? 'var(--accent)' : 'var(--orange)' }}>
+                {turnNotification === 'player' ? 'Your Turn' : `${opponentName}'s Turn`}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-widest opacity-50" style={{ color: turnNotification === 'player' ? 'var(--accent)' : 'var(--orange)' }}>
+                {turnNotification === 'player' ? 'Ready to crack?' : 'Interception in progress...'}
+              </span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ── Top bar ── */}
       <div className="flex items-center justify-between pb-3 pt-8">
@@ -182,39 +230,71 @@ export default function GameBoard({
       {/* ── Guess history ── */}
       <div
         ref={historyRef}
-        className="mb-3 flex flex-col gap-2 overflow-y-auto pr-1"
-        style={{ maxHeight: '220px', minHeight: '80px' }}
+        className="mb-3 flex flex-col gap-2 overflow-y-auto pr-1 relative"
+        style={{ 
+          maxHeight: '220px', 
+          minHeight: '80px',
+          background: view === 'opponent' ? 'rgba(255, 107, 43, 0.03)' : 'transparent',
+          borderRadius: '12px',
+          padding: '8px 4px'
+        }}
       >
+        {view === 'opponent' && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-[0.03] select-none overflow-hidden">
+            <span className="font-orbitron text-4xl font-black rotate-[-15deg] whitespace-nowrap">REMOTE TRACE</span>
+          </div>
+        )}
         <AnimatePresence mode="popLayout">
           {view === 'player' ? (
             playerGuesses.map((g, i) => (
-              <GuessRow key={g.id} digits={g.digits} clues={g.clues} rowIndex={i} />
+              <GuessRow key={g.id} digits={g.digits} clues={g.clues} rowIndex={i} type="player" />
             ))
           ) : (
             <>
               {opponentGuesses.map((g, i) => (
-                <GuessRow key={g.id} digits={g.digits} clues={g.clues} rowIndex={i} />
+                <GuessRow key={g.id} digits={g.digits} clues={g.clues} rowIndex={i} type="opponent" />
               ))}
-              {/* Active Tyler Row */}
-              {!isPlayerTurn && opponentCurrentInput.length > 0 && (
-                <div className="flex items-center gap-2 opacity-80">
+              {/* Active Typing Row */}
+              {!isPlayerTurn && (opponentCurrentInput.length > 0 || view === 'opponent') && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="flex items-center gap-2 py-1"
+                >
                   <span className="w-5 text-right text-xs font-medium" style={{ color: 'var(--orange)' }}>?</span>
                   <div className="flex gap-1.5">
-                    {Array.from({ length: CODE_LENGTH }).map((_, i) => (
-                      <div
-                        key={i}
-                        className="flex h-10 w-10 items-center justify-center rounded-xl"
-                        style={{ background: 'var(--bg-elevated)', border: '1px solid var(--orange)', opacity: i < opponentCurrentInput.length ? 1 : 0.3 }}
-                      >
-                        <span className="font-code text-base font-bold" style={{ color: 'var(--orange)' }}>
-                          {i < opponentCurrentInput.length ? opponentCurrentInput[i] : ''}
-                        </span>
-                      </div>
-                    ))}
+                    {Array.from({ length: CODE_LENGTH }).map((_, i) => {
+                      const filled = i < opponentCurrentInput.length;
+                      return (
+                        <motion.div
+                          key={i}
+                          className="flex h-10 w-10 items-center justify-center rounded-xl"
+                          style={{ 
+                            background: filled ? 'var(--orange-dim)' : 'var(--bg-elevated)', 
+                            border: `1px solid ${filled ? 'var(--orange)' : 'var(--border)'}`, 
+                            opacity: filled ? 1 : 0.3 
+                          }}
+                          animate={filled ? { scale: [1, 1.1, 1] } : {}}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <span className="font-code text-base font-bold" style={{ color: 'var(--orange)' }}>
+                            {filled ? opponentCurrentInput[i] : ''}
+                          </span>
+                        </motion.div>
+                      );
+                    })}
                   </div>
-                  <div className="h-4 w-px rounded-full bg-[var(--orange)]" />
-                  <div className="text-[10px] uppercase font-bold text-[var(--orange)] animate-pulse">Typing…</div>
-                </div>
+                  <div className="h-4 w-px rounded-full bg-[var(--orange)] mx-1" />
+                  <div className="flex items-center gap-1">
+                    <motion.div 
+                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      transition={{ duration: 0.8, repeat: Infinity }}
+                      className="text-[10px] uppercase font-bold text-[var(--orange)]"
+                    >
+                      {opponentCurrentInput.length === CODE_LENGTH ? 'Confirming...' : 'Typing…'}
+                    </motion.div>
+                  </div>
+                </motion.div>
               )}
             </>
           )}

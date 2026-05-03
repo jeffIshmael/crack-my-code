@@ -9,6 +9,7 @@ interface GuessRowProps {
   rowIndex: number;
   /** If true, skip the reveal animation (already seen rows) */
   instant?: boolean;
+  type?: 'player' | 'opponent';
 }
 
 const CLUE_STYLES: Record<string, { color: string; bg: string }> = {
@@ -17,7 +18,7 @@ const CLUE_STYLES: Record<string, { color: string; bg: string }> = {
   none: { color: 'var(--text-dim)', bg: 'rgba(255,255,255,0.05)' },
 };
 
-export default function GuessRow({ digits, clues, rowIndex, instant = false }: GuessRowProps) {
+export default function GuessRow({ digits, clues, rowIndex, instant = false, type = 'player' }: GuessRowProps) {
   return (
     <motion.div
       className="flex items-center gap-2"
@@ -25,10 +26,18 @@ export default function GuessRow({ digits, clues, rowIndex, instant = false }: G
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, delay: instant ? 0 : 0.05 }}
     >
+      {/* Side accent for opponent guesses */}
+      {type === 'opponent' && (
+        <motion.div 
+          layoutId={`accent-${rowIndex}`}
+          className="w-1 h-8 rounded-full bg-[var(--orange)]"
+        />
+      )}
+      
       {/* Row number */}
       <span
         className="w-5 text-right text-xs font-medium tabular-nums"
-        style={{ color: 'var(--text-dim)' }}
+        style={{ color: type === 'opponent' ? 'var(--orange)' : 'var(--text-dim)' }}
       >
         {rowIndex + 1}
       </span>
@@ -40,8 +49,8 @@ export default function GuessRow({ digits, clues, rowIndex, instant = false }: G
             key={ci}
             className="flex h-10 w-10 items-center justify-center rounded-xl"
             style={{
-              background: 'var(--bg-elevated)',
-              border: '1px solid var(--border-mid)',
+              background: type === 'opponent' ? 'var(--orange-dim)' : 'var(--bg-elevated)',
+              border: type === 'opponent' ? '1px solid var(--orange)' : '1px solid var(--border-mid)',
             }}
             initial={!instant ? { rotateY: 0 } : false}
             animate={!instant ? { rotateY: [0, 90, 0] } : {}}

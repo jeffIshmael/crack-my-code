@@ -84,6 +84,7 @@ export default function Home() {
   const [countdown, setCountdown] = useState<number | 'GO' | null>(null);
   const [readyGame, setReadyGame] = useState<any | null>(null);
   const [currentOnChainMatchId, setCurrentOnChainMatchId] = useState<string | null>(null);
+  const [turnNotification, setTurnNotification] = useState<'player' | 'opponent' | null>(null);
 
   const { cancelChallenge } = useGuessMyCode();
 
@@ -244,7 +245,8 @@ export default function Home() {
       setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: data.input }));
     });
 
-    channel.bind('opponent-guess', (data: { digits: number[], clues: any[] }) => {
+    channel.bind('opponent-guess', (data: { digits: number[], clues: any[], sender: string }) => {
+      if (data.sender === address) return;
       setGs((prev: GameState) => {
         const entry: GuessEntry = { digits: data.digits, clues: data.clues as any[], id: `opp-${Date.now()}` };
         const newGuesses = [...prev.opponentGuesses, entry];
@@ -299,13 +301,21 @@ export default function Home() {
     return () => {
       pusherClient.unsubscribe(`private-game-${currentGameId}`);
     };
-  }, [currentGameId, gs.gameMode]);
+  }, [currentGameId, gs.gameMode, address, updateBackendPoints]);
+
+  // Turn notification effect
+  useEffect(() => {
+    if (gs.phase === 'playing') {
+      setTurnNotification(gs.isPlayerTurn ? 'player' : 'opponent');
+      const timer = setTimeout(() => setTurnNotification(null), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [gs.isPlayerTurn, gs.phase]);
 
   const emitTyping = (input: number[]) => {
     if (!currentGameId || gs.gameMode === 'ai') return;
-    const channel = pusherClient.subscribe(`private-game-${currentGameId}`);
+    const channel = pusherClient.channel(`private-game-${currentGameId}`);
     if (channel) {
-      // Trigger client event (must start with client-)
       channel.trigger('client-typing', { input });
     }
   };
@@ -847,6 +857,7 @@ export default function Home() {
           onDigitPress={handleDigitPress}
           onDelete={handleDeleteDigit}
           onSubmit={() => handleSubmitGuess(gs.currentInput)}
+          turnNotification={turnNotification}
         />
 
         <AnimatePresence>
