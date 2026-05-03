@@ -85,12 +85,23 @@ export async function POST(req: NextRequest) {
         try {
           const p1GuessCount = await prisma.guess.count({ where: { gameId, isPlayer: true } });
           const p2GuessCount = await prisma.guess.count({ where: { gameId, isPlayer: false } });
+          
+          const allGuesses = await prisma.guess.findMany({
+            where: { gameId },
+            orderBy: { createdAt: 'asc' }
+          });
+          const guessArray = allGuesses.map(g => g.digits);
 
           await resolveMatchOnChain(
             (game as any).onChainMatchId as `0x${string}`,
             playerAddress as `0x${string}`,
+            (game.player2Address || '') as `0x${string}`,
             p1GuessCount,
-            p2GuessCount
+            p2GuessCount,
+            game.player1Code || '',
+            game.player2Code || '',
+            '', // historyHash (IPFS) - could be added here
+            guessArray
           );
 
           // Only update points in backend AFTER successful on-chain resolution

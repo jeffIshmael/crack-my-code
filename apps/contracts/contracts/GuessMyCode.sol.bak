@@ -56,9 +56,6 @@ contract GuessMyCode is
         uint256     endedAt;
         uint256     player1Guesses;
         uint256     player2Guesses;
-        string      player1Code;
-        string      player2Code;
-        string      historyHash;
     }
 
     // ─── State ────────────────────────────────────────────────────────────────
@@ -87,18 +84,7 @@ contract GuessMyCode is
     event ChallengeCreated  (bytes32 indexed matchId, address indexed challenger, MatchType matchType, uint256 stakeAmount);
     event ChallengeJoined   (bytes32 indexed matchId, address indexed challenger, address indexed opponent, uint256 startedAt);
     event ChallengeCancelled(bytes32 indexed matchId, address indexed challenger);
-    event MatchCompleted(
-        bytes32 indexed matchId,
-        address indexed winner,
-        address indexed loser,
-        uint256 payout,
-        uint256 fee,
-        MatchType matchType,
-        string p1Code,
-        string p2Code,
-        string historyHash,
-        string[] guesses
-    );
+    event MatchCompleted    (bytes32 indexed matchId, address indexed winner, address indexed loser, uint256 payout, uint256 fee, MatchType matchType);
     event MatchAbandoned    (bytes32 indexed matchId, address indexed quitter, address indexed winner);
     event MatchExpired      (bytes32 indexed matchId, address indexed challenger);
     event GuessCountsUpdated(bytes32 indexed matchId, uint256 player1Guesses, uint256 player2Guesses);
@@ -187,10 +173,7 @@ contract GuessMyCode is
             startedAt:      0,
             endedAt:        0,
             player1Guesses: 0,
-            player2Guesses: 0,
-            player1Code:    "",
-            player2Code:    "",
-            historyHash:    ""
+            player2Guesses: 0
         });
 
         challengeBoard[msg.sender] = matchId;
@@ -281,38 +264,10 @@ contract GuessMyCode is
     function resolveMatch(
         bytes32 matchId,
         address winner,
-        address player2,
         uint256 p1Guesses,
-        uint256 p2Guesses,
-        string memory p1Code,
-        string memory p2Code,
-        string memory historyHash,
-        string[] memory guesses
+        uint256 p2Guesses
     ) external nonReentrant onlyBackend matchExists(matchId) {
         Match storage m = matches[matchId];
-        
-        // Support off-chain joins for Free games
-        if (m.status == MatchStatus.Pending && m.matchType == MatchType.Free) {
-            require(player2 != address(0), "CB: player2 required for free match");
-            require(player2 != m.player1, "CB: cannot join own challenge");
-            
-            m.player2 = player2;
-            m.status = MatchStatus.Active;
-            m.startedAt = block.timestamp;
-            
-            // Register player2 and add to their match history
-            if (players[player2].registeredAt == 0) {
-                players[player2].points = POINTS_START;
-                players[player2].registeredAt = block.timestamp;
-                emit PlayerRegistered(player2, block.timestamp);
-            }
-            players[player2].matchIds.push(matchId);
-            players[m.player1].matchIds.push(matchId);
-            
-            delete challengeBoard[m.player1];
-            emit ChallengeJoined(matchId, m.player1, player2, block.timestamp);
-        }
-
         require(m.status == MatchStatus.Active,                     "CB: match not active");
         require(winner == m.player1 || winner == m.player2,         "CB: invalid winner");
 
@@ -320,9 +275,6 @@ contract GuessMyCode is
 
         m.player1Guesses = p1Guesses;
         m.player2Guesses = p2Guesses;
-        m.player1Code    = p1Code;
-        m.player2Code    = p2Code;
-        m.historyHash    = historyHash;
 
         uint256 payout = 0;
         uint256 fee    = 0;
@@ -341,7 +293,11 @@ contract GuessMyCode is
         m.status  = MatchStatus.Completed;
         m.endedAt = block.timestamp;
 
-        emit MatchCompleted(matchId, winner, loser, payout, fee, m.matchType, p1Code, p2Code, historyHash, guesses);
+        // activeMatchOf is deprecated
+        // delete activeMatchOf[m.player1];
+        // delete activeMatchOf[m.player2];
+
+        emit MatchCompleted(matchId, winner, loser, payout, fee, m.matchType);
     }
 
     function recordQuit(bytes32 matchId, address quitter)
@@ -475,62 +431,6 @@ contract GuessMyCode is
 
     function getMatchCount(address wallet) external view returns (uint256) {
         return players[wallet].matchIds.length;
-    }
-
-    /**
-     * @dev Returns all open (Pending or Active) matches for a player.
-     */
-    function getOpenChallenges(address wallet) 
-        external 
-        view 
-        returns (bytes32[] memory result) 
-    {
-        bytes32[] storage all = players[wallet].matchIds;
-        uint256 count = 0;
-        for (uint256 i = 0; i < all.length; i++) {
-            MatchStatus s = matches[all[i]].status;
-            if (s == MatchStatus.Pending || s == MatchStatus.Active) {
-                count++;
-            }
-        }
-        
-        result = new bytes32[](count);
-        uint256 index = 0;
-        for (uint256 i = 0; i < all.length; i++) {
-            MatchStatus s = matches[all[i]].status;
-            if (s == MatchStatus.Pending || s == MatchStatus.Active) {
-                result[index++] = all[i];
-            }
-        }
-    }
-
-    /**
-     * @dev Returns all finished (Completed, Abandoned, Expired, Refunded) matches for a player.
-     */
-    function getFinishedChallenges(address wallet) 
-        external 
-        view 
-        returns (bytes32[] memory result) 
-    {
-        bytes32[] storage all = players[wallet].matchIds;
-        uint256 count = 0;
-        for (uint256 i = 0; i < all.length; i++) {
-            MatchStatus s = matches[all[i]].status;
-            if (s == MatchStatus.Completed || s == MatchStatus.Abandoned || 
-                s == MatchStatus.Expired || s == MatchStatus.Refunded) {
-                count++;
-            }
-        }
-        
-        result = new bytes32[](count);
-        uint256 index = 0;
-        for (uint256 i = 0; i < all.length; i++) {
-            MatchStatus s = matches[all[i]].status;
-            if (s == MatchStatus.Completed || s == MatchStatus.Abandoned || 
-                s == MatchStatus.Expired || s == MatchStatus.Refunded) {
-                result[index++] = all[i];
-            }
-        }
     }
 
     function getOpenChallenge(address challenger)

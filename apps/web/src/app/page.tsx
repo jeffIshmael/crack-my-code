@@ -904,51 +904,44 @@ export default function Home() {
 
     setIsJoining(gameId);
     try {
-      let actualChallenger = challengerAddress;
+      // Fetch game details if not already available
+      const gameRes = await fetch(`/api/games/lobby?id=${gameId}`);
+      const gameData = await gameRes.json();
       
-      // If joining via invite link, we need to fetch game details to get the creator's address
-      if (challengerAddress === 'INVITE_LINK') {
-        const gameRes = await fetch(`/api/games/lobby?id=${gameId}`);
-        const gameData = await gameRes.json();
-        if (gameData && gameData.player1Address) {
-          actualChallenger = gameData.player1Address;
+      if (!gameData) throw new Error("Challenge not found or expired");
+      const actualChallenger = gameData.player1Address;
+      const isPaid = gameData.mode === 'cash';
+
+      if (isPaid) {
+        console.log("On-chain joinChallenge required for paid match");
+        let receipt;
+        if (smartWalletClient) {
+          const data = encodeFunctionData({
+            abi: CONTRACT_ABI,
+            functionName: 'joinChallenge',
+            args: [actualChallenger as `0x${string}`]
+          });
+          const txHash = await smartWalletClient.sendTransaction({
+            to: CONTRACT_ADDRESS as `0x${string}`,
+            data: data,
+            value: BigInt(0)
+          });
+          if (!publicClient) throw new Error("Public client not available");
+          receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
         } else {
-          throw new Error("Challenge not found or expired");
+          const hash = await writeContractAsync({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'joinChallenge',
+            args: [actualChallenger as `0x${string}`],
+          });
+          if (!publicClient) throw new Error("Public client not available");
+          receipt = await publicClient.waitForTransactionReceipt({ hash });
         }
-      }
-
-      console.log("DEBUG: Bypassing on-chain joinChallenge for debugging. Challenger:", actualChallenger);
-      toast.info("Debug: Bypassing on-chain transaction");
-
-      // --- ON-CHAIN: Join Challenge (BYPASSED) ---
-      /*
-      let receipt;
-      if (smartWalletClient) {
-        console.log("Using Smart Wallet for joining challenge");
-        const data = encodeFunctionData({
-          abi: CONTRACT_ABI,
-          functionName: 'joinChallenge',
-          args: [actualChallenger as `0x${string}`]
-        });
-        const txHash = await smartWalletClient.sendTransaction({
-          to: CONTRACT_ADDRESS as `0x${string}`,
-          data: data,
-          value: BigInt(0)
-        });
-        if (!publicClient) throw new Error("Public client not available");
-        receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+        console.log("On-chain join successful", receipt);
       } else {
-        console.log("Using Standard Wallet for joining challenge");
-        const hash = await writeContractAsync({
-          address: CONTRACT_ADDRESS,
-          abi: CONTRACT_ABI,
-          functionName: 'joinChallenge',
-          args: [actualChallenger as `0x${string}`],
-        });
-        if (!publicClient) throw new Error("Public client not available");
-        receipt = await publicClient.waitForTransactionReceipt({ hash });
+        console.log("Bypassing on-chain joinChallenge for free match");
       }
-      */
 
       const res = await fetch('/api/games/join', {
         method: 'POST',

@@ -321,6 +321,30 @@ export const CONTRACT_ABI = [
           "internalType": "enum GuessMyCode.MatchType",
           "name": "matchType",
           "type": "uint8"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "p1Code",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "p2Code",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string",
+          "name": "historyHash",
+          "type": "string"
+        },
+        {
+          "indexed": false,
+          "internalType": "string[]",
+          "name": "guesses",
+          "type": "string[]"
         }
       ],
       "name": "MatchCompleted",
@@ -693,6 +717,25 @@ export const CONTRACT_ABI = [
     {
       "inputs": [
         {
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        }
+      ],
+      "name": "getFinishedChallenges",
+      "outputs": [
+        {
+          "internalType": "bytes32[]",
+          "name": "result",
+          "type": "bytes32[]"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
           "internalType": "bytes32",
           "name": "matchId",
           "type": "bytes32"
@@ -771,6 +814,21 @@ export const CONTRACT_ABI = [
               "internalType": "uint256",
               "name": "player2Guesses",
               "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "player1Code",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "player2Code",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "historyHash",
+              "type": "string"
             }
           ],
           "internalType": "struct GuessMyCode.Match",
@@ -886,11 +944,45 @@ export const CONTRACT_ABI = [
               "internalType": "uint256",
               "name": "player2Guesses",
               "type": "uint256"
+            },
+            {
+              "internalType": "string",
+              "name": "player1Code",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "player2Code",
+              "type": "string"
+            },
+            {
+              "internalType": "string",
+              "name": "historyHash",
+              "type": "string"
             }
           ],
           "internalType": "struct GuessMyCode.Match",
           "name": "m",
           "type": "tuple"
+        }
+      ],
+      "stateMutability": "view",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "wallet",
+          "type": "address"
+        }
+      ],
+      "name": "getOpenChallenges",
+      "outputs": [
+        {
+          "internalType": "bytes32[]",
+          "name": "result",
+          "type": "bytes32[]"
         }
       ],
       "stateMutability": "view",
@@ -1118,6 +1210,21 @@ export const CONTRACT_ABI = [
           "internalType": "uint256",
           "name": "player2Guesses",
           "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "player1Code",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "player2Code",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "historyHash",
+          "type": "string"
         }
       ],
       "stateMutability": "view",
@@ -1258,6 +1365,11 @@ export const CONTRACT_ABI = [
           "type": "address"
         },
         {
+          "internalType": "address",
+          "name": "player2",
+          "type": "address"
+        },
+        {
           "internalType": "uint256",
           "name": "p1Guesses",
           "type": "uint256"
@@ -1266,6 +1378,26 @@ export const CONTRACT_ABI = [
           "internalType": "uint256",
           "name": "p2Guesses",
           "type": "uint256"
+        },
+        {
+          "internalType": "string",
+          "name": "p1Code",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "p2Code",
+          "type": "string"
+        },
+        {
+          "internalType": "string",
+          "name": "historyHash",
+          "type": "string"
+        },
+        {
+          "internalType": "string[]",
+          "name": "guesses",
+          "type": "string[]"
         }
       ],
       "name": "resolveMatch",
