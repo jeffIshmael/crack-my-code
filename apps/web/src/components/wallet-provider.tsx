@@ -4,11 +4,12 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, useMemo } from "react";
 import { createConfig, WagmiProvider } from "@privy-io/wagmi";
-import { http, useConnect, injected } from "wagmi";
+import { http, useConnect, injected, useAccount } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
+import sdk from "@farcaster/miniapp-sdk";
 
 
 
@@ -81,10 +82,23 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
   const [isAutoConnectEnv, setIsAutoConnectEnv] = useState(false);
 
   useEffect(() => {
-    const checkEnv = () => {
+    const checkEnv = async () => {
       const isMiniPay = (window as any).ethereum?.isMiniPay;
       const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
-      setIsAutoConnectEnv(!!(isMiniPay || isFarcasterUrl));
+      
+      // Also check SDK context if available
+      let isFarcasterSdk = false;
+      try {
+        const context = await sdk.context;
+        if (context?.client) {
+          isFarcasterSdk = true;
+        }
+      } catch (e) {
+        // SDK not available or not in Farcaster
+      }
+
+      console.log("Environment check:", { isMiniPay, isFarcasterUrl, isFarcasterSdk });
+      setIsAutoConnectEnv(!!(isMiniPay || isFarcasterUrl || isFarcasterSdk));
     };
     checkEnv();
   }, []);
@@ -125,33 +139,48 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
   const { ready } = usePrivy();
   const { connect, connectors } = useConnect();
 
+  const { isConnected } = useAccount();
+
   useEffect(() => {
-    const isMiniPay = (window as any).ethereum?.isMiniPay;
-    const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
-
-    console.log("Auto-connect check:", { isMiniPay, isFarcasterUrl, connectorCount: connectors.length });
-
-    if (isMiniPay || isFarcasterUrl) {
-      // Find the appropriate connector. 
-      // For Farcaster, we look for 'farcaster' in ID or name.
-      // For MiniPay, we look for 'injected'.
-      const targetConnector = connectors.find((c) => {
-        if (isFarcasterUrl) {
-          return c.id.toLowerCase().includes("farcaster") || c.name.toLowerCase().includes("farcaster");
+    const checkAndConnect = async () => {
+      if (isConnected) return;
+      
+      const isMiniPay = (window as any).ethereum?.isMiniPay;
+      const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
+      
+      let isFarcasterSdk = false;
+      try {
+        const context = await sdk.context;
+        if (context?.client) {
+          isFarcasterSdk = true;
         }
-        if (isMiniPay) {
-          return c.id === "injected";
-        }
-        return false;
-      });
+      } catch (e) {}
 
-      if (targetConnector) {
-        console.log("Auto-connecting to:", targetConnector.name, targetConnector.id);
-        connect({ connector: targetConnector });
-      } else {
-        console.warn("Target connector not found for environment");
+      const isFarcaster = isFarcasterUrl || isFarcasterSdk;
+
+      console.log("Auto-connect check:", { isMiniPay, isFarcaster, connectorCount: connectors.length });
+
+      if (isMiniPay || isFarcaster) {
+        const targetConnector = connectors.find((c) => {
+          if (isFarcaster) {
+            return c.id.toLowerCase().includes("farcaster") || c.name.toLowerCase().includes("farcaster");
+          }
+          if (isMiniPay) {
+            return c.id === "injected";
+          }
+          return false;
+        });
+
+        if (targetConnector) {
+          console.log("Auto-connecting to:", targetConnector.name, targetConnector.id);
+          connect({ connector: targetConnector });
+        } else if (connectors.length > 0) {
+          console.warn("Target connector not found for environment, but connectors are available");
+        }
       }
-    }
+    };
+
+    checkAndConnect();
   }, [connect, connectors]);
 
   return <>{children}</>;
