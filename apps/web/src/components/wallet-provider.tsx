@@ -59,7 +59,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
             }
           },
           defaultChain: celo,
-          supportedChains: [celo, celoSepolia],
+          supportedChains: [celo],
         }}
       >
         <SmartWalletsProvider
@@ -105,10 +105,9 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
   
   const wagmiConfig = useMemo(() => {
     return createConfig({
-      chains: [celo, celoSepolia],
+      chains: [celo],
       transports: {
         [celo.id]: http(),
-        [celoSepolia.id]: http(),
       },
       connectors: [
         farcasterMiniApp(),
@@ -158,12 +157,20 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
 
       const isFarcaster = isFarcasterUrl || isFarcasterSdk;
 
-      console.log("Auto-connect check:", { isMiniPay, isFarcaster, connectorCount: connectors.length });
+      console.log("Auto-connect check:", { 
+        isMiniPay, 
+        isFarcaster, 
+        connectorCount: connectors.length,
+        connectors: connectors.map(c => ({ id: c.id, name: c.name }))
+      });
 
       if (isMiniPay || isFarcaster) {
         const targetConnector = connectors.find((c) => {
           if (isFarcaster) {
-            return c.id.toLowerCase().includes("farcaster") || c.name.toLowerCase().includes("farcaster");
+            // Log each check to see why it might fail
+            const matches = c.id.toLowerCase().includes("farcaster") || c.name.toLowerCase().includes("farcaster");
+            console.log(`Checking connector ${c.name} (${c.id}): ${matches}`);
+            return matches;
           }
           if (isMiniPay) {
             return c.id === "injected";
