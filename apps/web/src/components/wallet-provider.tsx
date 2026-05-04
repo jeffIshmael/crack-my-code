@@ -4,7 +4,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useEffect, useState, useMemo } from "react";
 import { createConfig, WagmiProvider } from "@privy-io/wagmi";
-import { http, useConnect } from "wagmi";
+import { http, useConnect, injected } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
@@ -83,9 +83,8 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const checkEnv = () => {
       const isMiniPay = (window as any).ethereum?.isMiniPay;
-      const isFarcaster = (window as any).ethereum?.isFarcaster || (window as any).farcaster;
       const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
-      setIsAutoConnectEnv(!!(isMiniPay || isFarcaster || isFarcasterUrl));
+      setIsAutoConnectEnv(!!(isMiniPay || isFarcasterUrl));
     };
     checkEnv();
   }, []);
@@ -97,7 +96,10 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
         [celo.id]: http(),
         [celoSepolia.id]: http(),
       },
-      connectors: [farcasterMiniApp()],
+      connectors: [
+        farcasterMiniApp(),
+        injected()
+      ],
       ssr: true,
     });
   }, []);
@@ -125,14 +127,29 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const isMiniPay = (window as any).ethereum?.isMiniPay;
-    const isFarcaster = (window as any).ethereum?.isFarcaster || (window as any).farcaster;
     const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
 
-    if (isMiniPay || isFarcaster || isFarcasterUrl) {
-      const connectorId = (isFarcaster || isFarcasterUrl) ? "farcasterMiniApp" : "injected";
-      const targetConnector = connectors.find((c) => c.id === connectorId);
+    console.log("Auto-connect check:", { isMiniPay, isFarcasterUrl, connectorCount: connectors.length });
+
+    if (isMiniPay || isFarcasterUrl) {
+      // Find the appropriate connector. 
+      // For Farcaster, we look for 'farcaster' in ID or name.
+      // For MiniPay, we look for 'injected'.
+      const targetConnector = connectors.find((c) => {
+        if (isFarcasterUrl) {
+          return c.id.toLowerCase().includes("farcaster") || c.name.toLowerCase().includes("farcaster");
+        }
+        if (isMiniPay) {
+          return c.id === "injected";
+        }
+        return false;
+      });
+
       if (targetConnector) {
+        console.log("Auto-connecting to:", targetConnector.name, targetConnector.id);
         connect({ connector: targetConnector });
+      } else {
+        console.warn("Target connector not found for environment");
       }
     }
   }, [connect, connectors]);
