@@ -12,7 +12,7 @@ import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../b
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Lock } from 'lucide-react';
 
 interface LobbyProps {
   rating: number;
@@ -392,17 +392,20 @@ export default function Lobby({
                         <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Free Match • Play for Global Ranking</p>
                       </button>
 
-                      {/* Paid Option */}
-                      <button
-                        onClick={() => handleStartPvP('cash')}
-                        className="group flex flex-col gap-2 rounded-2xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 p-5 text-left transition-all hover:bg-[var(--orange)]/10"
+                      {/* Paid Option - Coming Soon */}
+                      <div
+                        className="group relative flex flex-col gap-2 rounded-2xl border border-white/5 bg-white/5 p-5 text-left transition-all opacity-60"
                       >
+                        <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-[var(--orange)]/10 px-3 py-1 border border-[var(--orange)]/20">
+                          <Lock size={10} className="text-[var(--orange)]" />
+                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--orange)]">Coming Soon</span>
+                        </div>
                         <div className="flex items-center justify-between">
-                          <span className="font-orbitron text-sm font-black tracking-wider text-[var(--orange)]">PROFESSIONAL</span>
-                          <span className="text-xl">💰</span>
+                          <span className="font-orbitron text-sm font-black tracking-wider text-[var(--text-dim)]">PROFESSIONAL</span>
+                          <span className="text-xl grayscale opacity-30">💰</span>
                         </div>
                         <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Stake USDT • Winner Takes 99%</p>
-                      </button>
+                      </div>
                     </div>
                   </motion.div>
                 ) : pvpStep === 'config' ? (

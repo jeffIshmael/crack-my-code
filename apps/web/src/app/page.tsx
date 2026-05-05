@@ -26,7 +26,7 @@ import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { Wallet, LogOut, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -86,6 +86,7 @@ export default function Home() {
   const [currentOnChainMatchId, setCurrentOnChainMatchId] = useState<string | null>(null);
   const [turnNotification, setTurnNotification] = useState<'player' | 'opponent' | null>(null);
   const [pendingOpponentClues, setPendingOpponentClues] = useState<any[] | null>(null);
+  const [copied, setCopied] = useState(false);
 
   const { cancelChallenge } = useGuessMyCode();
 
@@ -1237,40 +1238,71 @@ export default function Home() {
             <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[var(--accent)]/10 blur-3xl" />
 
             <div className="relative z-10 flex flex-col gap-8">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
-                    <Wallet size={24} />
-                  </div>
-                  <div className="flex flex-col">
+              <div className="flex flex-col gap-5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                      <Wallet size={24} />
+                    </div>
                     <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">Connected Wallet</span>
-                    <span className="font-code text-sm font-bold text-[var(--text)]">{address?.slice(0, 10)}...{address?.slice(-10)}</span>
+                  </div>
+                  <a
+                    href={`https://celoscan.io/address/${address}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="rounded-xl bg-white/5 p-3 text-[var(--text-dim)] hover:bg-white/10 transition-colors"
+                  >
+                    <ExternalLink size={18} />
+                  </a>
+                </div>
+
+                <div 
+                  onClick={() => {
+                    if (address) {
+                      navigator.clipboard.writeText(address);
+                      setCopied(true);
+                      setTimeout(() => setCopied(false), 2000);
+                      toast.success("Address Copied!");
+                    }
+                  }}
+                  className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/5 p-4 transition-all hover:bg-white/[0.08]"
+                >
+                  <div className="flex flex-col gap-2">
+                    <span className="font-code break-all text-[11px] font-bold leading-relaxed text-[var(--text)] tracking-wider">
+                      {address}
+                    </span>
+                    <div className="flex items-center justify-between">
+                      <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Tap to copy full identity</span>
+                      {copied ? (
+                        <Check size={12} className="text-[var(--clue-green)]" />
+                      ) : (
+                        <Copy size={12} className="text-[var(--text-dim)] opacity-40 group-hover:opacity-100 transition-opacity" />
+                      )}
+                    </div>
                   </div>
                 </div>
-                <a
-                  href={`https://celoscan.io/address/${address}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-xl bg-white/5 p-3 text-[var(--text-dim)] hover:bg-white/10 transition-colors"
-                >
-                  <ExternalLink size={18} />
-                </a>
               </div>
 
               <div className="grid grid-cols-1 gap-4">
-                <div className="flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-6">
+                <div className="relative group overflow-hidden rounded-2xl border border-white/5 bg-white/5 p-6 transition-all hover:bg-white/[0.08]">
+                   <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
+                      <span className="text-5xl">💰</span>
+                   </div>
                   <div className="flex flex-col gap-1">
                     <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">USDT Balance</span>
-                    <span className="text-3xl font-black text-[var(--accent)]">
+                    <span className="text-4xl font-black text-[var(--accent)]">
                       {usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00'}
                     </span>
                   </div>
                 </div>
 
-                <div className="flex items-center justify-between rounded-2xl border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 p-6">
+                <div className="relative group overflow-hidden rounded-2xl border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 p-6 transition-all hover:bg-[var(--clue-yellow)]/10">
+                   <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
+                      <span className="text-5xl">⭐</span>
+                   </div>
                   <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--clue-yellow)]/50">Points</span>
-                    <span className="text-3xl font-black text-[var(--clue-yellow)]">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--clue-yellow)]/50">Points Earned</span>
+                    <span className="text-4xl font-black text-[var(--clue-yellow)]">
                       {gs.playerPoints} <span className="text-[20px] font-black text-[var(--clue-yellow)]/20">CMC</span>
                     </span>
                   </div>
