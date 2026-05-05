@@ -8,8 +8,8 @@ import { http, useConnect, injected, useAccount } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
-import { farcasterMiniApp } from "@farcaster/miniapp-wagmi-connector";
-import sdk from "@farcaster/miniapp-sdk";
+import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
+import { sdk } from "@farcaster/frame-sdk";
 
 
 
@@ -110,7 +110,7 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
         [celo.id]: http(),
       },
       connectors: [
-        farcasterMiniApp(),
+        farcasterFrame(),
         injected()
       ],
       ssr: true,
@@ -165,24 +165,17 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
       });
 
       if (isMiniPay || isFarcaster) {
-        const targetConnector = connectors.find((c) => {
-          if (isFarcaster) {
-            // Log each check to see why it might fail
-            const matches = c.id.toLowerCase().includes("farcaster") || c.name.toLowerCase().includes("farcaster");
-            console.log(`Checking connector ${c.name} (${c.id}): ${matches}`);
-            return matches;
-          }
-          if (isMiniPay) {
-            return c.id === "injected";
-          }
-          return false;
-        });
-
-        if (targetConnector) {
-          console.log("Auto-connecting to:", targetConnector.name, targetConnector.id);
+        // If we are in Farcaster, the first connector is the frame connector
+        if (isFarcaster && connectors.length > 0) {
+          const targetConnector = connectors.find(c => c.id === 'farcaster' || c.name.toLowerCase().includes('farcaster')) || connectors[0];
+          console.log("Auto-connecting to Farcaster:", targetConnector.name, targetConnector.id);
           connect({ connector: targetConnector });
-        } else if (connectors.length > 0) {
-          console.warn("Target connector not found for environment, but connectors are available");
+        } else if (isMiniPay) {
+          const targetConnector = connectors.find(c => c.id === 'injected');
+          if (targetConnector) {
+            console.log("Auto-connecting to MiniPay:", targetConnector.name, targetConnector.id);
+            connect({ connector: targetConnector });
+          }
         }
       }
     };

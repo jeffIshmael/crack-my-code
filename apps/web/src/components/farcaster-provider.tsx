@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import sdk from "@farcaster/miniapp-sdk";
+import { sdk } from "@farcaster/frame-sdk";
 
 export function FarcasterProvider({ children }: { children: React.ReactNode }) {
   const [isSdkReady, setIsSdkReady] = useState(false);
@@ -9,7 +9,7 @@ export function FarcasterProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const init = async () => {
       try {
-        console.log("Initializing Farcaster SDK...");
+        console.log("Initializing Farcaster Frame SDK...");
         await sdk.actions.ready();
         setIsSdkReady(true);
         console.log("Farcaster SDK ready.");
