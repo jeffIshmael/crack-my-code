@@ -8,10 +8,8 @@ import { http, useConnect, injected, useAccount } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
 import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
-import { farcasterFrame } from "@farcaster/frame-wagmi-connector";
+import { farcasterMiniApp as farcasterFrame } from "@farcaster/miniapp-wagmi-connector";
 import { sdk } from "@farcaster/frame-sdk";
-
-
 
 const queryClient = new QueryClient();
 
@@ -170,24 +168,19 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
       }
 
       if (isFarcaster) {
-        // Specifically look for Farcaster connector
-        const farcasterConnector = connectors.find(c => 
-          c.id === 'farcaster' || 
-          c.name.toLowerCase().includes('farcaster')
-        );
-        
-        if (farcasterConnector) {
-          console.log("Auto-connecting to Farcaster:", farcasterConnector.name);
-          connect({ connector: farcasterConnector });
+        if (connectors.length > 0) {
+          console.log("Auto-connecting to Farcaster using first connector");
+          connect({ connector: connectors[0] });
         } else {
-          console.log("Farcaster environment detected but connector not found yet.");
-          // No fallback to connectors[0] to prevent MetaMask popups
+          console.log("Farcaster environment detected but connectors array is empty.");
         }
       } else if (isMiniPay) {
-        const injectedConnector = connectors.find(c => c.id === 'injected');
+        const injectedConnector = connectors.find(c => c.id === 'injected' || c.id === 'metaMask');
         if (injectedConnector) {
           console.log("Auto-connecting to MiniPay");
           connect({ connector: injectedConnector });
+        } else if (connectors.length > 1) {
+          connect({ connector: connectors[1] });
         }
       }
     };
