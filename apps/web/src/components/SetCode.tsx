@@ -7,10 +7,11 @@ import { CODE_LENGTH } from '@/lib/game';
 interface SetCodeProps {
   opponentName: string;
   onLockCode: (code: number[]) => void;
+  onBack?: () => void;
   isWaiting?: boolean;
 }
 
-export default function SetCode({ opponentName, onLockCode, isWaiting }: SetCodeProps) {
+export default function SetCode({ opponentName, onLockCode, onBack, isWaiting }: SetCodeProps) {
   const [code, setCode]    = useState<number[]>([]);
   const [locked, setLocked] = useState(false);
   const [shakeIdx, setShakeIdx] = useState<number | null>(null);
@@ -58,14 +59,25 @@ export default function SetCode({ opponentName, onLockCode, isWaiting }: SetCode
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <div className="flex items-center gap-2">
-          <div
-            className="h-1.5 w-1.5 rounded-full"
-            style={{ background: 'var(--orange)', boxShadow: '0 0 8px var(--orange)' }}
-          />
-          <span className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
-            vs {opponentName}
-          </span>
+        <div className="flex items-center justify-between mb-2">
+          <button 
+            onClick={onBack}
+            className="flex items-center gap-1 text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] hover:text-[var(--text)] transition-colors"
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+            Back
+          </button>
+          <div className="flex items-center gap-2">
+            <div
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ background: 'var(--orange)', boxShadow: '0 0 8px var(--orange)' }}
+            />
+            <span className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
+              vs {opponentName}
+            </span>
+          </div>
         </div>
         <h2 className="font-orbitron text-2xl font-bold" style={{ color: 'var(--text)' }}>
           Set Your Secret Code

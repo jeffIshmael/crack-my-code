@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import GuessRow, { EmptyGuessRow } from '@/components/GuessRow';
 import NumberPad from '@/components/NumberPad';
 import type { GuessEntry } from '@/lib/game';
-import { CODE_LENGTH, MAX_GUESSES } from '@/lib/game';
+import { CODE_LENGTH, MAX_GUESSES, getHintText } from '@/lib/game';
 
 interface GameBoardProps {
   playerGuesses: GuessEntry[];
@@ -22,6 +22,8 @@ interface GameBoardProps {
   onDigitPress: (d: number) => void;
   onDelete: () => void;
   onSubmit: () => void;
+  onQuit?: () => void;
+  pendingOpponentClues?: any[] | null;
   turnNotification?: 'player' | 'opponent' | null;
 }
 
@@ -40,6 +42,8 @@ export default function GameBoard({
   onDigitPress,
   onDelete,
   onSubmit,
+  onQuit,
+  pendingOpponentClues = null,
   turnNotification = null,
 }: GameBoardProps) {
   const historyRef = useRef<HTMLDivElement>(null);
@@ -131,7 +135,12 @@ export default function GameBoard({
              </span>
            </div>
            <div className="h-4 w-px bg-white/10" />
-           <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)]">Terminal 01</span>
+           <button 
+             onClick={onQuit}
+             className="text-[10px] font-bold uppercase tracking-widest text-red-400/80 hover:text-red-400 transition-colors"
+           >
+             QUIT GAME
+           </button>
         </div>
 
         {/* Turn badge */}
@@ -163,44 +172,32 @@ export default function GameBoard({
 
       {/* ── Opponent progress bar ── */}
       <motion.div
-        className="mb-3 flex items-center gap-3 rounded-2xl p-3"
-        style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
-        animate={!isPlayerTurn ? { borderColor: 'rgba(255,107,43,0.3)' } : { borderColor: 'var(--border)' }}
+        className="mb-3 flex items-center justify-center rounded-2xl p-4"
+        style={{ 
+          background: 'rgba(255, 255, 255, 0.03)', 
+          border: '1px solid var(--border)',
+          backdropFilter: 'blur(10px)'
+        }}
+        animate={!isPlayerTurn ? { borderColor: 'rgba(255,107,43,0.3)', background: 'rgba(255,107,43,0.05)' } : {}}
       >
-        <div
-          className="flex h-8 w-8 items-center justify-center rounded-xl text-xs font-bold"
-          style={{ background: 'var(--orange-dim)', color: 'var(--orange)', fontFamily: 'Space Mono, monospace' }}
-        >
-          {opponentName.charAt(0).toUpperCase()}
-        </div>
-        <div className="flex flex-1 flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium" style={{ color: 'var(--text-2)' }}>
-              {opponentName}
-            </span>
-            <span className="font-code text-xs" style={{ color: 'var(--orange)' }}>
-              {opponentGuessCount} guess{opponentGuessCount !== 1 ? 'es' : ''}
-            </span>
-          </div>
-          {/* Guess attempt pips */}
-          <div className="flex gap-1">
-            {Array.from({ length: MAX_GUESSES }).map((_, i) => (
-              <motion.div
-                key={i}
-                className="h-1.5 flex-1 rounded-full"
-                style={{ background: i < opponentGuessCount ? 'var(--orange)' : 'var(--text-dim)' }}
-                animate={i < opponentGuessCount ? { opacity: [0.6, 1] } : {}}
-                transition={{ duration: 0.3, delay: i * 0.05 }}
-              />
-            ))}
-          </div>
+        <div className="flex items-center gap-3 font-orbitron">
+          <span className="text-[11px] font-black tracking-[0.3em] uppercase text-[var(--accent)]">
+            YOU
+          </span>
+          <span className="text-[9px] font-bold italic tracking-widest text-[var(--text-dim)] opacity-50">
+            VS
+          </span>
+          <span className="text-[11px] font-black tracking-[0.3em] uppercase text-[var(--orange)]">
+            {isAI ? `${opponentName.toUpperCase()} AI` : opponentName.toUpperCase()}
+          </span>
         </div>
         {!isPlayerTurn && (
           <motion.div
+            className="ml-4"
             animate={{ opacity: [0.4, 1, 0.4] }}
             transition={{ duration: 0.8, repeat: Infinity }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
               style={{ color: 'var(--orange)' }}>
               <circle cx="12" cy="12" r="3"/>
               <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
@@ -269,7 +266,9 @@ export default function GameBoard({
                   animate={{ opacity: 1, x: 0 }}
                   className="flex items-center gap-2 py-1"
                 >
-                  <span className="w-5 text-right text-xs font-medium" style={{ color: 'var(--orange)' }}>?</span>
+                  <span className="w-5 text-right text-xs font-medium" style={{ color: 'var(--orange)' }}>
+                    {opponentGuesses.length + 1}
+                  </span>
                   <div className="flex gap-1.5">
                     {Array.from({ length: CODE_LENGTH }).map((_, i) => {
                       const filled = i < opponentCurrentInput.length;
@@ -295,11 +294,14 @@ export default function GameBoard({
                   <div className="h-4 w-px rounded-full bg-[var(--orange)] mx-1" />
                   <div className="flex items-center gap-1">
                     <motion.div 
-                      animate={{ opacity: [0.3, 1, 0.3] }}
+                      animate={pendingOpponentClues ? { scale: [1, 1.05, 1] } : { opacity: [0.3, 1, 0.3] }}
                       transition={{ duration: 0.8, repeat: Infinity }}
-                      className="text-[10px] uppercase font-bold text-[var(--orange)]"
+                      className="text-[10px] uppercase font-bold text-[var(--orange)] px-2 py-0.5 rounded-md"
+                      style={pendingOpponentClues ? { background: 'rgba(255, 107, 43, 0.1)', border: '1px solid rgba(255, 107, 43, 0.3)' } : {}}
                     >
-                      {opponentCurrentInput.length === CODE_LENGTH ? 'Confirming...' : isAI ? 'Processing...' : 'Typing…'}
+                      {pendingOpponentClues 
+                        ? getHintText(pendingOpponentClues) 
+                        : (opponentCurrentInput.length === CODE_LENGTH ? '' : isAI ? 'Processing...' : 'Typing…')}
                     </motion.div>
                   </div>
                 </motion.div>

@@ -85,6 +85,7 @@ export default function Home() {
   const [readyGame, setReadyGame] = useState<any | null>(null);
   const [currentOnChainMatchId, setCurrentOnChainMatchId] = useState<string | null>(null);
   const [turnNotification, setTurnNotification] = useState<'player' | 'opponent' | null>(null);
+  const [pendingOpponentClues, setPendingOpponentClues] = useState<any[] | null>(null);
 
   const { cancelChallenge } = useGuessMyCode();
 
@@ -389,17 +390,21 @@ export default function Home() {
           typeIndex++;
           oppTimerRef.current = setTimeout(typeDigit, 400); // Slower typing, 400ms per digit
         } else {
-          // Typing done, wait briefly then evaluate and show result
+          // Typing done, evaluate and show result ON THE SAME LINE first
+          const clues = evaluateGuess(targetDigits, gsRef.current.playerCode);
+          setPendingOpponentClues(clues);
+
+          // Wait 2 seconds so the user can see the result on the current line
           oppTimerRef.current = setTimeout(() => {
             setGs((prev: GameState) => {
               if (prev.phase !== 'playing') return prev;
-              const clues = evaluateGuess(targetDigits, prev.playerCode);
+              
               const entry: GuessEntry = { digits: targetDigits, clues, id: `opp-${Date.now()}` };
               const newGuesses = [...prev.opponentGuesses, entry];
               const newCount = prev.opponentGuessCount + 1;
 
               if (isWinningClues(clues)) {
-                // Reveal AI's code and end game immediately
+                // Reveal AI's code and end game
                 fetch('/api/games/reveal', {
                   method: 'POST',
                   headers: { 'Content-Type': 'application/json' },
@@ -415,17 +420,15 @@ export default function Home() {
                       opponentCode: data.opponentCode || []
                     }));
                   });
+                setPendingOpponentClues(null);
                 return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
               }
 
-              // Delay returning the turn so the player can see the AI's move
-              oppTimerRef.current = setTimeout(() => {
-                setGs((p: GameState) => ({ ...p, isPlayerTurn: true, opponentCurrentInput: [] }));
-              }, 2000);
-
-              return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
+              // Return turn to player
+              setPendingOpponentClues(null);
+              return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [], isPlayerTurn: true };
             });
-          }, 600); // 600ms pause after typing before revealing result
+          }, 2000); // 2 second pause to show result on the current line
         }
       };
 
@@ -610,6 +613,15 @@ export default function Home() {
     setCurrentOnChainMatchId(null);
     toast.info("Search Cancelled");
   }, [currentGameId, currentOnChainMatchId, handleCancelChallenge]);
+
+  const handleQuitGame = useCallback(() => {
+    if (window.confirm("Are you sure you want to quit the game?")) {
+      clearOppTimer();
+      setGs(initialGameState(gs.playerRating, gs.playerPoints));
+      setCurrentGameId(null);
+      setCurrentOnChainMatchId(null);
+    }
+  }, [gs.playerRating, gs.playerPoints]);
 
   // ─── Phase: SetCode → Playing ─────────────────────────────────────────────
 
@@ -813,6 +825,12 @@ export default function Home() {
         <SetCode
           opponentName={gs.opponentName}
           onLockCode={handleLockCode}
+          onBack={() => {
+            clearOppTimer();
+            setGs(initialGameState(gs.playerRating, gs.playerPoints));
+            setCurrentGameId(null);
+            setCurrentOnChainMatchId(null);
+          }}
           isWaiting={isWaiting}
         />
         <AnimatePresence>
@@ -876,6 +894,8 @@ export default function Home() {
           onDigitPress={handleDigitPress}
           onDelete={handleDeleteDigit}
           onSubmit={() => handleSubmitGuess(gs.currentInput)}
+          onQuit={handleQuitGame}
+          pendingOpponentClues={pendingOpponentClues}
           turnNotification={turnNotification}
           isAI={gs.gameMode === 'ai'}
         />
