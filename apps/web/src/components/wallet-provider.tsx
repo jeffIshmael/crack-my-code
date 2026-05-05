@@ -168,11 +168,21 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
       }
 
       if (isFarcaster) {
-        if (connectors.length > 0) {
-          console.log("Auto-connecting to Farcaster using first connector");
-          connect({ connector: connectors[0] });
-        } else {
+        if (connectors.length === 0) {
           console.log("Farcaster environment detected but connectors array is empty.");
+          return;
+        }
+
+        const farcasterConnector = connectors.find(c => 
+          c.id.toLowerCase().includes('farcaster') || 
+          c.name.toLowerCase().includes('farcaster')
+        );
+
+        if (farcasterConnector) {
+          console.log("Auto-connecting to Farcaster using connector:", farcasterConnector.name);
+          connect({ connector: farcasterConnector });
+        } else {
+          console.log("Farcaster connector not found. Available connectors:", connectors.map(c => c.id).join(", "));
         }
       } else if (isMiniPay) {
         const injectedConnector = connectors.find(c => c.id === 'injected' || c.id === 'metaMask');
