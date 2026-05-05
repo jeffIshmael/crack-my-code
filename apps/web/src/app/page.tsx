@@ -430,6 +430,13 @@ export default function Home() {
     }, thinkingDelay);
   }, [currentGameId, address]); // eslint-disable-line
 
+  // AI Turn Trigger
+  useEffect(() => {
+    if (gs.phase === 'playing' && !gs.isPlayerTurn && gs.gameMode === 'ai') {
+      scheduleOpponentTurn();
+    }
+  }, [gs.phase, gs.isPlayerTurn, gs.gameMode, scheduleOpponentTurn]);
+
   // ─── Phase: Lobby → Matchmaking ───────────────────────────────────────────
 
   const handleMatchFound = useCallback((gameId: string, opponentAddress: string) => {
@@ -437,7 +444,7 @@ export default function Home() {
     setGs((prev: GameState) => ({
       ...prev,
       phase: 'setCode',
-      opponentName: opponentAddress === 'AI_BOT' ? 'Cipher' : opponentAddress.slice(0, 6),
+      opponentName: (opponentAddress === 'AI_BOT' || opponentAddress === 'AI') ? 'Cipher' : opponentAddress.slice(0, 6),
       playerCode: [],
       playerGuesses: [],
       opponentGuesses: [],
@@ -698,8 +705,7 @@ export default function Home() {
               return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false };
             }
 
-            // Opponent's turn
-            if (prev.gameMode === 'ai') scheduleOpponentTurn();
+            // Opponent's turn (now handled by useEffect)
             return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
           });
         }
