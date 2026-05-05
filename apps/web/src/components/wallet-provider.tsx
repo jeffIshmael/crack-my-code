@@ -86,22 +86,29 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const checkEnv = async () => {
-      const isMiniPay = (window as any).ethereum?.isMiniPay;
-      const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
+      const isMiniPay = (window as any).ethereum?.isMiniPay === true;
       
-      // Also check SDK context if available
-      let isFarcasterSdk = false;
+      let isFarcaster = false;
+      // Check for Farcaster SDK context (Frames v2)
       try {
         const context = await sdk.context;
         if (context?.client) {
-          isFarcasterSdk = true;
+          isFarcaster = true;
         }
-      } catch (e) {
-        // SDK not available or not in Farcaster
+      } catch (e) {}
+
+      // Fallback for URL markers or other injections
+      if (!isFarcaster) {
+        isFarcaster = !!(
+          (window as any).ethereum?.isFarcaster || 
+          (window as any).farcaster ||
+          window.location.search.includes('miniApp=true') || 
+          window.location.pathname.includes('/mini')
+        );
       }
 
-      console.log("Environment check:", { isMiniPay, isFarcasterUrl, isFarcasterSdk });
-      setIsAutoConnectEnv(!!(isMiniPay || isFarcasterUrl || isFarcasterSdk));
+      console.log("Environment check:", { isMiniPay, isFarcaster });
+      setIsAutoConnectEnv(isMiniPay || isFarcaster);
     };
     checkEnv();
   }, []);
@@ -138,53 +145,55 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
 }
 
 function WalletProviderInner({ children }: { children: React.ReactNode }) {
-  const { ready } = usePrivy();
   const { connect, connectors } = useConnect();
-
   const { isConnected } = useAccount();
 
   useEffect(() => {
     const checkAndConnect = async () => {
       if (isConnected) return;
       
-      const isMiniPay = (window as any).ethereum?.isMiniPay;
-      const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
+      const isMiniPay = (window as any).ethereum?.isMiniPay === true;
       
-      let isFarcasterSdk = false;
+      let isFarcaster = false;
       try {
         const context = await sdk.context;
-        if (context?.client) {
-          isFarcasterSdk = true;
-        }
+        if (context?.client) isFarcaster = true;
       } catch (e) {}
 
-      const isFarcaster = isFarcasterUrl || isFarcasterSdk;
+      if (!isFarcaster) {
+        isFarcaster = !!(
+          (window as any).ethereum?.isFarcaster || 
+          (window as any).farcaster ||
+          window.location.search.includes('miniApp=true') || 
+          window.location.pathname.includes('/mini')
+        );
+      }
 
-      console.log("Auto-connect check:", { 
-        isMiniPay, 
-        isFarcaster, 
-        connectorCount: connectors.length,
-        connectors: connectors.map(c => ({ id: c.id, name: c.name }))
-      });
-
-      if (isMiniPay || isFarcaster) {
-        // If we are in Farcaster, the first connector is the frame connector
-        if (isFarcaster && connectors.length > 0) {
-          const targetConnector = connectors.find(c => c.id === 'farcaster' || c.name.toLowerCase().includes('farcaster')) || connectors[0];
-          console.log("Auto-connecting to Farcaster:", targetConnector.name, targetConnector.id);
-          connect({ connector: targetConnector });
-        } else if (isMiniPay) {
-          const targetConnector = connectors.find(c => c.id === 'injected');
-          if (targetConnector) {
-            console.log("Auto-connecting to MiniPay:", targetConnector.name, targetConnector.id);
-            connect({ connector: targetConnector });
-          }
+      if (isFarcaster) {
+        // Specifically look for Farcaster connector
+        const farcasterConnector = connectors.find(c => 
+          c.id === 'farcaster' || 
+          c.name.toLowerCase().includes('farcaster')
+        );
+        
+        if (farcasterConnector) {
+          console.log("Auto-connecting to Farcaster:", farcasterConnector.name);
+          connect({ connector: farcasterConnector });
+        } else {
+          console.log("Farcaster environment detected but connector not found yet.");
+          // No fallback to connectors[0] to prevent MetaMask popups
+        }
+      } else if (isMiniPay) {
+        const injectedConnector = connectors.find(c => c.id === 'injected');
+        if (injectedConnector) {
+          console.log("Auto-connecting to MiniPay");
+          connect({ connector: injectedConnector });
         }
       }
     };
 
     checkAndConnect();
-  }, [connect, connectors]);
+  }, [connect, connectors, isConnected]);
 
   return <>{children}</>;
 }

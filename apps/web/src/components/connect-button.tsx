@@ -47,10 +47,27 @@ export function ConnectButton({ onWalletClick }: ConnectButtonProps) {
   const [isAutoConnectEnv, setIsAutoConnectEnv] = useState(false);
 
   useEffect(() => {
-    const isMiniPay = (window as any).ethereum?.isMiniPay;
-    const isFarcaster = (window as any).ethereum?.isFarcaster || (window as any).farcaster;
-    const isFarcasterUrl = window.location.search.includes('miniApp=true') || window.location.pathname.includes('/mini');
-    setIsAutoConnectEnv(!!(isMiniPay || isFarcaster || isFarcasterUrl));
+    const checkEnv = async () => {
+      const isMiniPay = (window as any).ethereum?.isMiniPay === true;
+      let isFarcaster = false;
+      
+      try {
+        const { sdk } = await import("@farcaster/frame-sdk");
+        const context = await sdk.context;
+        if (context?.client) isFarcaster = true;
+      } catch (e) {}
+
+      if (!isFarcaster) {
+        isFarcaster = !!(
+          (window as any).ethereum?.isFarcaster || 
+          (window as any).farcaster ||
+          window.location.search.includes('miniApp=true') || 
+          window.location.pathname.includes('/mini')
+        );
+      }
+      setIsAutoConnectEnv(isMiniPay || isFarcaster);
+    };
+    checkEnv();
   }, []);
 
   const isSyncIssue = authenticated && isConnected && wagmiAddress !== user?.wallet?.address;

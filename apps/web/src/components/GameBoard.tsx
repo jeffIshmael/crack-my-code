@@ -18,6 +18,7 @@ interface GameBoardProps {
   playerRating: number;
   playerPoints: number;
   isSubmitting?: boolean;
+  isAI?: boolean;
   onDigitPress: (d: number) => void;
   onDelete: () => void;
   onSubmit: () => void;
@@ -35,6 +36,7 @@ export default function GameBoard({
   playerRating,
   playerPoints,
   isSubmitting = false,
+  isAI = false,
   onDigitPress,
   onDelete,
   onSubmit,
@@ -44,18 +46,24 @@ export default function GameBoard({
   const [view, setView] = useState<'player' | 'opponent'>('player');
   const canSubmit = isPlayerTurn && currentInput.length === CODE_LENGTH;
 
-  // Auto-switch view logic
+  // Auto-switch view logic (when opponent starts typing)
   useEffect(() => {
     if (!isPlayerTurn && opponentCurrentInput.length > 0) {
-      setView('opponent');
+      if (view !== 'opponent') setView('opponent');
     }
-    // When it becomes player's turn, wait a bit before switching back
-    // so they can see the opponent's last guess result.
+  }, [isPlayerTurn, opponentCurrentInput.length]);
+
+  // Return to player view
+  useEffect(() => {
     if (isPlayerTurn) {
+      if (isAI) {
+        setView('player');
+        return;
+      }
       const timer = setTimeout(() => setView('player'), 2000);
       return () => clearTimeout(timer);
     }
-  }, [isPlayerTurn, opponentCurrentInput.length]);
+  }, [isPlayerTurn, isAI]);
 
   // Handle turn notification transitions
   useEffect(() => {
@@ -107,7 +115,7 @@ export default function GameBoard({
                 {turnNotification === 'player' ? 'Your Turn' : `${opponentName}'s Turn`}
               </span>
               <span className="text-[10px] font-bold uppercase tracking-widest opacity-50" style={{ color: turnNotification === 'player' ? 'var(--accent)' : 'var(--orange)' }}>
-                {turnNotification === 'player' ? 'Ready to crack?' : 'Interception in progress...'}
+                {turnNotification === 'player' ? 'Ready to crack?' : isAI ? 'Processing data...' : 'Interception in progress...'}
               </span>
             </div>
           </motion.div>
@@ -148,7 +156,7 @@ export default function GameBoard({
               animate={isPlayerTurn ? { scale: [1, 1.4, 1], opacity: [1, 0.5, 1] } : {}}
               transition={{ duration: 0.8, repeat: Infinity }}
             />
-            {isPlayerTurn ? 'Your Turn' : "Opponent's Turn"}
+            {isPlayerTurn ? 'Your Turn' : isAI ? `${opponentName.toUpperCase()} ANALYZING` : "Opponent's Turn"}
           </motion.div>
         </AnimatePresence>
       </div>
@@ -291,7 +299,7 @@ export default function GameBoard({
                       transition={{ duration: 0.8, repeat: Infinity }}
                       className="text-[10px] uppercase font-bold text-[var(--orange)]"
                     >
-                      {opponentCurrentInput.length === CODE_LENGTH ? 'Confirming...' : 'Typing…'}
+                      {opponentCurrentInput.length === CODE_LENGTH ? 'Confirming...' : isAI ? 'Processing...' : 'Typing…'}
                     </motion.div>
                   </div>
                 </motion.div>
@@ -312,7 +320,7 @@ export default function GameBoard({
       <div className="mb-3">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
-            {isPlayerTurn ? 'Your Guess' : 'Waiting…'}
+            {isPlayerTurn ? 'Your Guess' : isAI ? `${opponentName} is thinking...` : 'Waiting…'}
           </span>
           {isPlayerTurn && (
             <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
@@ -414,7 +422,7 @@ export default function GameBoard({
             >
               ···
             </motion.span>
-            OPPONENT THINKING
+            {isAI ? `${opponentName.toUpperCase()} THINKING` : 'OPPONENT THINKING'}
           </span>
         ) : canSubmit ? (
           'SUBMIT GUESS →'

@@ -306,11 +306,15 @@ export default function Home() {
   // Turn notification effect
   useEffect(() => {
     if (gs.phase === 'playing') {
+      if (gs.gameMode === 'ai') {
+        setTurnNotification(null);
+        return;
+      }
       setTurnNotification(gs.isPlayerTurn ? 'player' : 'opponent');
       const timer = setTimeout(() => setTurnNotification(null), 2000);
       return () => clearTimeout(timer);
     }
-  }, [gs.isPlayerTurn, gs.phase]);
+  }, [gs.isPlayerTurn, gs.phase, gs.gameMode]);
 
   const emitTyping = (input: number[]) => {
     if (!currentGameId || gs.gameMode === 'ai') return;
@@ -324,8 +328,7 @@ export default function Home() {
     if (gsRef.current.gameMode !== 'ai') return;
     clearOppTimer();
 
-    const thinkingDelay = 1000 + Math.random() * 1000;
-
+    // Wait 1.5s so the player can see their own guess result
     oppTimerRef.current = setTimeout(() => {
       const currentGs = gsRef.current;
       const history = currentGs.opponentGuesses;
@@ -350,15 +353,11 @@ export default function Home() {
       } else if (candidates.length === 1) {
         targetDigits = candidates[0];
       } else {
-        // Smarter pick: if pool is small enough, use minimax. Otherwise pick random from candidates.
         if (candidates.length > 200) {
           targetDigits = candidates[Math.floor(Math.random() * candidates.length)];
         } else {
-          // Knuth-lite minimax
           let bestGuess = candidates[0];
           let minMaxRemaining = Infinity;
-
-          // Optimization: sample candidates if still too many
           const testPool = candidates.length > 50 ? candidates.slice(0, 50) : candidates;
 
           for (const guess of testPool) {
@@ -379,32 +378,35 @@ export default function Home() {
         }
       }
 
-      // 3. Simulate typing
-      let typedCount = 0;
+      // 3. Execute Turn Fast Typing Simulation
+      let typeIndex = 0;
       const typeDigit = () => {
-        typedCount++;
-        setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: targetDigits.slice(0, typedCount) }));
-
-        if (typedCount < CODE_LENGTH) {
-          oppTimerRef.current = setTimeout(typeDigit, 150 + Math.random() * 100);
+        if (typeIndex < CODE_LENGTH) {
+          setGs((prev: GameState) => ({
+            ...prev,
+            opponentCurrentInput: [...prev.opponentCurrentInput, targetDigits[typeIndex]]
+          }));
+          typeIndex++;
+          oppTimerRef.current = setTimeout(typeDigit, 400); // Slower typing, 400ms per digit
         } else {
-          setGs((prev: GameState) => {
-            if (prev.phase !== 'playing') return prev;
-            const clues = evaluateGuess(targetDigits, prev.playerCode);
-            const entry: GuessEntry = { digits: targetDigits, clues, id: `opp-${Date.now()}` };
-            const newGuesses = [...prev.opponentGuesses, entry];
-            const newCount = prev.opponentGuessCount + 1;
+          // Typing done, wait briefly then evaluate and show result
+          oppTimerRef.current = setTimeout(() => {
+            setGs((prev: GameState) => {
+              if (prev.phase !== 'playing') return prev;
+              const clues = evaluateGuess(targetDigits, prev.playerCode);
+              const entry: GuessEntry = { digits: targetDigits, clues, id: `opp-${Date.now()}` };
+              const newGuesses = [...prev.opponentGuesses, entry];
+              const newCount = prev.opponentGuessCount + 1;
 
-            if (isWinningClues(clues)) {
-              // Reveal AI's code and end game
-              fetch('/api/games/reveal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' })
-              })
-                .then(res => res.json())
-                .then(data => {
-                  setTimeout(() => {
+              if (isWinningClues(clues)) {
+                // Reveal AI's code and end game immediately
+                fetch('/api/games/reveal', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' })
+                })
+                  .then(res => res.json())
+                  .then(data => {
                     setGs((p: GameState) => ({
                       ...p,
                       phase: 'result',
@@ -412,23 +414,24 @@ export default function Home() {
                       ratingDelta: -5,
                       opponentCode: data.opponentCode || []
                     }));
-                  }, 1500);
-                });
+                  });
+                return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
+              }
+
+              // Delay returning the turn so the player can see the AI's move
+              oppTimerRef.current = setTimeout(() => {
+                setGs((p: GameState) => ({ ...p, isPlayerTurn: true, opponentCurrentInput: [] }));
+              }, 2000);
+
               return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
-            }
-
-            oppTimerRef.current = setTimeout(() => {
-              setGs((p: GameState) => ({ ...p, isPlayerTurn: true, opponentCurrentInput: [] }));
-            }, 1000);
-
-            return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
-          });
+            });
+          }, 600); // 600ms pause after typing before revealing result
         }
       };
 
       typeDigit();
-    }, thinkingDelay);
-  }, [currentGameId, address]); // eslint-disable-line
+    }, 1500);
+  }, [currentGameId, address]); 
 
   // AI Turn Trigger
   useEffect(() => {
@@ -441,10 +444,13 @@ export default function Home() {
 
   const handleMatchFound = useCallback((gameId: string, opponentAddress: string) => {
     setCurrentGameId(gameId);
+    const isAIMatch = opponentAddress === 'AI_BOT' || opponentAddress === 'AI';
+    
     setGs((prev: GameState) => ({
       ...prev,
       phase: 'setCode',
-      opponentName: (opponentAddress === 'AI_BOT' || opponentAddress === 'AI') ? 'Cipher' : opponentAddress.slice(0, 6),
+      gameMode: isAIMatch ? 'ai' : prev.gameMode,
+      opponentName: isAIMatch ? 'Cipher' : opponentAddress.slice(0, 6),
       playerCode: [],
       playerGuesses: [],
       opponentGuesses: [],
@@ -614,6 +620,19 @@ export default function Home() {
     const effectiveAddress = address || 'GUEST';
 
     setGs((prev: GameState) => ({ ...prev, playerCode: code }));
+
+    // For AI games, skip the synchronizing modal and go straight to playing
+    if (gs.gameMode === 'ai') {
+      setGs((prev: GameState): GameState => ({ ...prev, phase: 'playing' }));
+      // Do the server lock-code in the background without blocking
+      fetch('/api/games/lock-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: currentGameId, address: effectiveAddress, code: code.join('') })
+      }).catch(err => console.error('Failed to lock AI code', err));
+      return;
+    }
+
     setIsWaiting(true);
 
     try {
@@ -622,12 +641,6 @@ export default function Home() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gameId: currentGameId, address: effectiveAddress, code: code.join('') })
       });
-
-      // For AI games, we can start immediately since AI code is already set
-      if (gs.gameMode === 'ai') {
-        setIsWaiting(false);
-        setGs((prev: GameState): GameState => ({ ...prev, phase: 'countdown' }));
-      }
       // For PvP, we wait for 'game-started' Pusher event
     } catch (err) {
       console.error('Failed to lock code', err);
@@ -864,6 +877,7 @@ export default function Home() {
           onDelete={handleDeleteDigit}
           onSubmit={() => handleSubmitGuess(gs.currentInput)}
           turnNotification={turnNotification}
+          isAI={gs.gameMode === 'ai'}
         />
 
         <AnimatePresence>
