@@ -20,6 +20,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => setMounted(true), []);
 
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+  const isAppIdValid = appId && appId !== 'undefined' && appId.length > 5;
 
   // During SSR (prerendering), we return a null or a simple div to avoid 
   // executing children that rely on Privy/Wagmi hooks, which would crash the build.
@@ -29,10 +30,12 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
-  // If we are on the client but the appId is missing, we log a warning 
-  // but still render the children so the app doesn't stay blank.
-  if (!appId) {
-    console.warn("NEXT_PUBLIC_PRIVY_APP_ID is missing. Wallet functionality will be disabled.");
+  // If we are on the client but the appId is missing or invalid, we log a warning 
+  // and render the children WITHOUT Privy to allow static generation to complete.
+  if (!isAppIdValid) {
+    if (typeof window !== 'undefined') {
+      console.warn("NEXT_PUBLIC_PRIVY_APP_ID is missing or invalid. Wallet functionality will be disabled.");
+    }
     return (
       <QueryClientProvider client={queryClient}>
         {children}
