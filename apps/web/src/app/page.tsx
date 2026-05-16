@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import Lobby from '@/components/Lobby';
+import Image from 'next/image';
 import SetCode from '@/components/SetCode';
 import GameBoard from '@/components/GameBoard';
 import ResultModal from '@/components/ResultModal';
@@ -516,7 +517,9 @@ export default function Home() {
 
   const handleFindMatch = async (mode: GameMode, stake: number, isPublic: boolean = true, userBalance?: number) => {
     setSearchTime(0);
-    setGs(curr => ({ ...curr, phase: 'matchmaking', gameMode: mode, opponentName: 'SEARCHING...' }));
+    if (mode !== 'ai') {
+      setGs(curr => ({ ...curr, phase: 'matchmaking', gameMode: mode, opponentName: 'SEARCHING...' }));
+    }
 
     const effectiveAddress = address || 'GUEST';
     setCurrentGameId(null);
@@ -786,6 +789,15 @@ export default function Home() {
     }
   }, [gs.playerRating, gs.playerPoints, gs.ratingDelta, gs.gameMode, handleFindMatch]);
 
+  const handleHome = useCallback(() => {
+    clearOppTimer();
+    const nextRating = gs.playerRating + (gs.ratingDelta ?? 0);
+    const nextPoints = gs.playerPoints + (gs.gameMode === 'ai' ? 0 : (gs.ratingDelta ?? 0) * 2);
+    
+    setGs(initialGameState(nextRating, nextPoints));
+    setCurrentGameId(null);
+  }, [gs.playerRating, gs.playerPoints, gs.ratingDelta, gs.gameMode]);
+
   // ─── Cleanup on unmount ───────────────────────────────────────────────────
 
   useEffect(() => () => { clearOppTimer(); }, []); // eslint-disable-line
@@ -942,6 +954,7 @@ export default function Home() {
               playerPoints={gs.playerPoints}
               guessCount={gs.playerGuesses.length}
               onPlayAgain={handlePlayAgain}
+              onHome={handleHome}
             />
           )}
         </AnimatePresence>
@@ -1028,11 +1041,29 @@ export default function Home() {
         </div>
       ) : (
         <>
-          <div className="flex w-full">
-            <div className="rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 shadow-sm">
-              <span className="font-orbitron text-[10px] font-black tracking-widest text-[var(--text)] uppercase">
-                CODE <span className="text-[var(--accent)]">CRACKER</span>
+          <div className="flex w-full flex-col gap-4 mb-6">
+            {/* Row 1: Logo (Centered) */}
+            <div className="flex w-full justify-center">
+              <span className="font-['Dancing_Script'] text-3xl font-bold leading-none bg-blue-500 bg-clip-text text-transparent drop-shadow-sm">
+                Crack My Code
               </span>
+            </div>
+
+            {/* Row 2: Stats */}
+            <div className="flex items-center justify-between">
+              {/* CMC Points */}
+              <div className="flex items-center gap-1.5 rounded-xl border border-black/5 bg-black/5 px-3 py-1.5">
+                <span className="text-[10px] font-black text-black/40 uppercase tracking-widest">CMC</span>
+                <span className="font-orbitron text-xs font-black text-[var(--clue-yellow)]">{gs.playerPoints}</span>
+              </div>
+
+              {/* USDT Balance */}
+              <div className="flex items-center gap-1.5 rounded-xl border border-[var(--accent)]/10 bg-[var(--accent)]/5 px-3 py-1.5">
+                <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
+                <span className="font-orbitron text-xs font-black text-[var(--accent)]">
+                  {usdtData && parseFloat(usdtData.formatted) > 0 ? parseFloat(usdtData.formatted).toFixed(3) : '0.000'} <span className="text-[8px] opacity-60">USDT</span>
+                </span>
+              </div>
             </div>
           </div>
 
@@ -1064,9 +1095,43 @@ export default function Home() {
                     </span>
                     <span className="text-[10px] font-black text-black/30 tracking-widest uppercase">(1200 CMC)</span>
                   </div>
-                  <div className="flex w-full justify-end">
+                  <div className="flex w-full justify-end gap-2">
                     {game.player1Address.toLowerCase() === address.toLowerCase() ? (
-                      <div className="rounded-lg border-2 border-black/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-black/20">Hosting</div>
+                      <>
+                        {!game.isPublic && (
+                          <button 
+                            onClick={() => {
+                              const inviteUrl = `${window.location.origin}/?invite=${game.id}`;
+                              navigator.clipboard.writeText(inviteUrl);
+                              toast.success("Invite link copied!");
+                            }}
+                            className="rounded-lg border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] shadow-sm"
+                          >
+                            COPY LINK
+                          </button>
+                        )}
+                        <button 
+                          onClick={async () => {
+                            try {
+                              if (game.onChainId) {
+                                await cancelChallenge(game.onChainId);
+                              }
+                              await fetch('/api/games/cancel', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ gameId: game.id, address })
+                              });
+                              toast.success("Challenge closed");
+                              fetchLobby();
+                            } catch (err) {
+                              toast.error("Failed to close challenge");
+                            }
+                          }}
+                          className="rounded-lg border-2 border-red-500/20 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 shadow-sm"
+                        >
+                          CLOSE
+                        </button>
+                      </>
                     ) : (
                       <button onClick={() => setReadyGame(game)} className="rounded-lg border-2 border-black/10 bg-[var(--bg-elevated)] px-8 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] shadow-sm">JOIN</button>
                     )}
@@ -1174,7 +1239,7 @@ export default function Home() {
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-2 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-sm">
               <span className="text-[10px] font-black uppercase tracking-widest text-black/40">USDT</span>
-              <span className="font-orbitron text-2xl font-black text-[var(--accent)]">{usdtData ? parseFloat(usdtData.formatted).toFixed(0) : '0'}</span>
+              <span className="font-orbitron text-2xl font-black text-[var(--accent)]">{usdtData ? parseFloat(usdtData.formatted).toFixed(3) : '0.000'}</span>
             </div>
             <div className="flex flex-col gap-2 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-sm">
               <span className="text-[10px] font-black uppercase tracking-widest text-black/40">CMC</span>

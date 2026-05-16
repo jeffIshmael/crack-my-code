@@ -35,15 +35,15 @@ const fadeUp = {
   animate: { opacity: 1, y: 0, transition: { duration: 0.45, ease: [0.22, 1, 0.36, 1] } },
 };
 
-export default function Lobby({ 
-  rating, 
-  points, 
-  isMatchmaking, 
-  opponentName, 
-  onFindMatch, 
-  onMatchFound, 
-  onWalletClick, 
-  searchTime = 0, 
+export default function Lobby({
+  rating,
+  points,
+  isMatchmaking,
+  opponentName,
+  onFindMatch,
+  onMatchFound,
+  onWalletClick,
+  searchTime = 0,
   onCancelMatchmaking,
   gameId
 }: LobbyProps) {
@@ -164,31 +164,51 @@ export default function Lobby({
   };
 
   return (
-    <div className="flex h-dvh flex-col items-center justify-between px-5 pt-8 pb-32 text-[var(--text)] overflow-hidden">
-      
+    <div className="relative flex h-dvh flex-col items-center justify-between px-5 pt-8 pb-32 text-[var(--text)] overflow-hidden">
+
       {/* ── Top row with Sign Up ── */}
-      <div className="flex w-full items-center justify-end">
-        {!isConnected ? (
-          <button
-            onClick={() => login()}
-            className="flex items-center gap-2 rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 shadow-sm hover:scale-105 transition-transform"
-          >
-            <div className="h-3 w-3 rounded-full border-2 border-black/20" />
-            <span className="text-[10px] font-black tracking-widest text-[var(--text)] uppercase">Sign Up</span>
-          </button>
+      {/* ── Top Header Row ── */}
+      {/* ── Top Header Section ── */}
+      <div className="flex w-full flex-col gap-4 px-2">
+        {/* Row 1: Logo (Centered) */}
+        <div className="flex w-full justify-center">
+          <span className="font-['Dancing_Script'] text-3xl font-bold leading-none bg-blue-500 bg-clip-text text-transparent drop-shadow-sm">
+            Crack My Code
+          </span>
+        </div>
+
+        {/* Row 2: Stats (When Connected) */}
+        {isConnected ? (
+          <div className="flex items-center justify-between">
+            {/* CMC Points */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-black/5 bg-black/5 px-3 py-1.5">
+
+              <span className="font-orbitron text-xs font-black text-[var(--clue-yellow)]">{points}</span>
+              <span className="text-[10px] font-black text-black/40 uppercase tracking-widest">CMC</span>
+            </div>
+
+            {/* USDT Balance */}
+            <div className="flex items-center gap-1.5 rounded-xl border border-[var(--accent)]/10 bg-[var(--accent)]/5 px-3 py-1.5">
+              <span className="font-orbitron text-xs font-black text-[var(--accent)]">
+                {usdtData && parseFloat(usdtData.formatted) > 0 ? parseFloat(usdtData.formatted).toFixed(3) : '0.000'} <span className="text-[8px] opacity-60">USDT</span>
+              </span>
+            </div>
+          </div>
         ) : (
-          <div className="flex items-center gap-2 rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 shadow-sm">
-            <div className="h-2 w-2 rounded-full bg-[var(--clue-green)] animate-pulse" />
-            <span className="text-[10px] font-black tracking-widest text-[var(--text)] uppercase">
-              {address?.slice(0, 4)}...{address?.slice(-4)}
-            </span>
+          <div className="flex w-full justify-center">
+            <button
+              onClick={() => login()}
+              className="flex items-center gap-2 rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-2 shadow-sm hover:scale-105 transition-transform"
+            >
+              <span className="text-[10px] font-black tracking-widest text-[var(--text)] uppercase">Connect Wallet</span>
+            </button>
           </div>
         )}
       </div>
 
       {/* ── Center: Interactive Detective Zone ── */}
       <div className="flex flex-1 w-full flex-col items-center justify-center py-4 relative">
-        
+
         {/* Background Narrative Layer (Scribbles) */}
         <motion.div
           initial={{ opacity: 0 }}
@@ -199,8 +219,8 @@ export default function Lobby({
             <span className="absolute top-4 left-4 font-handwritten text-4xl -rotate-12 text-black">1042?</span>
             <span className="absolute bottom-4 right-4 font-handwritten text-3xl rotate-6 text-black underline">Classified</span>
             <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center opacity-40">
-               <span className="font-orbitron text-5xl font-black tracking-[0.4em] text-black">TOP SECRET</span>
-               <div className="h-1 w-64 bg-black mt-2" />
+              <span className="font-orbitron text-5xl font-black tracking-[0.4em] text-black">TOP SECRET</span>
+              <div className="h-1 w-64 bg-black mt-2" />
             </div>
             <div className="absolute top-1/4 right-0 h-12 w-12 rounded-full border-2 border-black flex items-center justify-center font-handwritten text-xl rotate-12">7</div>
             <div className="absolute bottom-1/4 left-0 h-10 w-10 rounded-full border-2 border-black flex items-center justify-center font-handwritten text-lg -rotate-12">3</div>
@@ -213,10 +233,10 @@ export default function Lobby({
             <div className="w-full">
               {opponentName === 'WAITING' ? (
                 gameId ? (
-                  <InviteWaiting 
+                  <InviteWaiting
                     searchTime={searchTime}
                     onCancel={onCancelMatchmaking}
-                    gameId={gameId} 
+                    gameId={gameId}
                     isCreating={isCreating}
                   />
                 ) : (
@@ -226,9 +246,9 @@ export default function Lobby({
                   </div>
                 )
               ) : (
-                <MatchmakingPulse 
-                  opponentName={opponentName} 
-                  mode={selectedMode} 
+                <MatchmakingPulse
+                  opponentName={opponentName}
+                  mode={selectedMode}
                   searchTime={searchTime}
                   onCancel={onCancelMatchmaking}
                 />
@@ -242,12 +262,12 @@ export default function Lobby({
                 <motion.div
                   className="absolute -top-20 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none"
                   initial={{ opacity: 0, y: 40 }}
-                  animate={{ 
-                    opacity: 1, 
+                  animate={{
+                    opacity: 1,
                     y: [0, -4, 0],
                     rotate: [0, -1, 1, -1, 0]
                   }}
-                  transition={{ 
+                  transition={{
                     opacity: { delay: 0.3, duration: 0.8 },
                     y: { repeat: Infinity, duration: 4, ease: "easeInOut" },
                     rotate: { repeat: Infinity, duration: 6, ease: "easeInOut" }
@@ -258,23 +278,23 @@ export default function Lobby({
                     initial={{ scale: 0, opacity: 0, y: 10 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
                     transition={{ delay: 0.8, duration: 0.4, type: 'spring' }}
-                    className="relative mb-4 max-w-[150px] rounded-2xl border-2 border-[var(--accent)] bg-white p-3 shadow-[0_4px_20px_rgba(37,99,235,0.15)] -translate-y-2"
+                    className="relative mb-4 max-w-[180px] rounded-2xl border-2 border-[var(--accent)] bg-white p-3 shadow-[0_4px_20px_rgba(37,99,235,0.15)] -translate-y-2"
                   >
                     <p className="font-orbitron text-[9px] font-black leading-tight text-[var(--accent)] text-center uppercase tracking-wider">
-                      "Psst! I'm <span className="text-blue-500">Cipher</span>. Try my code if you dare!"
+                      "I&apos;m <span className="text-blue-500">Cipher</span>. I crack your code in 3 tries. You&apos;ll never crack mine. Let&apos;s begin."
                     </p>
-                    
+
                     {/* Bubble Tail */}
                     <div className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-r-2 border-b-2 border-[var(--accent)] bg-white" />
                   </motion.div>
 
                   {/* Character (On Top) */}
                   <div className="h-28 w-28 -mt-8">
-                    <Image 
-                      src="/robot.png" 
-                      alt="Cipher AI" 
-                      width={112} 
-                      height={112} 
+                    <Image
+                      src="/robot.png"
+                      alt="Cipher AI"
+                      width={112}
+                      height={112}
                       className="drop-shadow-2xl mix-blend-multiply"
                       priority
                     />
@@ -288,8 +308,8 @@ export default function Lobby({
                 >
                   <div className="absolute inset-0 bg-gradient-to-tr from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   <div className="flex flex-col items-center gap-1">
-                    <span className="font-orbitron text-sm font-black tracking-[0.2em] text-[var(--text)] uppercase">
-                      Cipher AI Duel
+                    <span className="font-orbitron text-sm font-black tracking-[0.1em] text-[var(--text)] uppercase px-4 text-center">
+                      Play Against Cipher AI
                     </span>
                     <span className="text-[8px] font-black text-black/30 tracking-[0.3em] uppercase">Computer Match</span>
                   </div>
@@ -299,15 +319,14 @@ export default function Lobby({
               {/* PvP Button */}
               <button
                 onClick={isConnected ? openPvPModal : () => login()}
-                className={`group relative z-10 flex h-20 items-center justify-center rounded-3xl border-2 transition-all shadow-[0_8px_24px_rgba(0,0,0,0.06)] ${
-                  isConnected 
-                    ? "border-black/10 bg-[var(--bg-elevated)] hover:translate-y-[-2px] active:translate-y-[1px]" 
+                className={`group relative z-10 flex h-20 items-center justify-center rounded-3xl border-2 transition-all shadow-[0_8px_24px_rgba(0,0,0,0.06)] ${isConnected
+                    ? "border-black/10 bg-[var(--bg-elevated)] hover:translate-y-[-2px] active:translate-y-[1px]"
                     : "border-black/10 bg-black/5 opacity-80"
-                }`}
+                  }`}
               >
                 <div className="flex flex-col items-center gap-1">
-                  <span className="font-orbitron text-sm font-black tracking-[0.2em] text-[var(--text)] uppercase">
-                    PVP Challenge
+                  <span className="font-orbitron text-sm font-black tracking-[0.1em] text-[var(--text)] uppercase px-4 text-center">
+                    Play Against Opponent
                   </span>
                   <span className="text-[8px] font-black text-black/30 tracking-[0.3em] uppercase">Human Opponent</span>
                 </div>
@@ -320,18 +339,18 @@ export default function Lobby({
       {/* ── Incoming Invite Modal ── */}
       <AnimatePresence>
         {!isMatchmaking && gameId && !isCreating && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6">
+          <div className="fixed inset-x-0 inset-y-0 z-[110] flex items-center justify-center pointer-events-none p-6">
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[var(--bg-base)]/80 backdrop-blur-xl"
+              className="fixed inset-0 bg-black/60 backdrop-blur-xl pointer-events-auto"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm rounded-3xl border-2 border-black/10 bg-[var(--bg-card)] p-8 shadow-2xl"
+              className="relative w-full max-w-[400px] rounded-3xl border-2 border-black/10 bg-[var(--bg-card)] p-8 shadow-2xl pointer-events-auto"
             >
               <div className="flex flex-col items-center gap-6 text-center">
                 <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
@@ -367,23 +386,23 @@ export default function Lobby({
       {/* ── PvP Mode Selection Bottom Sheet ── */}
       <AnimatePresence>
         {showPvPModal && (
-          <div className="fixed inset-0 z-[100] flex items-end justify-center">
-            {/* Backdrop */}
+          <div className="fixed inset-x-0 inset-y-0 z-[120] flex items-end justify-center pointer-events-none">
+            {/* Backdrop (Full screen) */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[var(--bg-base)]/70 backdrop-blur-md"
+              className="fixed inset-0 bg-black/60 backdrop-blur-md pointer-events-auto"
               onClick={() => setShowPvPModal(false)}
             />
 
-            {/* Sheet */}
+            {/* Sheet (Caged) */}
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-              className="relative w-full max-w-sm rounded-t-[2.5rem] border-t border-x border-black/5 bg-[var(--bg-elevated)] p-8 shadow-[0_-12px_40px_rgba(0,0,0,0.15)]"
+              className="relative w-full max-w-[440px] rounded-t-[2.5rem] border-t border-x border-black/10 bg-[#FDFCFB] p-8 shadow-[0_-12px_40px_rgba(0,0,0,0.25)] pb-12 pointer-events-auto"
             >
               {/* Handle */}
               <div className="absolute top-3 left-1/2 h-1.5 w-12 -translate-x-1/2 rounded-full bg-white/10" />
@@ -425,11 +444,11 @@ export default function Lobby({
                       {/* Friendly Option */}
                       <button
                         onClick={() => handleStartPvP('fun')}
-                        className="group flex flex-col gap-2 rounded-2xl border border-white/5 bg-white/5 p-5 text-left transition-all hover:bg-white/[0.08]"
+                        className="group flex flex-col gap-2 rounded-2xl border border-black/5 bg-black/5 p-5 text-left transition-all hover:bg-black/[0.08] hover:translate-y-[-2px] active:translate-y-[1px] shadow-sm hover:shadow-md"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-orbitron text-sm font-black tracking-wider text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">FRIENDLY</span>
-                          <span className="text-xl">⚔️</span>
+                          <span className="text-xl transition-transform group-hover:scale-125">⚔️</span>
                         </div>
                         <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Free Match • Play for Global Ranking</p>
                       </button>
@@ -437,11 +456,11 @@ export default function Lobby({
                       {/* Paid Option */}
                       <button
                         onClick={() => handleStartPvP('cash')}
-                        className="group flex flex-col gap-2 rounded-2xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 p-5 text-left transition-all hover:bg-[var(--orange)]/10"
+                        className="group flex flex-col gap-2 rounded-2xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 p-5 text-left transition-all hover:bg-[var(--orange)]/10 hover:translate-y-[-2px] active:translate-y-[1px] shadow-sm hover:shadow-md"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-orbitron text-sm font-black tracking-wider text-[var(--orange)]">PROFESSIONAL</span>
-                          <span className="text-xl">💰</span>
+                          <span className="text-xl transition-transform group-hover:scale-125">💰</span>
                         </div>
                         <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Stake USDT • Winner Takes 99%</p>
                       </button>
@@ -535,13 +554,13 @@ export default function Lobby({
                       <button
                         onClick={() => handleFinalizeChallenge(true)}
                         disabled={isCreating}
-                        className="group flex flex-col gap-2 rounded-2xl border border-white/5 bg-white/5 p-5 text-left transition-all hover:bg-white/[0.08] disabled:opacity-50"
+                        className="group flex flex-col gap-2 rounded-2xl border border-black/10 bg-black/5 p-5 text-left transition-all hover:bg-black/[0.08] disabled:opacity-50"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-orbitron text-sm font-black tracking-wider text-white">ANYONE CAN JOIN</span>
+                          <span className="font-orbitron text-sm font-black tracking-wider text-black">ANYONE CAN JOIN</span>
                           <span className="text-xl">🌍</span>
                         </div>
-                        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Public challenge • Visible on Global Board</p>
+                        <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Public challenge • Visible on Global Board</p>
                       </button>
 
                       <button
@@ -553,10 +572,10 @@ export default function Lobby({
                           <span className="font-orbitron text-sm font-black tracking-wider text-[var(--accent)]">INVITE ONLY</span>
                           <span className="text-xl">🔐</span>
                         </div>
-                        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Private challenge • Generate secret link</p>
+                        <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Private challenge • Generate secret link</p>
                       </button>
 
-                      <button 
+                      <button
                         onClick={() => selectedMode === 'cash' ? setPvpStep('config') : setPvpStep('selection')}
                         className="mt-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] hover:text-white transition-colors"
                       >
@@ -579,16 +598,16 @@ export default function Lobby({
 
 // ─── Radar matchmaking animation ────────────────────────────────────────────
 
-function MatchmakingPulse({ 
-  opponentName, 
-  mode, 
-  searchTime = 0, 
-  onCancel 
-}: { 
-  opponentName: string, 
-  mode: GameMode, 
-  searchTime?: number, 
-  onCancel?: () => void 
+function MatchmakingPulse({
+  opponentName,
+  mode,
+  searchTime = 0,
+  onCancel
+}: {
+  opponentName: string,
+  mode: GameMode,
+  searchTime?: number,
+  onCancel?: () => void
 }) {
   const isAI = mode === 'ai';
 
@@ -626,35 +645,35 @@ function MatchmakingPulse({
           {isAI ? 'INITIALIZING AI' : 'FINDING OPPONENT'}
         </p>
         <motion.p
-           className="text-xs"
-           style={{ color: 'var(--text-2)' }}
-           animate={{ opacity: [0.4, 1, 0.4] }}
-           transition={{ duration: 1.4, repeat: Infinity }}
-         >
-           {isAI ? 'Booting logical engine' : 'Scanning for challengers'}
-           <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}>.</motion.span>
-           <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.6 }}>.</motion.span>
-           <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.8 }}>.</motion.span>
-         </motion.p>
- 
-         {/* Live Timer */}
-         {!isAI && (
-           <div className="mt-4 flex flex-col items-center gap-4">
-             <div className="rounded-full border border-white/10 bg-white/5 px-4 py-1">
-               <span className="font-code text-sm font-black text-[var(--accent)]">
-                 {Math.floor(searchTime / 60)}:{(searchTime % 60).toString().padStart(2, '0')}
-               </span>
-             </div>
-             
-             <button
-               onClick={onCancel}
-               className="rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 active:scale-95"
-             >
-               CANCEL SEARCH
-             </button>
-           </div>
-         )}
-       </div>
+          className="text-xs"
+          style={{ color: 'var(--text-2)' }}
+          animate={{ opacity: [0.4, 1, 0.4] }}
+          transition={{ duration: 1.4, repeat: Infinity }}
+        >
+          {isAI ? 'Booting logical engine' : 'Scanning for challengers'}
+          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}>.</motion.span>
+          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.6 }}>.</motion.span>
+          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.8 }}>.</motion.span>
+        </motion.p>
+
+        {/* Live Timer */}
+        {!isAI && (
+          <div className="mt-4 flex flex-col items-center gap-4">
+            <div className="rounded-full border border-white/10 bg-white/5 px-4 py-1">
+              <span className="font-code text-sm font-black text-[var(--accent)]">
+                {Math.floor(searchTime / 60)}:{(searchTime % 60).toString().padStart(2, '0')}
+              </span>
+            </div>
+
+            <button
+              onClick={onCancel}
+              className="rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 active:scale-95"
+            >
+              CANCEL SEARCH
+            </button>
+          </div>
+        )}
+      </div>
 
       {/* Found opponent indicator */}
       {!isAI && (
@@ -681,13 +700,13 @@ function MatchmakingPulse({
   );
 }
 
-function InviteWaiting({ 
-  searchTime, 
+function InviteWaiting({
+  searchTime,
   onCancel,
   gameId,
   isCreating
-}: { 
-  searchTime: number, 
+}: {
+  searchTime: number,
   onCancel?: () => void,
   gameId: string,
   isCreating?: boolean
@@ -706,12 +725,12 @@ function InviteWaiting({
   return (
     <div className="flex flex-col items-center gap-8 py-4">
       <div className="relative flex h-24 w-24 items-center justify-center rounded-full bg-[var(--accent)]/10">
-         <span className="text-4xl animate-bounce">⏳</span>
-         <motion.div 
-           className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/30 border-t-[var(--accent)]"
-           animate={{ rotate: 360 }}
-           transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-         />
+        <span className="text-4xl animate-bounce">⏳</span>
+        <motion.div
+          className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/30 border-t-[var(--accent)]"
+          animate={{ rotate: 360 }}
+          transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+        />
       </div>
 
       <div className="flex flex-col items-center gap-2 text-center">
@@ -722,11 +741,11 @@ function InviteWaiting({
       </div>
 
       <div className="flex w-full max-w-[300px] flex-col gap-3">
-        <div 
+        <div
           onClick={handleCopy}
-          className="relative flex cursor-pointer items-center justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4 transition-all hover:bg-white/10"
+          className="relative flex cursor-pointer items-center justify-between overflow-hidden rounded-2xl border border-black/10 bg-black/5 p-4 transition-all hover:bg-black/10"
         >
-          <span className="truncate pr-4 text-[10px] font-bold text-[var(--text-dim)]">{inviteUrl}</span>
+          <span className="truncate pr-4 text-[10px] font-bold text-black/60">{inviteUrl}</span>
           <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">
             {copied ? 'COPIED' : 'COPY'}
           </span>

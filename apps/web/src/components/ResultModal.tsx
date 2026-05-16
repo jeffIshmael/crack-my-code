@@ -1,6 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
+import { X } from 'lucide-react';
 import type { GameMode, GameResult } from '@/lib/game';
 
 interface ResultModalProps {
@@ -14,6 +15,7 @@ interface ResultModalProps {
   playerPoints: number;
   guessCount: number;
   onPlayAgain: () => void;
+  onHome: () => void;
 }
 
 const CONFETTI_COLORS = ['#00CFFF', '#10B981', '#F59E0B', '#FF6B2B', '#A78BFA'];
@@ -29,6 +31,7 @@ export default function ResultModal({
   playerPoints,
   guessCount,
   onPlayAgain,
+  onHome,
 }: ResultModalProps) {
   const isWin = result === 'win';
   const prizePool = stakeAmount * 2;
@@ -36,17 +39,17 @@ export default function ResultModal({
 
   return (
     <motion.div
-      className="fixed inset-0 z-50 flex items-end justify-center"
+      className="fixed inset-x-0 inset-y-0 z-[120] flex items-end justify-center pointer-events-none"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
     >
       {/* Backdrop */}
       <motion.div
-        className="absolute inset-0"
-        style={{ background: 'var(--bg-base)', opacity: 0.85, backdropFilter: 'blur(8px)' }}
+        className="fixed inset-0 bg-black/50 backdrop-blur-md pointer-events-auto"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
+        onClick={onHome}
       />
 
       {/* Confetti particles (win only) */}
@@ -54,7 +57,7 @@ export default function ResultModal({
 
       {/* Modal card */}
       <motion.div
-        className="relative z-10 w-full max-w-sm overflow-hidden rounded-t-3xl pb-8"
+        className="relative z-10 w-full max-w-[440px] overflow-hidden rounded-t-[2.5rem] pb-10 pointer-events-auto"
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-mid)',
@@ -80,6 +83,14 @@ export default function ResultModal({
           animate={{ scaleX: 1 }}
           transition={{ duration: 0.6, delay: 0.3 }}
         />
+
+        {/* Close Button */}
+        <button
+          onClick={onHome}
+          className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/5 text-black/40 transition-all hover:bg-black/10 hover:text-black hover:scale-110 active:scale-90"
+        >
+          <X size={24} />
+        </button>
 
         <div className="flex flex-col items-center gap-5 px-6 pt-6">
 
@@ -266,20 +277,22 @@ export default function ResultModal({
           {/* Play again */}
           <motion.button
             onClick={onPlayAgain}
-            className="w-full rounded-[2rem] py-5 font-orbitron text-base font-black tracking-[0.25em]"
+            className="group relative w-full overflow-hidden rounded-2xl py-5 font-orbitron text-base font-black tracking-[0.25em] transition-all hover:translate-y-[-2px] active:translate-y-[1px]"
             style={{
               background: isWin
                 ? 'var(--clue-green)'
                 : 'var(--accent)',
               color: 'var(--bg-base)',
-              boxShadow: isWin ? '0 12px 32px rgba(5,150,105,0.2)' : '0 12px 32px rgba(37,99,235,0.2)',
+              boxShadow: isWin 
+                ? '0 12px 24px rgba(5,150,105,0.25), 0 0 0 1px rgba(0,0,0,0.1) inset' 
+                : '0 12px 24px rgba(37,99,235,0.25), 0 0 0 1px rgba(0,0,0,0.1) inset',
             }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.75 }}
-            whileTap={{ scale: 0.97 }}
           >
-            PLAY AGAIN
+            <div className="absolute inset-0 bg-white/10 opacity-0 transition-opacity group-hover:opacity-100" />
+            <span className="relative z-10">PLAY AGAIN</span>
           </motion.button>
 
           <motion.p
