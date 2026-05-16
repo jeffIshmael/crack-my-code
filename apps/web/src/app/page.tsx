@@ -1052,13 +1052,13 @@ export default function Home() {
             {/* Row 2: Stats */}
             <div className="flex items-center justify-between">
               {/* CMC Points */}
-              <div className="flex items-center gap-1.5 rounded-xl border border-black/5 bg-black/5 px-3 py-1.5">
+              <div className="flex items-center gap-1.5 rounded-xl bg-white/80 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-black/5 px-3 py-1.5">
                 <span className="text-[10px] font-black text-black/40 uppercase tracking-widest">CMC</span>
                 <span className="font-orbitron text-xs font-black text-[var(--clue-yellow)]">{gs.playerPoints}</span>
               </div>
 
               {/* USDT Balance */}
-              <div className="flex items-center gap-1.5 rounded-xl border border-[var(--accent)]/10 bg-[var(--accent)]/5 px-3 py-1.5">
+              <div className="flex items-center gap-1.5 rounded-xl bg-white/80 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-[var(--accent)]/10 px-3 py-1.5">
                 <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
                 <span className="font-orbitron text-xs font-black text-[var(--accent)]">
                   {usdtData && parseFloat(usdtData.formatted) > 0 ? parseFloat(usdtData.formatted).toFixed(3) : '0.000'} <span className="text-[8px] opacity-60">USDT</span>
@@ -1111,25 +1111,39 @@ export default function Home() {
                           </button>
                         )}
                         <button 
+                          disabled={isJoining === game.id}
                           onClick={async () => {
+                            if (isJoining) return;
+                            setIsJoining(game.id);
+                            const toastId = toast.loading("Closing challenge...");
                             try {
+                              console.log('Closing game:', game);
                               if (game.onChainId) {
+                                console.log('Calling on-chain cancelChallenge for ID:', game.onChainId);
                                 await cancelChallenge(game.onChainId);
                               }
-                              await fetch('/api/games/cancel', {
+                              
+                              console.log('Calling API to cancel game:', game.id);
+                              const res = await fetch('/api/games/cancel', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ gameId: game.id, address })
                               });
-                              toast.success("Challenge closed");
+
+                              if (!res.ok) throw new Error('API cancellation failed');
+                              
+                              toast.success("Challenge closed", { id: toastId });
                               fetchLobby();
                             } catch (err) {
-                              toast.error("Failed to close challenge");
+                              console.error('Failed to close challenge:', err);
+                              toast.error(getErrorMessage(err), { id: toastId });
+                            } finally {
+                              setIsJoining(null);
                             }
                           }}
-                          className="rounded-lg border-2 border-red-500/20 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 shadow-sm"
+                          className="rounded-lg border-2 border-red-500/20 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 shadow-sm disabled:opacity-50"
                         >
-                          CLOSE
+                          {isJoining === game.id ? 'CLOSING...' : 'CLOSE'}
                         </button>
                       </>
                     ) : (

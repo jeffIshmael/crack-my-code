@@ -181,14 +181,13 @@ export default function Lobby({
         {isConnected ? (
           <div className="flex items-center justify-between">
             {/* CMC Points */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-black/5 bg-black/5 px-3 py-1.5">
-
+            <div className="flex items-center gap-1.5 rounded-xl bg-white/80 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-black/5 px-3 py-1.5">
               <span className="font-orbitron text-xs font-black text-[var(--clue-yellow)]">{points}</span>
               <span className="text-[10px] font-black text-black/40 uppercase tracking-widest">CMC</span>
             </div>
 
             {/* USDT Balance */}
-            <div className="flex items-center gap-1.5 rounded-xl border border-[var(--accent)]/10 bg-[var(--accent)]/5 px-3 py-1.5">
+            <div className="flex items-center gap-1.5 rounded-xl bg-white/80 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-[var(--accent)]/10 px-3 py-1.5">
               <span className="font-orbitron text-xs font-black text-[var(--accent)]">
                 {usdtData && parseFloat(usdtData.formatted) > 0 ? parseFloat(usdtData.formatted).toFixed(3) : '0.000'} <span className="text-[8px] opacity-60">USDT</span>
               </span>
@@ -260,7 +259,7 @@ export default function Lobby({
               <div className="relative pt-12">
                 {/* Floating Cipher and Bubble */}
                 <motion.div
-                  className="absolute -top-20 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none"
+                  className="absolute -top-32 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none"
                   initial={{ opacity: 0, y: 40 }}
                   animate={{
                     opacity: 1,
@@ -278,10 +277,10 @@ export default function Lobby({
                     initial={{ scale: 0, opacity: 0, y: 10 }}
                     animate={{ scale: 1, opacity: 1, y: 0 }}
                     transition={{ delay: 0.8, duration: 0.4, type: 'spring' }}
-                    className="relative mb-4 max-w-[180px] rounded-2xl border-2 border-[var(--accent)] bg-white p-3 shadow-[0_4px_20px_rgba(37,99,235,0.15)] -translate-y-2"
+                    className="relative mb-4 max-w-[200px] rounded-2xl border-2 border-[var(--accent)] bg-white p-3 shadow-[0_4px_20px_rgba(37,99,235,0.15)] -translate-y-2"
                   >
                     <p className="font-orbitron text-[9px] font-black leading-tight text-[var(--accent)] text-center uppercase tracking-wider">
-                      "I&apos;m <span className="text-blue-500">Cipher</span>. I crack your code in 3 tries. You&apos;ll never crack mine. Let&apos;s begin."
+                      I&apos;m <span className="text-blue-500">Cipher</span>. I crack your code in 3 tries. You&apos;ll never crack mine. Let&apos;s begin.
                     </p>
 
                     {/* Bubble Tail */}
