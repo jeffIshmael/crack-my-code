@@ -26,7 +26,7 @@ import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check } from 'lucide-react';
+import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -79,6 +79,7 @@ export default function Home() {
   const [isWaiting, setIsWaiting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [myActiveGames, setMyActiveGames] = useState<any[]>([]);
+  const [gameHistory, setGameHistory] = useState<any[]>([]);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
   const [searchTime, setSearchTime] = useState(0);
   const [countdown, setCountdown] = useState<number | 'GO' | null>(null);
@@ -92,29 +93,34 @@ export default function Home() {
 
   const clearOppTimer = () => { if (oppTimerRef.current) clearTimeout(oppTimerRef.current); };
 
-  // 1. Fetch initial lobby
-  useEffect(() => {
-    const fetchLobby = async () => {
-      try {
-        const res = await fetch('/api/games/lobby');
-        const data = await res.json();
-        setLobbyGames(data);
-      } catch (err) {
-        console.error('Lobby fetch failed', err);
-      }
-    };
-    fetchLobby();
+  const fetchLobby = useCallback(async () => {
+    try {
+      const res = await fetch('/api/games/lobby');
+      const data = await res.json();
+      setLobbyGames(data);
+    } catch (err) {
+      console.error('Lobby fetch failed', err);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchLobby();
+  }, [fetchLobby]);
 
   // 1.2 Fetch my active challenges
   const fetchMyActive = useCallback(async () => {
     if (!authenticated || !address) return;
     try {
-      const res = await fetch(`/api/games/my-active?address=${address}`);
-      const data = await res.json();
-      setMyActiveGames(Array.isArray(data) ? data : []);
+      const [activeRes, historyRes] = await Promise.all([
+        fetch(`/api/games/my-active?address=${address}`),
+        fetch(`/api/games/history?address=${address}`)
+      ]);
+      const activeData = await activeRes.json();
+      const historyData = await historyRes.json();
+      setMyActiveGames(Array.isArray(activeData) ? activeData : []);
+      setGameHistory(Array.isArray(historyData) ? historyData : []);
     } catch (err) {
-      console.error('My active games fetch failed', err);
+      console.error('Games data fetch failed', err);
     }
   }, [authenticated, address]);
 
@@ -508,12 +514,9 @@ export default function Home() {
     }
   };
 
-  const handleFindMatch = useCallback(async (mode: GameMode, stake: number, isPublic: boolean = true) => {
-    if (!address && mode !== 'ai') {
-      toast.error("Connect wallet to play PvP or Professional duels.");
-      return;
-    }
-
+  const handleFindMatch = async (mode: GameMode, stake: number, isPublic: boolean = true, userBalance?: number) => {
+    setSearchTime(0);
+    setGs(curr => ({ ...curr, phase: 'matchmaking', gameMode: mode, opponentName: 'SEARCHING...' }));
 
     const effectiveAddress = address || 'GUEST';
     setCurrentGameId(null);
@@ -527,6 +530,7 @@ export default function Home() {
         const isPaid = mode === 'cash';
         const stakeAmt = parseUnits(stake.toString(), 6);
         console.log("the paid status", isPaid);
+
 
         let receipt;
 
@@ -602,7 +606,7 @@ export default function Home() {
       toast.error('Matchmaking Error', { description: getErrorMessage(err) });
       setGs(prev => ({ ...prev, phase: 'lobby' }));
     }
-  }, [address, isConnected, publicClient, writeContractAsync, smartWalletClient, handleMatchFound]);
+  };
 
   const handleCancelMatchmaking = useCallback(async () => {
     if (currentGameId) {
@@ -966,6 +970,8 @@ export default function Home() {
 
       if (isPaid) {
         console.log("On-chain joinChallenge required for paid match");
+        
+
         let receipt;
         if (smartWalletClient) {
           const data = encodeFunctionData({
@@ -990,9 +996,6 @@ export default function Home() {
           if (!publicClient) throw new Error("Public client not available");
           receipt = await publicClient.waitForTransactionReceipt({ hash });
         }
-        console.log("On-chain join successful", receipt);
-      } else {
-        console.log("Bypassing on-chain joinChallenge for free match");
       }
 
       const res = await fetch('/api/games/join', {
@@ -1012,172 +1015,118 @@ export default function Home() {
       setIsJoining(null);
     }
   };
+
+  const [lobbyTab, setLobbyTab] = useState<'open' | 'mine'>('open');
+
   const renderOpenGames = () => (
-    <motion.div key="games" className="flex w-full flex-col gap-10 px-5 pt-12 pb-48 text-left" {...screenVariants}>
+    <motion.div key="games" className="flex w-full flex-col gap-8 px-5 pt-12 pb-48 text-left" {...screenVariants}>
       {!address ? (
-        <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
-          <div className="text-6xl grayscale opacity-30">🛡️</div>
-          <div className="flex flex-col gap-2">
-            <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Wallet Not Connected</h2>
-            <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest max-w-[200px] mx-auto">Connect your wallet to view active challenges and accept duels</p>
-          </div>
-          <button
-            onClick={() => login()}
-            className="rounded-full bg-[var(--accent)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[#030C15]"
-          >
-            Sign In
-          </button>
+        <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-8">
+          <div className="text-5xl grayscale opacity-30">🛡️</div>
+          <p className="text-[10px] font-black tracking-widest text-[var(--text-dim)] uppercase">Connect wallet to view board</p>
+          <button onClick={() => login()} className="rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Sign In</button>
         </div>
       ) : (
         <>
-          {/* Section: My Active Challenges */}
-          {myActiveGames.length > 0 && (
-            <div className="flex flex-col gap-6">
-              <div className="flex flex-col gap-1">
-                <h2 className="font-orbitron text-base font-black tracking-widest text-[var(--orange)] uppercase">My Pending Dues</h2>
-                <p className="text-[8px] text-[var(--text-dim)] uppercase tracking-widest">You are currently hosting these challenges</p>
-              </div>
-              <div className="flex flex-col gap-3">
-                {myActiveGames.map((game) => (
-                  <motion.div
-                    key={game.id}
-                    className="flex items-center justify-between rounded-2xl border border-[var(--orange)]/20 bg-[var(--orange)]/5 p-5"
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="font-orbitron text-[9px] font-black tracking-widest text-[var(--orange)] uppercase">
-                        {game.mode === 'cash' ? 'Professional' : 'Friendly'} Duel
-                      </span>
-                      <span className="text-[10px] font-bold text-[var(--text-dim)]">WAITING FOR OPPONENT...</span>
-                    </div>
-                    <button
-                      onClick={() => handleCancelChallenge(game.id, game.onChainMatchId)}
-                      disabled={isCancelling === game.id}
-                      className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-red-400 transition-all hover:bg-red-500/20 disabled:opacity-50"
-                    >
-                      {isCancelling === game.id ? 'Cancelling...' : 'Cancel'}
-                    </button>
-                  </motion.div>
-                ))}
-              </div>
-              <div className="h-px w-full bg-white/5" />
-            </div>
-          )}
-
-          {/* Section: Global Board */}
-          <div className="flex flex-col gap-6">
-            <div className="flex flex-col gap-2">
-              <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Global Challenges</h2>
-              <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest pt-1">Accept a duel on the global board</p>
-            </div>
-
-            <div className="flex flex-col gap-4">
-              {lobbyGames.length > 0 ? (
-                lobbyGames.map((game) => (
-                  <motion.div
-                    key={game.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="group flex items-center justify-between rounded-2xl border border-white/5 bg-white/5 p-5 transition-all hover:bg-white/[0.08]"
-                  >
-                    <div className="flex flex-col gap-1">
-                      <span className="font-orbitron text-[10px] font-black tracking-widest text-[var(--accent)] uppercase">{game.mode === 'cash' ? 'Professional' : 'Friendly'} Duel</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-code text-sm font-bold text-[var(--text)]">{game.player1Address.slice(0, 6)}...{game.player1Address.slice(-4)}</span>
-                        <span className="text-[8px] font-bold text-[var(--text-dim)] uppercase">
-                          • {Math.floor((Date.now() - new Date(game.createdAt).getTime()) / 60000)}m waiting
-                        </span>
-                      </div>
-                    </div>
- 
-                    <div className="flex items-center gap-6">
-                      {game.mode === 'cash' && (
-                        <div className="flex flex-col items-end">
-                          <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-dim)]">Stake</span>
-                          <span className="text-sm font-black text-[var(--orange)]">{game.stake} USDT</span>
-                        </div>
-                      )}
-                      {game.player1Address.toLowerCase() === address.toLowerCase() ? (
-                        <div className="rounded-xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-[var(--orange)] opacity-80">
-                          Hosting
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setReadyGame(game)}
-                          className="rounded-xl bg-[var(--text)] px-4 py-2 text-[10px] font-black uppercase tracking-tighter text-[var(--bg-base)] transition-transform active:scale-95 disabled:opacity-50"
-                        >
-                          Accept
-                        </button>
-                      )}
-                    </div>
-                  </motion.div>
-                ))
-              ) : (
-                <div className="flex items-center justify-center rounded-3xl border border-white/5 bg-white/5 py-20 text-center">
-                  <div className="flex flex-col gap-3">
-                    <div className="mx-auto h-12 w-12 rounded-full border-2 border-dashed border-[var(--text-dim)] opacity-20" />
-                    <p className="text-sm font-bold text-[var(--text-dim)]">No active public challenges</p>
-                    <button onClick={() => setActiveTab('home')} className="mx-auto mt-2 text-[10px] font-bold uppercase tracking-widest text-[var(--accent)] underline underline-offset-4">Create one now</button>
-                  </div>
-                </div>
-              )}
+          <div className="flex w-full">
+            <div className="rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 shadow-sm">
+              <span className="font-orbitron text-[10px] font-black tracking-widest text-[var(--text)] uppercase">
+                CODE <span className="text-[var(--accent)]">CRACKER</span>
+              </span>
             </div>
           </div>
+
+          <div className="flex w-full overflow-hidden rounded-xl border-2 border-black/10 bg-black/5 p-1 shadow-sm">
+            <button 
+              onClick={() => setLobbyTab('open')}
+              className={`flex-1 rounded-lg py-3 text-[10px] font-black uppercase tracking-widest transition-all ${lobbyTab === 'open' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
+            >
+              Open Challenges
+            </button>
+            <button 
+              onClick={() => setLobbyTab('mine')}
+              className={`flex-1 rounded-lg py-3 text-[10px] font-black uppercase tracking-widest transition-all ${lobbyTab === 'mine' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
+            >
+              My Open Challenges
+            </button>
+          </div>
+
+          <div className="flex flex-col gap-4">
+            {(lobbyTab === 'open' ? lobbyGames : myActiveGames).length > 0 ? (
+              (lobbyTab === 'open' ? lobbyGames : myActiveGames).map((game) => (
+                <motion.div key={game.id} className="relative flex flex-col gap-3 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-md">
+                  <div className="absolute top-4 right-6 text-[10px] font-black uppercase tracking-widest text-black/40">
+                    {game.mode === 'cash' ? `${game.stake} USDT` : 'Free'}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="font-code text-sm font-bold text-black/70">
+                      {game.player1Address.slice(0, 8)}...{game.player1Address.slice(-4)}
+                    </span>
+                    <span className="text-[10px] font-black text-black/30 tracking-widest uppercase">(1200 CMC)</span>
+                  </div>
+                  <div className="flex w-full justify-end">
+                    {game.player1Address.toLowerCase() === address.toLowerCase() ? (
+                      <div className="rounded-lg border-2 border-black/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-black/20">Hosting</div>
+                    ) : (
+                      <button onClick={() => setReadyGame(game)} className="rounded-lg border-2 border-black/10 bg-[var(--bg-elevated)] px-8 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] shadow-sm">JOIN</button>
+                    )}
+                  </div>
+                </motion.div>
+              ))
+            ) : (
+              <div className="flex items-center justify-center py-20 text-center opacity-30">
+                <span className="text-[10px] font-black uppercase tracking-widest">No challenges found</span>
+              </div>
+            )}
+          </div>
+
+          {gameHistory.length > 0 && (
+            <div className="flex flex-col gap-6 mt-8">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 text-black/40"><History size={16} /></div>
+                <h3 className="font-orbitron text-xs font-black tracking-[0.2em] text-black/40 uppercase">Match History</h3>
+              </div>
+              <div className="flex flex-col gap-3">
+                {gameHistory.map((game) => {
+                  const isWinner = game.winnerAddress?.toLowerCase() === (address?.toLowerCase() || '');
+                  const isDraw = !game.winnerAddress;
+                  const opponentAddr = game.player1Address.toLowerCase() === (address?.toLowerCase() || '') ? game.player2Address : game.player1Address;
+                  return (
+                    <div key={game.id} className="flex items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-4 shadow-sm">
+                      <div className="flex flex-col gap-1">
+                        <span className={`text-[8px] font-black uppercase tracking-widest ${isWinner ? 'text-green-600' : isDraw ? 'text-blue-600' : 'text-red-600'}`}>{isWinner ? 'Victory' : isDraw ? 'Draw' : 'Defeat'}</span>
+                        <span className="text-[10px] font-bold text-black/60 uppercase tracking-widest">vs {opponentAddr ? `${opponentAddr.slice(0, 6)}...${opponentAddr.slice(-4)}` : 'AI'}</span>
+                      </div>
+                      <div className="text-[10px] font-black text-black/70">{game.mode === 'cash' ? (isWinner ? `+${(game.stake * 2 * 0.99).toFixed(2)}` : `-${game.stake}`) : 'FREE'}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </>
       )}
 
-      {/* Join Confirmation Modal */}
       <AnimatePresence>
         {readyGame && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setReadyGame(null)}
-              className="absolute inset-0 bg-[#030C15]/80 backdrop-blur-md"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#0A121A] p-8 shadow-2xl"
-            >
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setReadyGame(null)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-sm overflow-hidden rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-8 shadow-2xl">
               <div className="flex flex-col items-center gap-6 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
-                  <ShieldCheck size={32} />
-                </div>
-                
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]"><ShieldCheck size={32} /></div>
                 <div className="flex flex-col gap-2">
-                  <h2 className="font-orbitron text-xl font-black tracking-widest text-white uppercase">Ready to Duel?</h2>
-                  <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">
-                    You are about to join a {readyGame.mode === 'cash' ? 'Paid' : 'Free'} match against {readyGame.player1Address.slice(0, 8)}...
-                  </p>
+                  <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Ready to Duel?</h2>
+                  <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">You are about to join a {readyGame.mode === 'cash' ? 'Paid' : 'Free'} match.</p>
                 </div>
-
                 {readyGame.mode === 'cash' && (
-                  <div className="w-full rounded-2xl bg-[var(--orange)]/10 border border-[var(--orange)]/30 p-4">
-                    <p className="text-[10px] font-black text-[var(--orange)] uppercase tracking-widest mb-1">Stake Required</p>
-                    <p className="text-2xl font-black text-white">{readyGame.stake} <span className="text-xs opacity-60">USDT</span></p>
+                  <div className="w-full rounded-2xl bg-black/5 border-2 border-black/10 p-4">
+                    <p className="text-[10px] font-black text-black/40 uppercase tracking-widest mb-1">Stake Required</p>
+                    <p className="text-2xl font-black text-[var(--text)]">{readyGame.stake} <span className="text-xs opacity-60">USDT</span></p>
                   </div>
                 )}
-
                 <div className="flex w-full flex-col gap-3">
-                  <button
-                    onClick={() => {
-                      handleJoinChallenge(readyGame.id, readyGame.player1Address);
-                      setReadyGame(null);
-                    }}
-                    disabled={isJoining === readyGame.id}
-                    className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[#030C15] transition-transform active:scale-95 shadow-[0_0_20px_rgba(0,207,255,0.2)]"
-                  >
-                    {isJoining === readyGame.id ? 'PROCESSING...' : 'INITIALIZE DUEL'}
-                  </button>
-                  <button
-                    onClick={() => setReadyGame(null)}
-                    className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 text-[10px] font-black uppercase tracking-widest text-white/60 transition-all hover:bg-white/10"
-                  >
-                    ABORT
-                  </button>
+                  <button onClick={() => { handleJoinChallenge(readyGame.id, readyGame.player1Address); setReadyGame(null); }} disabled={isJoining === readyGame.id} className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] transition-transform active:scale-95 shadow-lg">{isJoining === readyGame.id ? 'PROCESSING...' : 'INITIALIZE DUEL'}</button>
+                  <button onClick={() => setReadyGame(null)} className="w-full rounded-2xl border-2 border-black/10 bg-black/5 py-4 text-[10px] font-black uppercase tracking-widest text-black/40 transition-all">ABORT</button>
                 </div>
               </div>
             </motion.div>
@@ -1193,16 +1142,16 @@ export default function Home() {
         <h2 className="font-orbitron text-2xl font-black tracking-widest text-[var(--text)]">ABOUT GAME</h2>
         <p className="text-xs text-[var(--text-dim)] uppercase tracking-widest">Rules & Rewards</p>
       </div>
-      <div className="flex flex-col gap-6 rounded-3xl border border-white/5 bg-white/5 p-6">
+      <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6">
         {[
           { t: 'Objective', d: 'Crack your opponent\'s secret 4-digit code before they crack yours.' },
           { t: 'The Clues', d: 'The game provides numerical feedback: "X in the right place" and "Y reallocated" (right digit, wrong place).' },
           { t: 'USDT Staking', d: 'In Professional mode, both players stake USDT. Winner takes 99% of the pool.' },
-          { t: 'Fair Play', d: 'Quitting during a cash game results in an automatic loss and forfeit of your stake.' }
+          { t: 'Fair Play', d: 'Quitting during a cash game results in an automatic loss.' }
         ].map((rule, i) => (
           <div key={i} className="flex flex-col gap-1.5">
             <span className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">{rule.t}</span>
-            <p className="text-sm leading-relaxed text-[var(--text-2)]">{rule.d}</p>
+            <p className="text-sm leading-relaxed text-black/60">{rule.d}</p>
           </div>
         ))}
       </div>
@@ -1210,120 +1159,39 @@ export default function Home() {
   );
 
   const renderWalletContent = () => (
-    <motion.div key="wallet" className="flex w-full flex-col gap-8 px-5 pt-24 pb-32 text-left" {...screenVariants}>
-      <div className="flex flex-col gap-2 text-center">
-        <h2 className="font-orbitron text-2xl font-black tracking-widest text-[var(--text)] uppercase">My Account</h2>
-        <p className="text-xs text-[var(--text-dim)] uppercase tracking-widest">Secure Account & Assets</p>
-      </div>
-
+    <motion.div key="wallet" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
       {!address ? (
-        <div className="flex flex-col items-center justify-center gap-6 py-12 text-center bg-white/5 rounded-[2.5rem] border border-white/10 p-10">
-          <div className="text-6xl grayscale opacity-30">🛡️</div>
+        <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-8">
+          <div className="text-5xl grayscale opacity-30">🛡️</div>
           <div className="flex flex-col gap-2">
-            <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Not Signed In</h2>
-            <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest max-w-[200px] mx-auto">Connect your wallet to manage your assets and points</p>
+            <h2 className="font-orbitron text-lg font-black tracking-widest text-[var(--text)] uppercase">Sign In Required</h2>
+            <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest max-w-[200px] mx-auto">Connect your wallet to view your account details</p>
           </div>
-          <button
-            onClick={() => login()}
-            className="rounded-full bg-[var(--accent)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[#030C15]"
-          >
-            Sign In Now
-          </button>
+          <button onClick={() => login()} className="rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Sign In</button>
         </div>
       ) : (
         <div className="flex flex-col gap-6">
-          {/* Main Card */}
-          <div className="relative overflow-hidden rounded-[2.5rem] border border-white/10 bg-[#03111C] p-8 shadow-2xl">
-            {/* Background Glow */}
-            <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-[var(--accent)]/10 blur-3xl" />
-
-            <div className="relative z-10 flex flex-col gap-8">
-              <div className="flex flex-col gap-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
-                      <Wallet size={24} />
-                    </div>
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">Connected Wallet</span>
-                  </div>
-                  <a
-                    href={`https://celoscan.io/address/${address}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-xl bg-white/5 p-3 text-[var(--text-dim)] hover:bg-white/10 transition-colors"
-                  >
-                    <ExternalLink size={18} />
-                  </a>
-                </div>
-
-                <div 
-                  onClick={() => {
-                    if (address) {
-                      navigator.clipboard.writeText(address);
-                      setCopied(true);
-                      setTimeout(() => setCopied(false), 2000);
-                      toast.success("Address Copied!");
-                    }
-                  }}
-                  className="group relative cursor-pointer overflow-hidden rounded-2xl border border-white/5 bg-white/5 p-4 transition-all hover:bg-white/[0.08]"
-                >
-                  <div className="flex flex-col gap-2">
-                    <span className="font-code break-all text-[11px] font-bold leading-relaxed text-[var(--text)] tracking-wider">
-                      {address}
-                    </span>
-                    <div className="flex items-center justify-between">
-                      <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Tap to copy full identity</span>
-                      {copied ? (
-                        <Check size={12} className="text-[var(--clue-green)]" />
-                      ) : (
-                        <Copy size={12} className="text-[var(--text-dim)] opacity-40 group-hover:opacity-100 transition-opacity" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                <div className="relative group overflow-hidden rounded-2xl border border-white/5 bg-white/5 p-6 transition-all hover:bg-white/[0.08]">
-                   <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                      <span className="text-5xl">💰</span>
-                   </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">USDT Balance</span>
-                    <span className="text-4xl font-black text-[var(--accent)]">
-                      {usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="relative group overflow-hidden rounded-2xl border border-[var(--clue-yellow)]/20 bg-[var(--clue-yellow)]/5 p-6 transition-all hover:bg-[var(--clue-yellow)]/10">
-                   <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-10 transition-opacity">
-                      <span className="text-5xl">⭐</span>
-                   </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--clue-yellow)]/50">Points Earned</span>
-                    <span className="text-4xl font-black text-[var(--clue-yellow)]">
-                      {gs.playerPoints} <span className="text-[20px] font-black text-[var(--clue-yellow)]/20">CMC</span>
-                    </span>
-                  </div>
-                </div>
-              </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-sm">
+              <span className="text-[10px] font-black uppercase tracking-widest text-black/40">USDT</span>
+              <span className="font-orbitron text-2xl font-black text-[var(--accent)]">{usdtData ? parseFloat(usdtData.formatted).toFixed(0) : '0'}</span>
+            </div>
+            <div className="flex flex-col gap-2 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-sm">
+              <span className="text-[10px] font-black uppercase tracking-widest text-black/40">CMC</span>
+              <span className="font-orbitron text-2xl font-black text-[var(--clue-yellow)]">{gs.playerPoints}</span>
             </div>
           </div>
-
-
-
-          {/* Logout (Non-miniapp) */}
+          <div className="flex flex-col gap-3 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-md">
+            <span className="text-[10px] font-black uppercase tracking-widest text-black/40 text-center">Wallet Address</span>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 rounded-xl border-2 border-black/10 bg-black/5 px-4 py-3 font-code text-xs font-bold text-black/60 truncate">{address}</div>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black/10 bg-black/5"><div className="h-4 w-4 rotate-45 border-2 border-black/30" /></div>
+            </div>
+          </div>
           {!(typeof window !== 'undefined' && ((window as any).ethereum?.isMiniPay || (window as any).ethereum?.isFarcaster)) && (
-            <button
-              onClick={() => {
-                logout();
-                setActiveTab('home');
-              }}
-              className="flex w-full items-center justify-center gap-3 rounded-[2rem] border border-red-500/20 bg-red-500/5 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-red-400 hover:bg-red-500/10 transition-all active:scale-95"
-            >
-              <LogOut size={18} />
-              Sign Out
+            <button onClick={() => { logout(); setActiveTab('home'); }} className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-red-500/10 bg-red-500/5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:bg-red-500/10 transition-all">
+              <LogOut size={16} />
+              Sign Out Account
             </button>
           )}
         </div>
@@ -1332,19 +1200,14 @@ export default function Home() {
   );
 
   return (
-    <main className="relative flex min-h-dvh flex-col items-center justify-start overflow-y-auto overflow-x-hidden">
+    <main className="relative flex flex-col items-center justify-start min-h-full">
       <div className="w-full max-w-xl px-4 relative">
         {activeTab === 'home' ? renderHomeContent() :
           activeTab === 'games' ? renderOpenGames() :
             activeTab === 'wallet' ? renderWalletContent() :
               renderAbout()}
 
-        {/* Debug fallback to ensure component is rendering */}
-        {!gs.phase && (
-          <div className="text-white text-center p-10">
-            Initial loading state...
-          </div>
-        )}
+
       </div>
 
 

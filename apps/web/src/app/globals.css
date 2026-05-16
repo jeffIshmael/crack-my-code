@@ -1,63 +1,82 @@
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&family=Caveat:wght@400;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  --bg-base: #030C15;
-  --bg-surface: #071828;
-  --bg-card: #0B1E30;
-  --bg-elevated: #102438;
-  --accent: #00CFFF;
-  --accent-dim: rgba(0, 207, 255, 0.10);
-  --accent-glow: rgba(0, 207, 255, 0.35);
-  --orange: #FF6B2B;
-  --orange-dim: rgba(255, 107, 43, 0.12);
-  --orange-glow: rgba(255, 107, 43, 0.35);
-  --clue-green: #10B981;
-  --clue-green-bg: rgba(16, 185, 129, 0.18);
-  --clue-yellow: #F59E0B;
-  --clue-yellow-bg: rgba(245, 158, 11, 0.18);
-  --clue-gray: #172840;
-  --text: #D8ECF5;
-  --text-2: #4A7A96;
-  --text-dim: #203348;
-  --border: rgba(0, 207, 255, 0.07);
-  --border-mid: rgba(0, 207, 255, 0.15);
-  --border-bright: rgba(0, 207, 255, 0.28);
+  --bg-base: #E5DED0;
+  --bg-surface: rgba(255, 255, 255, 0.25);
+  --bg-card: rgba(255, 255, 255, 0.45);
+  --bg-elevated: rgba(255, 255, 255, 0.65);
+  --accent: #2563EB;
+  --accent-dim: rgba(37, 99, 235, 0.1);
+  --accent-glow: rgba(37, 99, 235, 0.2);
+  --orange: #DC2626;
+  --orange-dim: rgba(220, 38, 38, 0.12);
+  --orange-glow: rgba(220, 38, 38, 0.35);
+  --clue-green: #059669;
+  --clue-green-bg: rgba(5, 150, 105, 0.15);
+  --clue-yellow: #D97706;
+  --clue-yellow-bg: rgba(217, 119, 6, 0.15);
+  --clue-gray: #4B5563;
+  --text: #1A1A1A;
+  --text-2: #4B5563;
+  --text-dim: #9CA3AF;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-mid: rgba(0, 0, 0, 0.15);
+  --border-bright: rgba(0, 0, 0, 0.25);
+  --clue-green-dim: rgba(5, 150, 105, 0.1);
+  --clue-green-mid: rgba(5, 150, 105, 0.3);
+  --clue-green-high: rgba(5, 150, 105, 0.6);
+  --clue-yellow-dim: rgba(217, 119, 6, 0.1);
 }
 
 * { box-sizing: border-box; }
 
 html, body {
   height: 100%;
-  background: var(--bg-base);
+  background: radial-gradient(circle at center, #111827 0%, #030712 100%);
   color: var(--text);
   font-family: 'Outfit', sans-serif;
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
 }
 
-.font-orbitron { font-family: 'Orbitron', sans-serif; }
-.font-code { font-family: 'Space Mono', monospace; }
+.bg-paper-cage {
+  background: 
+    linear-gradient(rgba(229, 222, 208, 0.85), rgba(229, 222, 208, 0.85)), 
+    url('/bg-paper.png') center/cover no-repeat fixed;
+  position: relative;
+}
 
-/* ─── Background texture ─── */
-.grid-bg {
+.bg-paper-cage::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 1;
+}
+
+.bg-paper-cage::after {
+  content: '';
+  position: absolute;
+  inset: 0;
   background-image:
     linear-gradient(var(--border) 1px, transparent 1px),
     linear-gradient(90deg, var(--border) 1px, transparent 1px);
   background-size: 36px 36px;
+  opacity: 0.1;
+  pointer-events: none;
+  z-index: 1;
 }
 
-.noise-overlay::before {
-  content: '';
-  position: fixed;
-  inset: 0;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-  pointer-events: none;
-  z-index: 0;
-}
+.font-orbitron { font-family: 'Orbitron', sans-serif; }
+.font-code { font-family: 'Space Mono', monospace; }
+.font-handwritten { font-family: 'Caveat', cursive; }
+
+/* Grid and Noise are now handled by .bg-paper-cage ::before/::after */
 
 /* ─── Glow utilities ─── */
 .glow-cyan {

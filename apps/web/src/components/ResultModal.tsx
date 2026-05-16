@@ -44,7 +44,7 @@ export default function ResultModal({
       {/* Backdrop */}
       <motion.div
         className="absolute inset-0"
-        style={{ background: 'rgba(3,12,21,0.85)', backdropFilter: 'blur(8px)' }}
+        style={{ background: 'var(--bg-base)', opacity: 0.85, backdropFilter: 'blur(8px)' }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
       />
@@ -269,10 +269,10 @@ export default function ResultModal({
             className="w-full rounded-[2rem] py-5 font-orbitron text-base font-black tracking-[0.25em]"
             style={{
               background: isWin
-                ? 'linear-gradient(135deg, #059669 0%, #10B981 100%)'
-                : 'linear-gradient(135deg, #0099CC 0%, #00CFFF 100%)',
-              color: '#030C15',
-              boxShadow: isWin ? '0 12px 32px rgba(16,185,129,0.35)' : '0 12px 32px rgba(0,207,255,0.35)',
+                ? 'var(--clue-green)'
+                : 'var(--accent)',
+              color: 'var(--bg-base)',
+              boxShadow: isWin ? '0 12px 32px rgba(5,150,105,0.2)' : '0 12px 32px rgba(37,99,235,0.2)',
             }}
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}

@@ -19,7 +19,7 @@ interface LobbyProps {
   points: number;
   isMatchmaking: boolean;
   opponentName: string;
-  onFindMatch: (mode: GameMode, stake: number, isPublic?: boolean) => Promise<void>;
+  onFindMatch: (mode: GameMode, stake: number, isPublic?: boolean, userBalance?: number) => Promise<void>;
   onMatchFound: (gameId: string, opponentAddress: string) => void;
   onWalletClick?: () => void;
   searchTime?: number;
@@ -135,9 +135,14 @@ export default function Lobby({
     setIsCreating(true);
     try {
       const stakeAmount = selectedMode === 'cash' ? parseFloat(stake) || 0 : 0;
-      await onFindMatch(selectedMode, stakeAmount, isPublic);
+      const currentBalance = parseFloat(usdtData?.formatted || '0');
+      await onFindMatch(selectedMode, stakeAmount, isPublic, currentBalance);
       setShowPvPModal(false);
       setPvpStep('selection'); // Reset for next time
+    } catch (err) {
+      console.error('Failed to create challenge', err);
+      // getErrorMessage is already imported and will handle the message
+      toast.error('Challenge Error', { description: getErrorMessage(err) });
     } finally {
       setIsCreating(false);
     }
@@ -159,115 +164,158 @@ export default function Lobby({
   };
 
   return (
-    <div className="flex min-h-dvh flex-col items-center justify-start gap-12 px-5 pt-20 pb-40 text-[var(--text)]">
+    <div className="flex h-dvh flex-col items-center justify-between px-5 pt-8 pb-32 text-[var(--text)] overflow-hidden">
+      
+      {/* ── Top row with Sign Up ── */}
+      <div className="flex w-full items-center justify-end">
+        {!isConnected ? (
+          <button
+            onClick={() => login()}
+            className="flex items-center gap-2 rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 shadow-sm hover:scale-105 transition-transform"
+          >
+            <div className="h-3 w-3 rounded-full border-2 border-black/20" />
+            <span className="text-[10px] font-black tracking-widest text-[var(--text)] uppercase">Sign Up</span>
+          </button>
+        ) : (
+          <div className="flex items-center gap-2 rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 shadow-sm">
+            <div className="h-2 w-2 rounded-full bg-[var(--clue-green)] animate-pulse" />
+            <span className="text-[10px] font-black tracking-widest text-[var(--text)] uppercase">
+              {address?.slice(0, 4)}...{address?.slice(-4)}
+            </span>
+          </div>
+        )}
+      </div>
 
-      {/* ── Top status bar ── */}
-      <motion.div
-        className="absolute top-8 left-0 right-0 px-8 flex items-center z-20"
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-      >
-        <ConnectButton onWalletClick={onWalletClick} />
-      </motion.div>
+      {/* ── Center: Interactive Detective Zone ── */}
+      <div className="flex flex-1 w-full flex-col items-center justify-center py-4 relative">
+        
+        {/* Background Narrative Layer (Scribbles) */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.15 }}
+          className="absolute inset-0 flex items-center justify-center pointer-events-none"
+        >
+          <div className="relative w-full h-full max-w-sm">
+            <span className="absolute top-4 left-4 font-handwritten text-4xl -rotate-12 text-black">1042?</span>
+            <span className="absolute bottom-4 right-4 font-handwritten text-3xl rotate-6 text-black underline">Classified</span>
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center opacity-40">
+               <span className="font-orbitron text-5xl font-black tracking-[0.4em] text-black">TOP SECRET</span>
+               <div className="h-1 w-64 bg-black mt-2" />
+            </div>
+            <div className="absolute top-1/4 right-0 h-12 w-12 rounded-full border-2 border-black flex items-center justify-center font-handwritten text-xl rotate-12">7</div>
+            <div className="absolute bottom-1/4 left-0 h-10 w-10 rounded-full border-2 border-black flex items-center justify-center font-handwritten text-lg -rotate-12">3</div>
+          </div>
+        </motion.div>
 
-      {/* ── Hero / Logo ── */}
-      <motion.div className="flex flex-col items-center gap-10 text-center" variants={stagger} initial="initial" animate="animate">
-        {/* Glyph icon */}
-        <div className="relative group">
-          <div className="absolute inset-0 bg-[var(--accent)]/20 blur-3xl rounded-full scale-150 opacity-40 group-hover:opacity-70 transition-opacity" />
-          <Image 
-            src='/logo.png' 
-            alt='logo' 
-            width={180} 
-            height={180} 
-            className='rounded-full relative z-10 border-4 border-white/5 shadow-2xl transition-transform group-hover:scale-105' 
-          />
-        </div>
-        {/* Primary CTA Buttons */}
-        <motion.div variants={fadeUp} className="flex w-full max-w-sm flex-col gap-10 pt-16">
+        {/* Buttons and Peeking Cipher */}
+        <div className="z-10 flex w-full max-w-sm flex-col gap-8 px-4">
           {isMatchmaking ? (
-            opponentName === 'WAITING' ? (
-              gameId ? (
-                <InviteWaiting 
+            <div className="w-full">
+              {opponentName === 'WAITING' ? (
+                gameId ? (
+                  <InviteWaiting 
+                    searchTime={searchTime}
+                    onCancel={onCancelMatchmaking}
+                    gameId={gameId} 
+                    isCreating={isCreating}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-8 gap-3">
+                    <div className="h-10 w-10 animate-spin rounded-full border-t-2 border-[var(--accent)]" />
+                    <span className="text-[10px] font-black tracking-widest text-[var(--accent)]">GENERATING...</span>
+                  </div>
+                )
+              ) : (
+                <MatchmakingPulse 
+                  opponentName={opponentName} 
+                  mode={selectedMode} 
                   searchTime={searchTime}
                   onCancel={onCancelMatchmaking}
-                  gameId={gameId} 
-                  isCreating={isCreating}
                 />
-              ) : (
-                <div className="flex flex-col items-center justify-center py-12 gap-4">
-                  <div className="relative h-16 w-16">
-                    <div className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/20" />
-                    <div className="absolute inset-0 rounded-full border-t-2 border-[var(--accent)] animate-spin" />
-                  </div>
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="font-orbitron text-[10px] font-black tracking-[0.2em] text-[var(--accent)]">GENERATING LINK</span>
-                    <span className="text-[8px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Encrypting match parameters...</span>
-                  </div>
-                </div>
-              )
-            ) : (
-              <MatchmakingPulse 
-                opponentName={opponentName} 
-                mode={selectedMode} 
-                searchTime={searchTime}
-                onCancel={onCancelMatchmaking}
-              />
-            )
+              )}
+            </div>
           ) : (
-            <>
-              <button
-                onClick={handleStartAI}
-                disabled={isCreating}
-                className="group relative flex items-center justify-between rounded-[2.5rem] bg-[var(--bg-elevated)] p-10 transition-all hover:scale-[1.02] border border-white/10 active:scale-[0.98] shadow-2xl disabled:opacity-50"
-              >
-                <div className="flex flex-col gap-2 text-left">
-                  <span className="font-orbitron text-base font-black tracking-[0.25em] text-[var(--text)]">
-                    {isCreating && selectedMode === 'ai' ? 'STARTING...' : 'PLAY WITH AI'}
-                  </span>
-                  <span className="text-xs font-bold text-white/50 uppercase tracking-[0.15em]">Sharpen your strategy</span>
-                </div>
-                <div className="text-5xl opacity-40 group-hover:opacity-100 group-hover:scale-110 transition-all duration-300">🤖</div>
-              </button>
-
-              <button
-                onClick={isConnected ? openPvPModal : undefined}
-                className={`group relative flex items-center justify-between rounded-[2.5rem] border p-10 transition-all ${
-                  isConnected 
-                    ? "border-[var(--accent)] bg-[var(--accent)]/5 hover:scale-[1.02] active:scale-[0.98]" 
-                    : "border-white/10 bg-white/5 opacity-80 cursor-not-allowed"
-                }`}
-                style={isConnected ? { boxShadow: '0 0 40px rgba(0,207,255,0.15)' } : {}}
-              >
-                <div className="flex flex-col gap-2 text-left">
-                  <span className={`font-orbitron text-base font-black tracking-[0.25em] ${isConnected ? "text-[var(--accent)]" : "text-[var(--text-dim)]"}`}>
-                    {isConnected ? "PVP DUEL" : "CONNECT WALLET"}
-                  </span>
-                  <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-[0.15em]">
-                    {isConnected ? "Challenge players" : "Required for PVP"}
-                  </span>
-                </div>
-                <div className={`text-5xl transition-all duration-300 ${isConnected ? "filter saturate-0 group-hover:saturate-100 group-hover:scale-110" : "opacity-20"}`}>
-                  ⚔️
-                </div>
-
-                {/* Subtle scanline animation */}
-                {isConnected && (
+            <div className="flex flex-col gap-4">
+              {/* Cipher AI Section */}
+              <div className="relative pt-12">
+                {/* Floating Cipher and Bubble */}
+                <motion.div
+                  className="absolute -top-20 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none"
+                  initial={{ opacity: 0, y: 40 }}
+                  animate={{ 
+                    opacity: 1, 
+                    y: [0, -4, 0],
+                    rotate: [0, -1, 1, -1, 0]
+                  }}
+                  transition={{ 
+                    opacity: { delay: 0.3, duration: 0.8 },
+                    y: { repeat: Infinity, duration: 4, ease: "easeInOut" },
+                    rotate: { repeat: Infinity, duration: 6, ease: "easeInOut" }
+                  }}
+                >
+                  {/* Speech Bubble */}
                   <motion.div
-                    className="absolute inset-0 z-0 bg-gradient-to-r from-transparent via-[var(--accent)]/10 to-transparent shadow-inner opacity-30"
-                    animate={{ x: ['-100%', '100%'] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: 'linear' }}
-                  />
-                )}
+                    initial={{ scale: 0, opacity: 0, y: 10 }}
+                    animate={{ scale: 1, opacity: 1, y: 0 }}
+                    transition={{ delay: 0.8, duration: 0.4, type: 'spring' }}
+                    className="relative mb-4 max-w-[150px] rounded-2xl border-2 border-[var(--accent)] bg-white p-3 shadow-[0_4px_20px_rgba(37,99,235,0.15)] -translate-y-2"
+                  >
+                    <p className="font-orbitron text-[9px] font-black leading-tight text-[var(--accent)] text-center uppercase tracking-wider">
+                      "Psst! I'm <span className="text-blue-500">Cipher</span>. Try my code if you dare!"
+                    </p>
+                    
+                    {/* Bubble Tail */}
+                    <div className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-r-2 border-b-2 border-[var(--accent)] bg-white" />
+                  </motion.div>
+
+                  {/* Character (On Top) */}
+                  <div className="h-28 w-28 -mt-8">
+                    <Image 
+                      src="/robot.png" 
+                      alt="Cipher AI" 
+                      width={112} 
+                      height={112} 
+                      className="drop-shadow-2xl mix-blend-multiply"
+                      priority
+                    />
+                  </div>
+                </motion.div>
+
+                <button
+                  onClick={handleStartAI}
+                  disabled={isCreating}
+                  className="group relative z-10 flex w-full h-20 items-center justify-center rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-all hover:translate-y-[-2px] active:translate-y-[1px] disabled:opacity-50 overflow-hidden"
+                >
+                  <div className="absolute inset-0 bg-gradient-to-tr from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="font-orbitron text-sm font-black tracking-[0.2em] text-[var(--text)] uppercase">
+                      Cipher AI Duel
+                    </span>
+                    <span className="text-[8px] font-black text-black/30 tracking-[0.3em] uppercase">Computer Match</span>
+                  </div>
+                </button>
+              </div>
+
+              {/* PvP Button */}
+              <button
+                onClick={isConnected ? openPvPModal : () => login()}
+                className={`group relative z-10 flex h-20 items-center justify-center rounded-3xl border-2 transition-all shadow-[0_8px_24px_rgba(0,0,0,0.06)] ${
+                  isConnected 
+                    ? "border-black/10 bg-[var(--bg-elevated)] hover:translate-y-[-2px] active:translate-y-[1px]" 
+                    : "border-black/10 bg-black/5 opacity-80"
+                }`}
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <span className="font-orbitron text-sm font-black tracking-[0.2em] text-[var(--text)] uppercase">
+                    PVP Challenge
+                  </span>
+                  <span className="text-[8px] font-black text-black/30 tracking-[0.3em] uppercase">Human Opponent</span>
+                </div>
               </button>
-            </>
+            </div>
           )}
-
-        </motion.div>
-      </motion.div>
-
-      <div className="h-2" />
+        </div>
+      </div>
 
       {/* ── Incoming Invite Modal ── */}
       <AnimatePresence>
@@ -277,33 +325,28 @@ export default function Lobby({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#030C15]/90 backdrop-blur-xl"
+              className="absolute inset-0 bg-[var(--bg-base)]/80 backdrop-blur-xl"
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.9, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-sm rounded-[2.5rem] border border-[var(--accent)]/30 bg-[#0A121A] p-8 shadow-[0_0_50px_rgba(0,207,255,0.2)]"
+              className="relative w-full max-w-sm rounded-3xl border-2 border-black/10 bg-[var(--bg-card)] p-8 shadow-2xl"
             >
               <div className="flex flex-col items-center gap-6 text-center">
-                <div className="relative">
-                  <div className="absolute inset-0 animate-pulse bg-[var(--accent)]/20 blur-2xl rounded-full" />
-                  <div className="relative flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
-                    <ShieldCheck size={32} />
-                  </div>
+                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                  <ShieldCheck size={32} />
                 </div>
-                
                 <div className="flex flex-col gap-2">
-                  <h2 className="font-orbitron text-xl font-black tracking-widest text-white uppercase">Duel Invitation</h2>
+                  <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Duel Invite</h2>
                   <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">
-                    You have been summoned to a private codebreaking match.
+                    You have been summoned to a private match.
                   </p>
                 </div>
-
                 {!isConnected ? (
                   <button
                     onClick={() => login()}
-                    className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[#030C15] transition-transform active:scale-95 shadow-[0_0_20px_rgba(0,207,255,0.3)]"
+                    className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] transition-transform active:scale-95"
                   >
                     SIGN IN TO ACCEPT
                   </button>
@@ -313,7 +356,6 @@ export default function Lobby({
                       <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-ping" />
                       <span className="text-[10px] font-black text-[var(--accent)] uppercase tracking-[0.2em]">Authenticating...</span>
                     </div>
-                    <span className="text-[8px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Initializing secure connection</span>
                   </div>
                 )}
               </div>
@@ -331,7 +373,7 @@ export default function Lobby({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-[#030C15]/80 backdrop-blur-md"
+              className="absolute inset-0 bg-[var(--bg-base)]/70 backdrop-blur-md"
               onClick={() => setShowPvPModal(false)}
             />
 
@@ -341,7 +383,7 @@ export default function Lobby({
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-              className="relative w-full max-w-sm rounded-t-[2.5rem] border-t border-x border-white/10 bg-[#03111C] p-8 shadow-[0_-12px_40px_rgba(0,0,0,0.5)]"
+              className="relative w-full max-w-sm rounded-t-[2.5rem] border-t border-x border-black/5 bg-[var(--bg-elevated)] p-8 shadow-[0_-12px_40px_rgba(0,0,0,0.15)]"
             >
               {/* Handle */}
               <div className="absolute top-3 left-1/2 h-1.5 w-12 -translate-x-1/2 rounded-full bg-white/10" />
@@ -392,20 +434,17 @@ export default function Lobby({
                         <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Free Match • Play for Global Ranking</p>
                       </button>
 
-                      {/* Paid Option - Coming Soon */}
-                      <div
-                        className="group relative flex flex-col gap-2 rounded-2xl border border-white/5 bg-white/5 p-5 text-left transition-all opacity-60"
+                      {/* Paid Option */}
+                      <button
+                        onClick={() => handleStartPvP('cash')}
+                        className="group flex flex-col gap-2 rounded-2xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 p-5 text-left transition-all hover:bg-[var(--orange)]/10"
                       >
-                        <div className="absolute top-4 right-4 flex items-center gap-1.5 rounded-full bg-[var(--orange)]/10 px-3 py-1 border border-[var(--orange)]/20">
-                          <Lock size={10} className="text-[var(--orange)]" />
-                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--orange)]">Coming Soon</span>
-                        </div>
                         <div className="flex items-center justify-between">
-                          <span className="font-orbitron text-sm font-black tracking-wider text-[var(--text-dim)]">PROFESSIONAL</span>
-                          <span className="text-xl grayscale opacity-30">💰</span>
+                          <span className="font-orbitron text-sm font-black tracking-wider text-[var(--orange)]">PROFESSIONAL</span>
+                          <span className="text-xl">💰</span>
                         </div>
                         <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Stake USDT • Winner Takes 99%</p>
-                      </div>
+                      </button>
                     </div>
                   </motion.div>
                 ) : pvpStep === 'config' ? (
@@ -430,14 +469,16 @@ export default function Lobby({
                               type="number"
                               value={stake}
                               onChange={(e) => setStake(e.target.value)}
-                              className="w-full flex-1 rounded-2xl border border-white/10 bg-white/5 p-5 text-2xl font-black text-[var(--orange)] outline-none ring-[var(--orange)] focus:ring-1"
+                              className="w-full flex-1 rounded-2xl border border-black/10 bg-black/5 p-5 text-2xl font-black text-[var(--orange)] outline-none ring-[var(--orange)] focus:ring-1"
                               autoFocus
                               placeholder="0.00"
                             />
                             <span className="absolute right-5 text-lg font-black text-[var(--text-dim)] mr-6">USDT</span>
                           </div>
                           <div className="flex items-center justify-between px-2">
-                            <span className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider">Min: 0.1 USDT</span>
+                            <span className={`text-[9px] font-bold uppercase tracking-wider ${(parseFloat(stake) || 0) < 0.1 ? 'text-red-500 animate-pulse' : 'text-[var(--text-dim)]'}`}>
+                              Min: 0.1 USDT
+                            </span>
                             <span className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
                               Available: <span className="text-[var(--text)]">{usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)} USDT` : '...'}</span>
                             </span>
@@ -447,9 +488,9 @@ export default function Lobby({
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1 rounded-2xl bg-[var(--clue-green)]/5 p-4 border border-[var(--clue-green)]/10">
-                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Net Reward</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Winner's Reward</span>
                           <span className="text-xl font-black text-[var(--clue-green)] tracking-tight">
-                            {(parseFloat(stake) * 2 * 0.99).toFixed(1)} <span className="text-[10px]">USDT</span>
+                            {((parseFloat(stake) || 0) * 2 * 0.99).toFixed(3)} <span className="text-[10px]">USDT</span>
                           </span>
                         </div>
                         <div className="flex flex-col gap-1 rounded-2xl bg-white/5 p-4 border border-white/10">
@@ -463,8 +504,8 @@ export default function Lobby({
                       <div className="flex flex-col gap-3">
                         <button
                           onClick={() => allowance < stakeBigInt ? handleApprove(stakeBigInt) : setPvpStep('visibility')}
-                          disabled={isApproving || isCreating}
-                          className="w-full rounded-2xl bg-[var(--orange)] py-4 text-[10px] font-black uppercase tracking-widest text-[#030C15] shadow-[0_0_20px_rgba(255,107,43,0.2)] disabled:opacity-50"
+                          disabled={isApproving || isCreating || (parseFloat(stake) || 0) < 0.1}
+                          className="w-full rounded-2xl bg-[var(--orange)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] shadow-[0_0_20px_rgba(220,38,38,0.2)] disabled:opacity-50"
                         >
                           {isApproving ? 'APPROVING...' : (allowance < stakeBigInt ? 'APPROVE USDT' : 'SET VISIBILITY')}
                         </button>

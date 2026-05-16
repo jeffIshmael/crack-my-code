@@ -13,9 +13,9 @@ interface GuessRowProps {
 }
 
 const CLUE_STYLES: Record<string, { color: string; bg: string }> = {
-  high: { color: 'var(--clue-green)', bg: 'rgba(16,185,129,0.1)' },
-  mid:  { color: 'var(--clue-yellow)', bg: 'rgba(245,158,11,0.1)' },
-  none: { color: 'var(--text-dim)', bg: 'rgba(255,255,255,0.05)' },
+  high: { color: 'var(--clue-green)', bg: 'var(--clue-green-dim)' },
+  mid:  { color: 'var(--clue-yellow)', bg: 'var(--clue-yellow-dim)' },
+  none: { color: 'var(--text-dim)', bg: 'var(--bg-card)' },
 };
 
 export default function GuessRow({ digits, clues, rowIndex, instant = false, type = 'player' }: GuessRowProps) {
@@ -70,8 +70,8 @@ export default function GuessRow({ digits, clues, rowIndex, instant = false, typ
       <motion.div
         className="flex items-center px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider"
         style={{
-          background: clues.some(c => c === 'green') ? 'rgba(16,185,129,0.1)' : 'var(--bg-card)',
-          borderColor: clues.some(c => c === 'green') ? 'rgba(16,185,129,0.4)' : 'var(--border)',
+          background: clues.some(c => c === 'green') ? 'var(--clue-green-dim)' : 'var(--bg-card)',
+          borderColor: clues.some(c => c === 'green') ? 'var(--clue-green-mid)' : 'var(--border)',
           color: clues.some(c => c === 'green') ? 'var(--clue-green)' : 'var(--text-2)',
         }}
         animate={
@@ -79,7 +79,7 @@ export default function GuessRow({ digits, clues, rowIndex, instant = false, typ
             ? {
                 scale: [1, 1.05, 1],
                 borderColor: clues.some(c => c === 'green') 
-                  ? ['rgba(16,185,129,0.4)', 'rgba(16,185,129,0.8)', 'rgba(16,185,129,0.4)'] 
+                  ? ['var(--clue-green-mid)', 'var(--clue-green-high)', 'var(--clue-green-mid)'] 
                   : ['var(--border)', 'var(--border-bright)', 'var(--border)'],
               }
             : {}
@@ -123,7 +123,7 @@ export function EmptyGuessRow({ rowIndex }: { rowIndex: number }) {
         ))}
       </div>
       <div className="h-4 w-px rounded-full" style={{ background: 'var(--border)' }} />
-      <div className="flex-1 h-6 rounded-lg" style={{ border: '1px dashed var(--border)', background: 'rgba(255,255,255,0.02)' }} />
+      <div className="flex-1 h-6 rounded-lg" style={{ border: '1px dashed var(--border)', background: 'rgba(0,0,0,0.02)' }} />
     </div>
   );
 }

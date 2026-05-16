@@ -8,8 +8,10 @@ export function getErrorMessage(error: any): string {
   // If it's a string, return it
   if (typeof error === 'string') return error;
 
-  // Handle Viem/Wagmi User Rejected
   const message = error.message || '';
+  const data = error.data || (error.cause as any)?.data || (error.cause as any)?.cause?.data;
+
+  // Handle Viem/Wagmi User Rejected
   if (
     message.includes('User rejected') || 
     message.includes('User denied') || 
@@ -18,16 +20,50 @@ export function getErrorMessage(error: any): string {
     return 'Transaction cancelled by user.';
   }
 
-  // Handle Insufficient Funds
-  if (message.includes('insufficient funds')) {
+  // Handle Insufficient Funds for Gas (Native Token)
+  if (message.includes('insufficient funds') || message.includes('exceeds the balance of the account')) {
     return 'Insufficient CELO for gas fees.';
+  }
+
+  // Handle ERC20: transfer amount exceeds balance (Hex or String)
+  // Hex for "ERC20: transfer amount exceeds balance" often appears in AA reverts
+  if (
+    message.includes('transfer amount exceeds balance') || 
+    message.includes('insufficient balance') ||
+    message.includes('524332303a207472616e7366657220616d6f756e7420657863656564732062616c616e6365') ||
+    (data && typeof data === 'string' && data.includes('524332303a207472616e7366657220616d6f756e7420657863656564732062616c616e6365'))
+  ) {
+    return 'Insufficient USDT balance to join this challenge.';
+  }
+
+  // Handle Contract Custom Errors (CB: ...)
+  if (message.includes('CB: stake transfer failed')) {
+    return 'Insufficient USDT balance or allowance.';
+  }
+
+  // Handle Account Abstraction / UserOperation Reverts
+  if (message.includes('UserOperation reverted during simulation')) {
+    if (message.includes('ERC20') || message.includes('balance')) {
+       return 'Insufficient USDT balance to join this challenge.';
+    }
+    // Try to find a readable part in the message
+    const matches = message.match(/reason:\s*([^]+)/);
+    if (matches && matches[1] && matches[1].length < 100 && !matches[1].startsWith('0x')) {
+      return matches[1].trim();
+    }
+    return 'The transaction failed during simulation. Ensure you have enough USDT and CELO.';
   }
 
   // Handle Contract Execution Reverted
   if (message.includes('execution reverted')) {
-    // Try to extract a specific reason if it's there
     const reasonMatch = message.match(/reverted with the following reason:\s*(.+)/);
     if (reasonMatch) return reasonMatch[1];
+    
+    if (message.includes('CB:')) {
+      const cbMatch = message.match(/CB:\s*([^"\n]+)/);
+      if (cbMatch) return cbMatch[0];
+    }
+    
     return 'The transaction was reverted by the contract.';
   }
 
@@ -47,5 +83,6 @@ export function getErrorMessage(error: any): string {
   }
 
   // Return the original message if it's short, otherwise generic
-  return message.length < 60 ? message : 'A system error occurred. Please try again.';
+  return message.length < 80 ? message : 'A system error occurred. Please try again.';
 }
+

@@ -269,10 +269,10 @@ export default function SetCode({ opponentName, onLockCode, onBack, isWaiting }:
             className="flex h-14 flex-[2] items-center justify-center gap-2 rounded-2xl font-orbitron text-sm font-black tracking-[0.15em] transition-all"
             style={{
               background: isComplete && !locked
-                ? 'linear-gradient(135deg, #10B981 0%, #059669 100%)'
+                ? 'var(--clue-green)'
                 : 'var(--clue-gray)',
-              color: isComplete && !locked ? '#fff' : 'var(--text-dim)',
-              boxShadow: isComplete && !locked ? '0 8px 24px rgba(16,185,129,0.35)' : 'none',
+              color: isComplete && !locked ? 'var(--bg-base)' : 'var(--text-dim)',
+              boxShadow: isComplete && !locked ? '0 8px 24px rgba(5,150,105,0.2)' : 'none',
               cursor: isComplete && !locked ? 'pointer' : 'not-allowed',
             }}
             whileTap={isComplete && !locked ? { scale: 0.96 } : {}}

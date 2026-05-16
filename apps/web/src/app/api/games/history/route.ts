@@ -15,21 +15,23 @@ export async function GET(req: NextRequest) {
     const games = await prisma.game.findMany({
       where: {
         OR: [
-          { player1Address: address, status: { in: ['PENDING', 'ACTIVE'] } },
-          { player2Address: address, status: 'ACTIVE' }
-        ]
+          { player1Address: address },
+          { player2Address: address }
+        ],
+        status: 'COMPLETED'
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        updatedAt: 'desc'
+      },
+      take: 10
     });
 
     return NextResponse.json(games);
   } catch (error) {
-    console.error('Fetch my active challenges error:', error);
+    console.error('Fetch game history error:', error);
     return NextResponse.json(
       { 
-        error: 'Failed to fetch your active challenges', 
+        error: 'Failed to fetch your game history', 
         details: error instanceof Error ? error.message : String(error)
       }, 
       { status: 500 }

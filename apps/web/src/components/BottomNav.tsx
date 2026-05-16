@@ -22,12 +22,12 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 flex justify-center px-4 pb-8 pointer-events-none">
+    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] z-[100] flex justify-center px-4 pb-8 pointer-events-none">
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        className="pointer-events-auto flex items-center justify-between rounded-full border border-white/10 bg-[#030C15]/80 px-2 py-2 backdrop-blur-xl shadow-2xl"
+        className="pointer-events-auto flex items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-3 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.15)]"
         style={{ width: '100%', maxWidth: '320px' }}
       >
         {tabs.map((tab) => {

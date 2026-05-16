@@ -104,9 +104,9 @@ export default function GameBoard({
             <div 
               className="rounded-3xl px-8 py-6 backdrop-blur-xl border shadow-2xl flex flex-col items-center gap-3 w-full max-w-[280px]"
               style={{
-                background: turnNotification === 'player' ? 'rgba(0, 207, 255, 0.1)' : 'rgba(255, 107, 43, 0.1)',
-                borderColor: turnNotification === 'player' ? 'rgba(0, 207, 255, 0.4)' : 'rgba(255, 107, 43, 0.4)',
-                boxShadow: turnNotification === 'player' ? '0 0 40px rgba(0, 207, 255, 0.2)' : '0 0 40px rgba(255, 107, 43, 0.2)',
+                background: turnNotification === 'player' ? 'rgba(37, 99, 235, 0.08)' : 'rgba(220, 38, 38, 0.08)',
+                borderColor: turnNotification === 'player' ? 'rgba(37, 99, 235, 0.3)' : 'rgba(220, 38, 38, 0.3)',
+                boxShadow: turnNotification === 'player' ? '0 0 40px rgba(37, 99, 235, 0.1)' : '0 0 40px rgba(220, 38, 38, 0.1)',
               }}
             >
               <motion.div 
@@ -134,7 +134,7 @@ export default function GameBoard({
                {playerPoints} CMC
              </span>
            </div>
-           <div className="h-4 w-px bg-white/10" />
+           <div className="h-4 w-px bg-black/10" />
            <button 
              onClick={onQuit}
              className="text-[10px] font-bold uppercase tracking-widest text-red-400/80 hover:text-red-400 transition-colors"
@@ -210,13 +210,13 @@ export default function GameBoard({
       <div className="mb-4 flex p-1 rounded-xl bg-[var(--bg-elevated)] border border-[var(--border)]">
         <button
           onClick={() => setView('player')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'player' ? 'bg-[var(--accent)] color-[#030C15] shadow-lg' : 'text-[var(--text-dim)]'}`}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'player' ? 'bg-[var(--accent)] text-[var(--bg-base)] shadow-lg' : 'text-[var(--text-dim)]'}`}
         >
           YOUR BOARD
         </button>
         <button
           onClick={() => setView('opponent')}
-          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'opponent' ? 'bg-[var(--orange)] color-[#030C15] shadow-lg' : 'text-[var(--text-dim)]'}`}
+          className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'opponent' ? 'bg-[var(--orange)] text-[var(--bg-base)] shadow-lg' : 'text-[var(--text-dim)]'}`}
         >
           OPPONENT'S BOARD
         </button>
@@ -396,21 +396,21 @@ export default function GameBoard({
         className="mb-4 w-full rounded-[2rem] py-5 font-orbitron text-base font-black tracking-[0.25em] relative overflow-hidden"
         style={{
           background: canSubmit
-            ? 'linear-gradient(135deg, #0099CC 0%, #00CFFF 60%, #0099CC 100%)'
+            ? 'var(--accent)'
             : 'var(--clue-gray)',
-          color: canSubmit ? '#030C15' : 'var(--text-dim)',
-          boxShadow: canSubmit ? '0 12px 32px rgba(0,207,255,0.3)' : 'none',
+          color: canSubmit ? 'var(--bg-base)' : 'var(--text-dim)',
+          boxShadow: canSubmit ? '0 12px 32px rgba(37,99,235,0.2)' : 'none',
           cursor: canSubmit && !isSubmitting ? 'pointer' : 'not-allowed',
           transition: 'all 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
         }}
-        animate={canSubmit && !isSubmitting ? { boxShadow: ['0 10px 24px rgba(0,207,255,0.25)', '0 12px 40px rgba(0,207,255,0.5)', '0 10px 24px rgba(0,207,255,0.25)'] } : {}}
+        animate={canSubmit && !isSubmitting ? { boxShadow: ['0 10px 24px rgba(37,99,235,0.2)', '0 12px 40px rgba(37,99,235,0.4)', '0 10px 24px rgba(37,99,235,0.2)'] } : {}}
         transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
         whileTap={canSubmit && !isSubmitting ? { scale: 0.97 } : {}}
       >
         {isSubmitting ? (
           <div className="flex items-center justify-center gap-3">
              <motion.div 
-               className="h-5 w-5 rounded-full border-2 border-[#030C15]/40 border-t-[#030C15]"
+               className="h-5 w-5 rounded-full border-2 border-[var(--bg-base)]/40 border-t-[var(--bg-base)]"
                animate={{ rotate: 360 }}
                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
              />
