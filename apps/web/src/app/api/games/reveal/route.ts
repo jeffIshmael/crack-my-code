@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 
 export const dynamic = 'force-dynamic';
 
@@ -36,6 +37,14 @@ export async function POST(req: NextRequest) {
               rating: { decrement: 5 }
             }
           });
+        }
+
+        // --- ON-CHAIN: Track Game On-Chain ---
+        try {
+          console.log(`[Blockchain] Tracking AI game completion (AI won) on-chain`);
+          await trackGameOnChain(0, true);
+        } catch (trackErr) {
+          console.error('[Blockchain] Track AI game on-chain failed:', trackErr);
         }
       } else {
         return NextResponse.json({ error: 'Game is not completed' }, { status: 403 });

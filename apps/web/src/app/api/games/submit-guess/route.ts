@@ -4,7 +4,7 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
 import { evaluateGuess } from '@/lib/game';
-import { resolveMatchOnChain } from '../../../../../blockchain/AgentFunctions';
+import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
 
 export async function POST(req: NextRequest) {
@@ -79,6 +79,16 @@ export async function POST(req: NextRequest) {
             rating: { decrement: 15 }
           }
         });
+      }
+
+      // --- ON-CHAIN: Track Game On-Chain ---
+      try {
+        const isAI = game.mode === 'ai';
+        const matchType = game.mode === 'cash' ? 1 : 0;
+        console.log(`[Blockchain] Tracking game on-chain: matchType=${matchType}, isAI=${isAI}`);
+        await trackGameOnChain(matchType, isAI);
+      } catch (trackErr) {
+        console.error('[Blockchain] Track game on-chain failed:', trackErr);
       }
 
       // --- ON-CHAIN: Resolve Match ---

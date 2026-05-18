@@ -98,3 +98,9 @@ Thumbs.db
 
 # Turbo
 .turbo
+
+# Video explainer
+apps/video-explainer/
+
+# Video outputs
+*.mp4
