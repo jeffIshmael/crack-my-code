@@ -9,11 +9,13 @@ export async function POST(req: NextRequest) {
     const { address, mode, stake, onChainMatchId, isPublic = true } = await req.json();
 
     const isAI = mode === 'ai';
-    const effectiveAddress = address || (isAI ? 'GUEST' : null);
+    const rawAddress = address || (isAI ? 'GUEST' : null);
 
-    if (!effectiveAddress) {
+    if (!rawAddress) {
       return NextResponse.json({ error: 'Wallet connection required for PvP' }, { status: 400 });
     }
+
+    const effectiveAddress = rawAddress === 'GUEST' ? 'GUEST' : rawAddress.toLowerCase();
 
     // 1. Ensure the user exists (Guests use a shared GUEST account)
     const user = await prisma.user.upsert({
@@ -85,7 +87,7 @@ export async function POST(req: NextRequest) {
     const newGame = await (prisma.game as any).create({
       data: {
         userId: user.id, 
-        player1Address: address,
+        player1Address: effectiveAddress,
         mode: mode,
         stake: parseFloat(stake) || 0,
         onChainMatchId: onChainMatchId || null,

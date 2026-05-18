@@ -12,11 +12,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 });
     }
 
+    const normalizedAddress = address.toLowerCase();
+
     const games = await prisma.game.findMany({
       where: {
         OR: [
-          { player1Address: address },
-          { player2Address: address }
+          { player1Address: normalizedAddress },
+          { player2Address: normalizedAddress }
         ],
         status: 'COMPLETED'
       },

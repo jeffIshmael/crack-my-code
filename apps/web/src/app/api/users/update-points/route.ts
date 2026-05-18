@@ -9,9 +9,16 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 });
     }
 
+    const normalizedAddress = address.toLowerCase();
+
     // Ensure we don't go below 0 for points or rating
-    const currentUser = await prisma.user.findUnique({
-      where: { address: address }
+    const currentUser = await prisma.user.findFirst({
+      where: {
+        address: {
+          equals: normalizedAddress,
+          mode: 'insensitive'
+        }
+      }
     });
 
     if (!currentUser) {
@@ -22,7 +29,7 @@ export async function POST(req: NextRequest) {
     const newPoints = Math.max(0, (currentUser.points || 1000) + (pointsDelta || 0));
 
     const user = await prisma.user.update({
-      where: { address: address },
+      where: { id: currentUser.id },
       data: {
         rating: newRating,
         points: newPoints

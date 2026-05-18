@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
+    const normalizedAddress = address.toLowerCase();
+
     const game = await prisma.game.findUnique({
       where: { id: gameId }
     });
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Game no longer available' }, { status: 400 });
     }
 
-    if (game.player1Address === address) {
+    if (game.player1Address.toLowerCase() === normalizedAddress) {
       return NextResponse.json({ error: 'Cannot join your own game' }, { status: 400 });
     }
 
@@ -33,14 +35,14 @@ export async function POST(req: NextRequest) {
       where: { id: gameId },
       data: {
         status: 'ACTIVE',
-        player2Address: address
+        player2Address: normalizedAddress
       }
     });
 
     // Notify Player 1 (the creator) via Pusher
     await pusherServer.trigger(`private-user-${game.player1Address}`, 'match-found', {
       gameId: updatedGame.id,
-      opponentAddress: address
+      opponentAddress: normalizedAddress
     });
 
     // Also broadcast to the lobby that this game is gone

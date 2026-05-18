@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
+    const normalizedAddress = address === 'GUEST' ? 'GUEST' : address.toLowerCase();
+
     const game = await prisma.game.findUnique({
       where: { id: gameId }
     });
@@ -30,13 +32,25 @@ export async function POST(req: NextRequest) {
         });
 
         // Update player points (-5 for AI loss)
-        if (address !== 'GUEST') {
-          await prisma.user.update({
-            where: { address: address },
-            data: { 
-              rating: { decrement: 5 }
+        if (normalizedAddress !== 'GUEST') {
+          const user = await prisma.user.findFirst({
+            where: {
+              address: {
+                equals: normalizedAddress,
+                mode: 'insensitive'
+              }
             }
           });
+          if (user) {
+            await prisma.user.update({
+              where: { id: user.id },
+              data: { 
+                rating: { decrement: 5 }
+              }
+            });
+          } else {
+            console.warn(`[Reveal] User not found for rating update: ${normalizedAddress}`);
+          }
         }
 
         // --- ON-CHAIN: Track Game On-Chain ---
@@ -52,7 +66,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Return the code that the requesting user was trying to guess
-    const opponentCodeStr = game.player1Address === address 
+    const opponentCodeStr = game.player1Address.toLowerCase() === normalizedAddress.toLowerCase() 
         ? game.player2Code 
         : game.player1Code;
 

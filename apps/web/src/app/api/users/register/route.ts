@@ -9,12 +9,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 });
     }
 
+    const normalizedAddress = address.toLowerCase();
+
     const user = await prisma.user.upsert({
-      where: { address: address },
+      where: { address: normalizedAddress },
       update: {},
       create: {
-        address: address,
-        name: `Player_${address.slice(2, 6)}`,
+        address: normalizedAddress,
+        name: `Player_${normalizedAddress.slice(2, 6)}`,
         rating: 1000,
         points: 1000
       }

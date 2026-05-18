@@ -15,6 +15,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
+    const normalizedPlayerAddress = playerAddress === 'GUEST' ? 'GUEST' : playerAddress.toLowerCase();
+
     const game = await prisma.game.findUnique({
       where: { id: gameId }
     });
@@ -24,7 +26,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Identify target code (guessing against the OTHER player)
-    const isPlayer1 = game.player1Address.toLowerCase() === playerAddress.toLowerCase();
+    const isPlayer1 = game.player1Address.toLowerCase() === normalizedPlayerAddress.toLowerCase();
     const opponentCodeStr = isPlayer1
       ? game.player2Code
       : game.player1Code;
@@ -54,33 +56,57 @@ export async function POST(req: NextRequest) {
 
     if (isWin) {
       revealCode = opponentCode;
-      winner = playerAddress;
+      winner = normalizedPlayerAddress;
       await prisma.game.update({
         where: { id: gameId },
-        data: { status: 'COMPLETED', winnerAddress: playerAddress }
+        data: { status: 'COMPLETED', winnerAddress: normalizedPlayerAddress }
       });
 
       // Update player rating (points handled separately for AI vs PVP)
-      if (playerAddress !== 'GUEST') {
+      if (normalizedPlayerAddress !== 'GUEST') {
         const isAI = game.mode === 'ai';
-        await prisma.user.update({
-          where: { address: playerAddress },
-          data: {
-            rating: { increment: isAI ? 10 : 25 }
+        const playerUser = await prisma.user.findFirst({
+          where: {
+            address: {
+              equals: normalizedPlayerAddress,
+              mode: 'insensitive'
+            }
           }
         });
+        if (playerUser) {
+          await prisma.user.update({
+            where: { id: playerUser.id },
+            data: {
+              rating: { increment: isAI ? 10 : 25 }
+            }
+          });
+        } else {
+          console.warn(`[Submit Guess] Player user not found for address: ${normalizedPlayerAddress}`);
+        }
       }
 
       // Decrement opponent rating in PVP
       if (game.mode !== 'ai') {
         const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;
         if (opponentAddress && opponentAddress !== 'GUEST' && opponentAddress !== 'AI_BOT' && opponentAddress !== 'AI') {
-          await prisma.user.update({
-            where: { address: opponentAddress },
-            data: {
-              rating: { decrement: 15 }
+          const opponentUser = await prisma.user.findFirst({
+            where: {
+              address: {
+                equals: opponentAddress,
+                mode: 'insensitive'
+              }
             }
           });
+          if (opponentUser) {
+            await prisma.user.update({
+              where: { id: opponentUser.id },
+              data: {
+                rating: { decrement: 15 }
+              }
+            });
+          } else {
+            console.warn(`[Submit Guess] Opponent user not found for address: ${opponentAddress}`);
+          }
         }
       }
 
@@ -135,11 +161,23 @@ export async function POST(req: NextRequest) {
           );
 
           // Only update points in backend AFTER successful on-chain resolution
-          if (playerAddress !== 'GUEST') {
-            await prisma.user.update({
-              where: { address: playerAddress },
-              data: { points: { increment: 50 } }
+          if (normalizedPlayerAddress !== 'GUEST') {
+            const playerUser = await prisma.user.findFirst({
+              where: {
+                address: {
+                  equals: normalizedPlayerAddress,
+                  mode: 'insensitive'
+                }
+              }
             });
+            if (playerUser) {
+              await prisma.user.update({
+                where: { id: playerUser.id },
+                data: { points: { increment: 50 } }
+              });
+            } else {
+              console.warn(`[Submit Guess] Player user not found for points update: ${normalizedPlayerAddress}`);
+            }
           }
         } catch (err) {
           console.error('[Blockchain] Resolve failed:', err);

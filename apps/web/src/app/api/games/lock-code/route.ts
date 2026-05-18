@@ -12,6 +12,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
+    const normalizedAddress = address === 'GUEST' ? 'GUEST' : address.toLowerCase();
+
     const game = await prisma.game.findUnique({
       where: { id: gameId }
     });
@@ -20,8 +22,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    const isPlayer1 = game.player1Address === address;
-    const isPlayer2 = game.player2Address === address;
+    const isPlayer1 = game.player1Address.toLowerCase() === normalizedAddress.toLowerCase();
+    const isPlayer2 = game.player2Address?.toLowerCase() === normalizedAddress.toLowerCase();
 
     if (!isPlayer1 && !isPlayer2) {
       return NextResponse.json({ error: 'Not a player in this game' }, { status: 403 });
