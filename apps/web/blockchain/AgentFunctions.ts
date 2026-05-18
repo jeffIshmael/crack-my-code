@@ -143,3 +143,19 @@ export async function sendCeloToUser(
   console.log(`Transaction successful! Hash: ${receipt.transactionHash}`);
   return receipt;
 }
+
+/**
+ * Get the agent wallet's CELO balance
+ */
+export async function getAgentBalance() {
+  if (!account) throw new Error("Agent not initialized");
+  const balance = await publicClient.getBalance({ address: account.address });
+  return balance; // Returns BigInt in wei
+}
+
+/**
+ * Get the agent wallet's address
+ */
+export function getAgentAddress() {
+  return account?.address || null;
+}
