@@ -18,12 +18,18 @@ export async function POST(req: NextRequest) {
     const url = new URL(req.url);
     const tokenParam = url.searchParams.get('token');
 
-    if (cronSecret) {
-      const expectedAuth = `Bearer ${cronSecret}`;
-      if (authHeader !== expectedAuth && tokenParam !== cronSecret) {
-        console.warn('[Cron] Unauthorized call attempt to game tracking endpoint');
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
+    if (!cronSecret) {
+      console.error('[Cron] CRON_SECRET environment variable is not defined!');
+      return NextResponse.json(
+        { error: 'Internal Server Error: Endpoint configuration is missing secure credentials' },
+        { status: 500 }
+      );
+    }
+
+    const expectedAuth = `Bearer ${cronSecret}`;
+    if (authHeader !== expectedAuth && tokenParam !== cronSecret) {
+      console.warn('[Cron] Unauthorized call attempt to game tracking endpoint');
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
     // 2. Fetch Agent Wallet Details
