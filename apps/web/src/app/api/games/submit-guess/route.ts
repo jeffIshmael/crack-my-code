@@ -24,7 +24,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Identify target code (guessing against the OTHER player)
-    const opponentCodeStr = game.player1Address === playerAddress
+    const isPlayer1 = game.player1Address.toLowerCase() === playerAddress.toLowerCase();
+    const opponentCodeStr = isPlayer1
       ? game.player2Code
       : game.player1Code;
 
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest) {
     await prisma.guess.create({
       data: {
         gameId: gameId,
-        isPlayer: game.player1Address === playerAddress,
+        isPlayer: isPlayer1,
         digits: digits.join(''),
         clues: JSON.stringify(clues)
       }
@@ -71,14 +72,16 @@ export async function POST(req: NextRequest) {
       }
 
       // Decrement opponent rating in PVP
-      const opponentAddress = game.player1Address === playerAddress ? game.player2Address : game.player1Address;
-      if (opponentAddress && opponentAddress !== 'GUEST' && opponentAddress !== 'AI_BOT') {
-        await prisma.user.update({
-          where: { address: opponentAddress },
-          data: {
-            rating: { decrement: 15 }
-          }
-        });
+      if (game.mode !== 'ai') {
+        const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;
+        if (opponentAddress && opponentAddress !== 'GUEST' && opponentAddress !== 'AI_BOT' && opponentAddress !== 'AI') {
+          await prisma.user.update({
+            where: { address: opponentAddress },
+            data: {
+              rating: { decrement: 15 }
+            }
+          });
+        }
       }
 
       // --- ON-CHAIN: Track Game On-Chain ---
