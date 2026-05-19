@@ -109,7 +109,8 @@ export default function Home() {
         if (smartWalletClient) {
             const txHash = await smartWalletClient.sendTransaction({
               to: sendAddress as `0x${string}`,
-              value: parseEther(sendAmount)
+              value: parseEther(sendAmount),
+              type: 'legacy'
             });
             if (!publicClient) throw new Error("Public client not available");
             await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
@@ -117,6 +118,7 @@ export default function Home() {
             const hash = await sendTransactionAsync({
               to: sendAddress as `0x${string}`,
               value: parseEther(sendAmount),
+              type: 'legacy'
             });
             if (!publicClient) throw new Error("Public client not available");
             await publicClient.waitForTransactionReceipt({ hash });
@@ -135,7 +137,8 @@ export default function Home() {
             const txHash = await smartWalletClient.sendTransaction({
               to: USDT_ADDRESS as `0x${string}`,
               data: data,
-              value: BigInt(0)
+              value: BigInt(0),
+              type: 'legacy'
             });
             if (!publicClient) throw new Error("Public client not available");
             await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
@@ -145,6 +148,7 @@ export default function Home() {
               abi: ERC20_TRANSFER_ABI,
               functionName: 'transfer',
               args: [sendAddress as `0x${string}`, amount],
+              type: 'legacy'
             });
             if (!publicClient) throw new Error("Public client not available");
             await publicClient.waitForTransactionReceipt({ hash });
