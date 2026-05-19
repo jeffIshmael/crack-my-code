@@ -114,14 +114,22 @@ export default function Home() {
     });
     try {
       if (sendTab === 'celo') {
-        const val = parseEther(sendAmount);
-        console.log("[handleSend] Sending CELO", { val: val.toString() });
+        const celoAddress = "0x471ece3750da237f93b8e339c536989b8978a438" as `0x${string}`;
+        const amount = parseEther(sendAmount);
+        console.log("[handleSend] Sending CELO via ERC20", { amount: amount.toString() });
+        const ERC20_TRANSFER_ABI = [{ "constant": false, "inputs": [ { "name": "_to", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "transfer", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" }] as const;
+
         if (smartWalletClient) {
-            console.log("[handleSend] Using smartWalletClient for CELO");
+            console.log("[handleSend] Using smartWalletClient for CELO ERC20");
+            const data = encodeFunctionData({
+              abi: ERC20_TRANSFER_ABI,
+              functionName: 'transfer',
+              args: [sendAddress as `0x${string}`, amount]
+            });
             const txHash = await smartWalletClient.sendTransaction({
-              to: sendAddress as `0x${string}`,
-              value: val,
-              data: '0x',
+              to: celoAddress,
+              data: data,
+              value: BigInt(0),
               type: 'legacy'
             });
             console.log("[handleSend] smartWalletClient CELO txHash", txHash);
@@ -129,14 +137,15 @@ export default function Home() {
             const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
             console.log("[handleSend] smartWalletClient receipt", receipt);
         } else {
-            console.log("[handleSend] Using sendTransactionAsync for CELO");
-            const hash = await sendTransactionAsync({
-              to: sendAddress as `0x${string}`,
-              value: val,
-              data: '0x',
+            console.log("[handleSend] Using writeContractAsync for CELO ERC20");
+            const hash = await writeContractAsync({
+              address: celoAddress,
+              abi: ERC20_TRANSFER_ABI,
+              functionName: 'transfer',
+              args: [sendAddress as `0x${string}`, amount],
               type: 'legacy'
             });
-            console.log("[handleSend] sendTransactionAsync CELO hash", hash);
+            console.log("[handleSend] writeContractAsync CELO hash", hash);
             if (!publicClient) throw new Error("Public client not available");
             const receipt = await publicClient.waitForTransactionReceipt({ hash });
             console.log("[handleSend] receipt", receipt);
