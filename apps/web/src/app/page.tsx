@@ -104,31 +104,48 @@ export default function Home() {
   const handleSend = async () => {
     if (!sendAddress || !sendAmount) return;
     setIsSending(true);
+    console.log("[handleSend] Initializing", {
+      sendTab,
+      sendAddress,
+      sendAmount,
+      hasSmartWallet: !!smartWalletClient,
+      celoBalance: celoData?.formatted,
+      usdtBalance: usdtData?.formatted,
+    });
     try {
       if (sendTab === 'celo') {
+        const val = parseEther(sendAmount);
+        console.log("[handleSend] Sending CELO", { val: val.toString() });
         if (smartWalletClient) {
+            console.log("[handleSend] Using smartWalletClient for CELO");
             const txHash = await smartWalletClient.sendTransaction({
               to: sendAddress as `0x${string}`,
-              value: parseEther(sendAmount),
+              value: val,
               type: 'legacy'
             });
+            console.log("[handleSend] smartWalletClient CELO txHash", txHash);
             if (!publicClient) throw new Error("Public client not available");
-            await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+            const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+            console.log("[handleSend] smartWalletClient receipt", receipt);
         } else {
+            console.log("[handleSend] Using sendTransactionAsync for CELO");
             const hash = await sendTransactionAsync({
               to: sendAddress as `0x${string}`,
-              value: parseEther(sendAmount),
+              value: val,
               type: 'legacy'
             });
+            console.log("[handleSend] sendTransactionAsync CELO hash", hash);
             if (!publicClient) throw new Error("Public client not available");
-            await publicClient.waitForTransactionReceipt({ hash });
+            const receipt = await publicClient.waitForTransactionReceipt({ hash });
+            console.log("[handleSend] receipt", receipt);
         }
       } else {
         const amount = parseUnits(sendAmount, 6); // assuming 6 decimals for USDT on Celo
-        
+        console.log("[handleSend] Sending USDT", { amount: amount.toString() });
         const ERC20_TRANSFER_ABI = [{ "constant": false, "inputs": [ { "name": "_to", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "transfer", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" }] as const;
 
         if (smartWalletClient) {
+            console.log("[handleSend] Using smartWalletClient for USDT");
             const data = encodeFunctionData({
               abi: ERC20_TRANSFER_ABI,
               functionName: 'transfer',
@@ -140,9 +157,12 @@ export default function Home() {
               value: BigInt(0),
               type: 'legacy'
             });
+            console.log("[handleSend] smartWalletClient USDT txHash", txHash);
             if (!publicClient) throw new Error("Public client not available");
-            await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+            const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+            console.log("[handleSend] smartWalletClient USDT receipt", receipt);
         } else {
+            console.log("[handleSend] Using writeContractAsync for USDT");
             const hash = await writeContractAsync({
               address: USDT_ADDRESS,
               abi: ERC20_TRANSFER_ABI,
@@ -150,17 +170,24 @@ export default function Home() {
               args: [sendAddress as `0x${string}`, amount],
               type: 'legacy'
             });
+            console.log("[handleSend] writeContractAsync USDT hash", hash);
             if (!publicClient) throw new Error("Public client not available");
-            await publicClient.waitForTransactionReceipt({ hash });
+            const receipt = await publicClient.waitForTransactionReceipt({ hash });
+            console.log("[handleSend] receipt", receipt);
         }
       }
       toast.success("Transaction successful!");
       setIsSendModalOpen(false);
       setSendAmount('');
       setSendAddress('');
-    } catch (err) {
-      console.error("Send failed", err);
-      toast.error("Send failed", { description: getErrorMessage(err) });
+    } catch (err: any) {
+      console.error("[handleSend] Error caught:", err);
+      const debugMsg = err?.message || err?.shortMessage || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+      alert("DEBUG ERROR: " + debugMsg);
+      toast.error("Send failed", { 
+        description: debugMsg,
+        duration: 10000
+      });
     } finally {
       setIsSending(false);
     }
