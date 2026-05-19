@@ -19,15 +19,15 @@ import {
   MAX_GUESSES,
 } from '@/lib/game';
 import type { GameMode, GuessEntry, GameState, GamePhase } from '@/lib/game';
-import { useAccount, useWriteContract, usePublicClient, useBalance } from 'wagmi';
+import { useAccount, useWriteContract, usePublicClient, useBalance, useSendTransaction } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
-import { parseUnits, parseEventLogs, encodeFunctionData } from 'viem';
+import { parseUnits, parseEventLogs, encodeFunctionData, parseEther } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS, USDT_ADDRESS } from '../../blockchain/constants';
 import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History } from 'lucide-react';
+import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, Send } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -48,7 +48,12 @@ export default function Home() {
   const address = wagmiAddress || user?.wallet?.address;
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
+  const { sendTransactionAsync } = useSendTransaction();
   const { client: smartWalletClient } = useSmartWallets();
+
+  const { data: celoData } = useBalance({
+    address: address as `0x${string}` | undefined,
+  });
 
   const { data: usdtData } = useBalance({
     address: address as `0x${string}` | undefined,
@@ -89,6 +94,73 @@ export default function Home() {
   const [turnNotification, setTurnNotification] = useState<'player' | 'opponent' | null>(null);
   const [pendingOpponentClues, setPendingOpponentClues] = useState<any[] | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  const [sendTab, setSendTab] = useState<'celo' | 'usdt'>('celo');
+  const [sendAddress, setSendAddress] = useState('');
+  const [sendAmount, setSendAmount] = useState('');
+  const [isSending, setIsSending] = useState(false);
+
+  const handleSend = async () => {
+    if (!sendAddress || !sendAmount) return;
+    setIsSending(true);
+    try {
+      if (sendTab === 'celo') {
+        if (smartWalletClient) {
+            const txHash = await smartWalletClient.sendTransaction({
+              to: sendAddress as `0x${string}`,
+              value: parseEther(sendAmount)
+            });
+            if (!publicClient) throw new Error("Public client not available");
+            await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+        } else {
+            const hash = await sendTransactionAsync({
+              to: sendAddress as `0x${string}`,
+              value: parseEther(sendAmount),
+            });
+            if (!publicClient) throw new Error("Public client not available");
+            await publicClient.waitForTransactionReceipt({ hash });
+        }
+      } else {
+        const amount = parseUnits(sendAmount, 6); // assuming 6 decimals for USDT on Celo
+        
+        const ERC20_TRANSFER_ABI = [{ "constant": false, "inputs": [ { "name": "_to", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "transfer", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" }] as const;
+
+        if (smartWalletClient) {
+            const data = encodeFunctionData({
+              abi: ERC20_TRANSFER_ABI,
+              functionName: 'transfer',
+              args: [sendAddress as `0x${string}`, amount]
+            });
+            const txHash = await smartWalletClient.sendTransaction({
+              to: USDT_ADDRESS as `0x${string}`,
+              data: data,
+              value: BigInt(0)
+            });
+            if (!publicClient) throw new Error("Public client not available");
+            await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+        } else {
+            const hash = await writeContractAsync({
+              address: USDT_ADDRESS,
+              abi: ERC20_TRANSFER_ABI,
+              functionName: 'transfer',
+              args: [sendAddress as `0x${string}`, amount],
+            });
+            if (!publicClient) throw new Error("Public client not available");
+            await publicClient.waitForTransactionReceipt({ hash });
+        }
+      }
+      toast.success("Transaction successful!");
+      setIsSendModalOpen(false);
+      setSendAmount('');
+      setSendAddress('');
+    } catch (err) {
+      console.error("Send failed", err);
+      toast.error("Send failed", { description: getErrorMessage(err) });
+    } finally {
+      setIsSending(false);
+    }
+  };
 
   const { cancelChallenge } = useGuessMyCode();
 
@@ -1267,6 +1339,11 @@ export default function Home() {
               <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black/10 bg-black/5"><div className="h-4 w-4 rotate-45 border-2 border-black/30" /></div>
             </div>
           </div>
+
+          <button onClick={() => setIsSendModalOpen(true)} className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] shadow-md transition-all active:scale-95">
+             <Send size={16} /> Send Crypto
+          </button>
+
           {!(typeof window !== 'undefined' && ((window as any).ethereum?.isMiniPay || (window as any).ethereum?.isFarcaster)) && (
             <button onClick={() => { logout(); setActiveTab('home'); }} className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-red-500/10 bg-red-500/5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:bg-red-500/10 transition-all">
               <LogOut size={16} />
@@ -1275,6 +1352,69 @@ export default function Home() {
           )}
         </div>
       )}
+
+      <AnimatePresence>
+        {isSendModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSendModalOpen(false)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-sm overflow-hidden rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-8 shadow-2xl">
+              <div className="flex flex-col gap-6 text-center">
+                <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Send Crypto</h2>
+                
+                <div className="flex w-full overflow-hidden rounded-xl border-2 border-black/10 bg-black/5 p-1 shadow-sm">
+                  <button 
+                    onClick={() => setSendTab('celo')}
+                    className={`flex-1 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest transition-all ${sendTab === 'celo' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
+                  >
+                    Celo
+                  </button>
+                  <button 
+                    onClick={() => setSendTab('usdt')}
+                    className={`flex-1 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest transition-all ${sendTab === 'usdt' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
+                  >
+                    USDT
+                  </button>
+                </div>
+
+                <div className="flex flex-col gap-4 text-left">
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-black/40">Address</label>
+                    <input 
+                      type="text" 
+                      placeholder="0x..." 
+                      value={sendAddress}
+                      onChange={(e) => setSendAddress(e.target.value)}
+                      className="rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-code text-xs font-bold text-black focus:border-[var(--accent)] focus:outline-none"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-black/40">Amount</label>
+                    <input 
+                      type="number" 
+                      placeholder="0.00" 
+                      value={sendAmount}
+                      onChange={(e) => setSendAmount(e.target.value)}
+                      className="rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-orbitron text-sm font-bold text-black focus:border-[var(--accent)] focus:outline-none"
+                    />
+                    <span className="text-[10px] font-bold text-black/40 px-1">
+                      Balance: {sendTab === 'celo' ? (celoData ? parseFloat(celoData.formatted).toFixed(4) : '0.0000') : (usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00')} {sendTab === 'celo' ? 'CELO' : 'USDT'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex w-full flex-col gap-3 mt-2">
+                  <button onClick={handleSend} disabled={isSending || !sendAddress || !sendAmount} className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] transition-transform active:scale-95 shadow-lg disabled:opacity-50">
+                    {isSending ? 'PROCESSING...' : 'SEND'}
+                  </button>
+                  <button onClick={() => setIsSendModalOpen(false)} className="w-full rounded-2xl border-2 border-black/10 bg-black/5 py-4 text-[10px] font-black uppercase tracking-widest text-black/40 transition-all">
+                    CANCEL
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 
