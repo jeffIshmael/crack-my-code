@@ -121,6 +121,7 @@ export default function Home() {
             const txHash = await smartWalletClient.sendTransaction({
               to: sendAddress as `0x${string}`,
               value: val,
+              data: '0x',
               type: 'legacy'
             });
             console.log("[handleSend] smartWalletClient CELO txHash", txHash);
@@ -132,6 +133,7 @@ export default function Home() {
             const hash = await sendTransactionAsync({
               to: sendAddress as `0x${string}`,
               value: val,
+              data: '0x',
               type: 'legacy'
             });
             console.log("[handleSend] sendTransactionAsync CELO hash", hash);
