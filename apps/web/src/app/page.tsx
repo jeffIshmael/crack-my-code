@@ -95,7 +95,7 @@ export default function Home() {
   const [pendingOpponentClues, setPendingOpponentClues] = useState<any[] | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const [isSendModalOpen, setIsSendModalOpen] = useState(false);
+  const [isSendSectionOpen, setIsSendSectionOpen] = useState(false);
   const [sendTab, setSendTab] = useState<'celo' | 'usdt'>('celo');
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
@@ -188,7 +188,7 @@ export default function Home() {
         }
       }
       toast.success("Transaction successful!");
-      setIsSendModalOpen(false);
+      setIsSendSectionOpen(false);
       setSendAmount('');
       setSendAddress('');
     } catch (err: any) {
@@ -1382,9 +1382,77 @@ export default function Home() {
             </div>
           </div>
 
-          <button onClick={() => setIsSendModalOpen(true)} className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] shadow-md transition-all active:scale-95">
-             <Send size={16} /> Send Crypto
-          </button>
+          <AnimatePresence initial={false}>
+            {isSendSectionOpen ? (
+              <motion.div
+                key="send-section"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-md">
+                  <div className="flex justify-between items-center">
+                    <h3 className="font-orbitron text-xs font-black tracking-[0.2em] text-black/40 uppercase">Send Crypto</h3>
+                  </div>
+                  
+                  <div className="flex w-full overflow-hidden rounded-xl border-2 border-black/10 bg-black/5 p-1 shadow-sm">
+                    <button 
+                      onClick={() => setSendTab('celo')}
+                      className={`flex-1 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest transition-all ${sendTab === 'celo' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
+                    >
+                      Celo
+                    </button>
+                    <button 
+                      onClick={() => setSendTab('usdt')}
+                      className={`flex-1 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest transition-all ${sendTab === 'usdt' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
+                    >
+                      USDT
+                    </button>
+                  </div>
+
+                  <div className="flex flex-col gap-4 text-left">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-black/40">Address</label>
+                      <input 
+                        type="text" 
+                        placeholder="0x..." 
+                        value={sendAddress}
+                        onChange={(e) => setSendAddress(e.target.value)}
+                        className="w-full rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-code text-xs font-bold text-black focus:border-[var(--accent)] focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-black/40">Amount</label>
+                      <input 
+                        type="number" 
+                        placeholder="0.00" 
+                        value={sendAmount}
+                        onChange={(e) => setSendAmount(e.target.value)}
+                        className="w-full rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-orbitron text-sm font-bold text-black focus:border-[var(--accent)] focus:outline-none"
+                      />
+                      <span className="text-[10px] font-bold text-black/40 px-1">
+                        Balance: {sendTab === 'celo' ? (celoData ? parseFloat(celoData.formatted).toFixed(4) : '0.0000') : (usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00')} {sendTab === 'celo' ? 'CELO' : 'USDT'}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex w-full gap-3 mt-2">
+                    <button onClick={() => setIsSendSectionOpen(false)} className="flex-1 rounded-2xl border-2 border-black/10 bg-black/5 py-4 text-[10px] font-black uppercase tracking-widest text-black/40 transition-all">
+                      CANCEL
+                    </button>
+                    <button onClick={handleSend} disabled={isSending || !sendAddress || !sendAmount} className="flex-1 rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] transition-transform active:scale-95 shadow-lg disabled:opacity-50">
+                      {isSending ? 'PROCESSING...' : 'SEND'}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            ) : (
+              <button onClick={() => setIsSendSectionOpen(true)} className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] shadow-md transition-all active:scale-95">
+                 <Send size={16} /> Send Crypto
+              </button>
+            )}
+          </AnimatePresence>
 
           {!(typeof window !== 'undefined' && ((window as any).ethereum?.isMiniPay || (window as any).ethereum?.isFarcaster)) && (
             <button onClick={() => { logout(); setActiveTab('home'); }} className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-red-500/10 bg-red-500/5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:bg-red-500/10 transition-all">
@@ -1394,69 +1462,6 @@ export default function Home() {
           )}
         </div>
       )}
-
-      <AnimatePresence>
-        {isSendModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setIsSendModalOpen(false)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-sm overflow-hidden rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-8 shadow-2xl">
-              <div className="flex flex-col gap-6 text-center">
-                <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Send Crypto</h2>
-                
-                <div className="flex w-full overflow-hidden rounded-xl border-2 border-black/10 bg-black/5 p-1 shadow-sm">
-                  <button 
-                    onClick={() => setSendTab('celo')}
-                    className={`flex-1 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest transition-all ${sendTab === 'celo' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
-                  >
-                    Celo
-                  </button>
-                  <button 
-                    onClick={() => setSendTab('usdt')}
-                    className={`flex-1 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest transition-all ${sendTab === 'usdt' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
-                  >
-                    USDT
-                  </button>
-                </div>
-
-                <div className="flex flex-col gap-4 text-left">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-black/40">Address</label>
-                    <input 
-                      type="text" 
-                      placeholder="0x..." 
-                      value={sendAddress}
-                      onChange={(e) => setSendAddress(e.target.value)}
-                      className="rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-code text-xs font-bold text-black focus:border-[var(--accent)] focus:outline-none"
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-black/40">Amount</label>
-                    <input 
-                      type="number" 
-                      placeholder="0.00" 
-                      value={sendAmount}
-                      onChange={(e) => setSendAmount(e.target.value)}
-                      className="rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-orbitron text-sm font-bold text-black focus:border-[var(--accent)] focus:outline-none"
-                    />
-                    <span className="text-[10px] font-bold text-black/40 px-1">
-                      Balance: {sendTab === 'celo' ? (celoData ? parseFloat(celoData.formatted).toFixed(4) : '0.0000') : (usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00')} {sendTab === 'celo' ? 'CELO' : 'USDT'}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="flex w-full flex-col gap-3 mt-2">
-                  <button onClick={handleSend} disabled={isSending || !sendAddress || !sendAmount} className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] transition-transform active:scale-95 shadow-lg disabled:opacity-50">
-                    {isSending ? 'PROCESSING...' : 'SEND'}
-                  </button>
-                  <button onClick={() => setIsSendModalOpen(false)} className="w-full rounded-2xl border-2 border-black/10 bg-black/5 py-4 text-[10px] font-black uppercase tracking-widest text-black/40 transition-all">
-                    CANCEL
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 
