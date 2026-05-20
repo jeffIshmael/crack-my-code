@@ -104,3 +104,6 @@ apps/video-explainer/
 
 # Video outputs
 *.mp4
+
+# Agent Skills
+.agents/

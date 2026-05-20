@@ -20,9 +20,9 @@ export function getErrorMessage(error: any): string {
     return 'Transaction cancelled by user.';
   }
 
-  // Handle Insufficient Funds for Gas (Native Token)
+  // Handle Insufficient Funds for Network Fees (Native Token)
   if (message.includes('insufficient funds') || message.includes('exceeds the balance of the account')) {
-    return 'Insufficient CELO for gas fees.';
+    return 'Insufficient balance for network fees.';
   }
 
   // Handle ERC20: transfer amount exceeds balance (Hex or String)
@@ -51,7 +51,7 @@ export function getErrorMessage(error: any): string {
     if (matches && matches[1] && matches[1].length < 100 && !matches[1].startsWith('0x')) {
       return matches[1].trim();
     }
-    return 'The transaction failed during simulation. Ensure you have enough USDT and CELO.';
+    return 'The transaction failed during simulation. Ensure you have enough USDT.';
   }
 
   // Handle Contract Execution Reverted

@@ -96,7 +96,7 @@ export default function Home() {
   const [copied, setCopied] = useState(false);
 
   const [isSendSectionOpen, setIsSendSectionOpen] = useState(false);
-  const [sendTab, setSendTab] = useState<'celo' | 'usdt'>('celo');
+  const [sendTab, setSendTab] = useState<'celo' | 'usdt'>('usdt');
   const [sendAddress, setSendAddress] = useState('');
   const [sendAmount, setSendAmount] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -720,8 +720,14 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error('Matchmaking failed', err);
-      toast.error('Matchmaking Error', { description: getErrorMessage(err) });
+      const errMsg = getErrorMessage(err);
+      toast.error('Matchmaking Error', { description: errMsg });
       setGs(prev => ({ ...prev, phase: 'lobby' }));
+      if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
+        setTimeout(() => {
+          window.location.href = "https://link.minipay.xyz/add_cash?tokens=USDT";
+        }, 1500);
+      }
     }
   };
 
@@ -1137,7 +1143,13 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Join failed', err);
-      toast.error('Join Error', { description: getErrorMessage(err) });
+      const errMsg = getErrorMessage(err);
+      toast.error('Join Error', { description: errMsg });
+      if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
+        setTimeout(() => {
+          window.location.href = "https://link.minipay.xyz/add_cash?tokens=USDT";
+        }, 1500);
+      }
     } finally {
       setIsJoining(null);
     }
@@ -1348,6 +1360,12 @@ export default function Home() {
           </div>
         ))}
       </div>
+      <div className="flex flex-col gap-3 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 text-center">
+        <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">Legal & Support</h3>
+        <a href="#" className="text-xs font-bold uppercase tracking-widest text-black/60 hover:text-[var(--accent)] transition-colors">Terms of Service</a>
+        <a href="#" className="text-xs font-bold uppercase tracking-widest text-black/60 hover:text-[var(--accent)] transition-colors">Privacy Policy</a>
+        <a href="https://t.me/+PveO9T_l3q5kMDFk" target="_blank" rel="noopener noreferrer" className="text-xs font-bold uppercase tracking-widest text-black/60 hover:text-[var(--accent)] transition-colors">Telegram Support</a>
+      </div>
     </motion.div>
   );
 
@@ -1382,7 +1400,7 @@ export default function Home() {
             </div>
           </div>
 
-          <AnimatePresence initial={false}>
+          {/* <AnimatePresence initial={false}>
             {isSendSectionOpen ? (
               <motion.div
                 key="send-section"
@@ -1393,22 +1411,7 @@ export default function Home() {
               >
                 <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-md">
                   <div className="flex justify-between items-center">
-                    <h3 className="font-orbitron text-xs font-black tracking-[0.2em] text-black/40 uppercase">Send Crypto</h3>
-                  </div>
-                  
-                  <div className="flex w-full overflow-hidden rounded-xl border-2 border-black/10 bg-black/5 p-1 shadow-sm">
-                    <button 
-                      onClick={() => setSendTab('celo')}
-                      className={`flex-1 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest transition-all ${sendTab === 'celo' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
-                    >
-                      Celo
-                    </button>
-                    <button 
-                      onClick={() => setSendTab('usdt')}
-                      className={`flex-1 rounded-lg py-2 text-[10px] font-black uppercase tracking-widest transition-all ${sendTab === 'usdt' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
-                    >
-                      USDT
-                    </button>
+                    <h3 className="font-orbitron text-xs font-black tracking-[0.2em] text-black/40 uppercase">Send Stablecoin</h3>
                   </div>
 
                   <div className="flex flex-col gap-4 text-left">
@@ -1432,7 +1435,7 @@ export default function Home() {
                         className="w-full rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-orbitron text-sm font-bold text-black focus:border-[var(--accent)] focus:outline-none"
                       />
                       <span className="text-[10px] font-bold text-black/40 px-1">
-                        Balance: {sendTab === 'celo' ? (celoData ? parseFloat(celoData.formatted).toFixed(4) : '0.0000') : (usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00')} {sendTab === 'celo' ? 'CELO' : 'USDT'}
+                        Balance: {usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00'} USDT
                       </span>
                     </div>
                   </div>
@@ -1449,10 +1452,10 @@ export default function Home() {
               </motion.div>
             ) : (
               <button onClick={() => setIsSendSectionOpen(true)} className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] shadow-md transition-all active:scale-95">
-                 <Send size={16} /> Send Crypto
+                 <Send size={16} /> Send Stablecoin
               </button>
             )}
-          </AnimatePresence>
+          </AnimatePresence> */}
 
           {!(typeof window !== 'undefined' && ((window as any).ethereum?.isMiniPay || (window as any).ethereum?.isFarcaster)) && (
             <button onClick={() => { logout(); setActiveTab('home'); }} className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-red-500/10 bg-red-500/5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:bg-red-500/10 transition-all">
