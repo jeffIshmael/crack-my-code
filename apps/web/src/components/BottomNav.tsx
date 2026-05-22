@@ -3,7 +3,7 @@
 import { motion } from 'framer-motion';
 import { Home, LayoutGrid, Info, User, Settings } from 'lucide-react';
 
-export type NavTab = 'home' | 'games' | 'about' | 'wallet' | 'stats' | 'terms' | 'privacy';
+export type NavTab = 'home' | 'games' | 'about' | 'wallet' | 'stats' | 'terms' | 'privacy' | 'contact';
 
 interface BottomNavProps {
   activeTab: NavTab;

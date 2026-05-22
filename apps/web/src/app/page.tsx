@@ -77,7 +77,24 @@ export default function Home() {
     generate([]);
   }
 
-  const [activeTab, setActiveTab] = useState<NavTab>('home');
+  const [activeTab, setActiveTab] = useState<NavTab>(() => {
+    if (typeof window !== 'undefined') {
+      const path = window.location.pathname.replace('/', '');
+      if (['games', 'wallet', 'about', 'stats', 'terms', 'privacy', 'contact'].includes(path)) {
+        return path as NavTab;
+      }
+    }
+    return 'home';
+  });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const path = activeTab === 'home' ? '/' : `/${activeTab}`;
+      if (window.location.pathname !== path) {
+        window.history.pushState(null, '', path);
+      }
+    }
+  }, [activeTab]);
   const [lobbyGames, setLobbyGames] = useState<any[]>([]);
   const [isJoining, setIsJoining] = useState<string | null>(null);
   const oppTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1426,7 +1443,7 @@ export default function Home() {
               <ChevronRight size={16} className="text-black/30" />
             </button>
 
-            <a href="https://t.me/crackmycode" target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
+            <button onClick={() => setActiveTab('contact' as any)} className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
               <div className="flex items-center gap-3">
                 <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#0088cc]/10 text-[#0088cc]">
                   <ExternalLink size={16} />
@@ -1434,7 +1451,7 @@ export default function Home() {
                 <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Telegram Support</span>
               </div>
               <ChevronRight size={16} className="text-black/30" />
-            </a>
+            </button>
           </div>
 
           {/* <AnimatePresence initial={false}>
@@ -1596,6 +1613,24 @@ export default function Home() {
     </motion.div>
   );
 
+  const renderContact = () => (
+    <motion.div key="contact" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
+          <ArrowLeft size={16} />
+        </button>
+        <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Contact Us</h2>
+      </div>
+      <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 text-sm leading-relaxed text-black/70">
+        <p>If you have any questions, encounter a bug, or need help with a transaction, our support team is available on Telegram.</p>
+        <a href="https://t.me/crackmycode" target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#0088cc] px-6 py-4 shadow-sm hover:scale-105 transition-all text-white mt-4">
+          <ExternalLink size={20} />
+          <span className="font-black uppercase tracking-widest">Open Telegram</span>
+        </a>
+      </div>
+    </motion.div>
+  );
+
   return (
     <main className="relative flex flex-col items-center justify-start min-h-full">
       <div className="w-full max-w-xl px-4 relative">
@@ -1605,7 +1640,8 @@ export default function Home() {
               activeTab === 'stats' ? renderStats() :
                 activeTab === 'terms' ? renderTerms() :
                   activeTab === 'privacy' ? renderPrivacy() :
-                    renderAbout()}
+                    activeTab === 'contact' ? renderContact() :
+                      renderAbout()}
 
 
       </div>

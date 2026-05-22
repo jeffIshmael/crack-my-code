@@ -14,6 +14,17 @@ const nextConfig = {
       },
     ]
   },
+  async rewrites() {
+    return [
+      { source: '/games', destination: '/' },
+      { source: '/wallet', destination: '/' },
+      { source: '/about', destination: '/' },
+      { source: '/stats', destination: '/' },
+      { source: '/terms', destination: '/' },
+      { source: '/privacy', destination: '/' },
+      { source: '/contact', destination: '/' },
+    ]
+  },
 };
 
 module.exports = nextConfig;
