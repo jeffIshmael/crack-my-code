@@ -27,7 +27,7 @@ import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, Send } from 'lucide-react';
+import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, Send, ArrowLeft, Activity, Users, Zap, BarChart2, ChevronRight } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -1360,12 +1360,7 @@ export default function Home() {
           </div>
         ))}
       </div>
-      <div className="flex flex-col gap-3 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 text-center">
-        <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">Legal & Support</h3>
-        <a href="#" className="text-xs font-bold uppercase tracking-widest text-black/60 hover:text-[var(--accent)] transition-colors">Terms of Service</a>
-        <a href="#" className="text-xs font-bold uppercase tracking-widest text-black/60 hover:text-[var(--accent)] transition-colors">Privacy Policy</a>
-        <a href="https://t.me/+PveO9T_l3q5kMDFk" target="_blank" rel="noopener noreferrer" className="text-xs font-bold uppercase tracking-widest text-black/60 hover:text-[var(--accent)] transition-colors">Telegram Support</a>
-      </div>
+
     </motion.div>
   );
 
@@ -1398,6 +1393,48 @@ export default function Home() {
               <div className="flex-1 rounded-xl border-2 border-black/10 bg-black/5 px-4 py-3 font-code text-xs font-bold text-black/60 truncate">{address}</div>
               <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black/10 bg-black/5"><div className="h-4 w-4 rotate-45 border-2 border-black/30" /></div>
             </div>
+          </div>
+
+          <div className="flex flex-col gap-3 mt-4">
+            {/* <button onClick={() => setActiveTab('stats' as any)} className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
+                  <Activity size={16} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Platform Stats</span>
+              </div>
+              <ChevronRight size={16} className="text-black/30" />
+            </button> */}
+
+            <button onClick={() => setActiveTab('terms' as any)} className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/5 text-black/60">
+                  <ShieldCheck size={16} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Terms of Service</span>
+              </div>
+              <ChevronRight size={16} className="text-black/30" />
+            </button>
+
+            <button onClick={() => setActiveTab('privacy' as any)} className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/5 text-black/60">
+                  <Users size={16} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Privacy Policy</span>
+              </div>
+              <ChevronRight size={16} className="text-black/30" />
+            </button>
+
+            <a href="https://t.me/crackmycode" target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
+              <div className="flex items-center gap-3">
+                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#0088cc]/10 text-[#0088cc]">
+                  <ExternalLink size={16} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Telegram Support</span>
+              </div>
+              <ChevronRight size={16} className="text-black/30" />
+            </a>
           </div>
 
           {/* <AnimatePresence initial={false}>
@@ -1468,13 +1505,107 @@ export default function Home() {
     </motion.div>
   );
 
+  const renderStats = () => (
+    <motion.div key="stats" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
+          <ArrowLeft size={16} />
+        </button>
+        <div className="flex flex-col">
+          <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Stats</h2>
+          <div className="flex items-center gap-2">
+            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-[8px] font-black uppercase tracking-widest text-green-500">Live Data</span>
+          </div>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        {[
+          { label: "Daily Active Users", value: "1,245", icon: Users },
+          { label: "Monthly Active Users", value: "14,580", icon: Activity },
+          { label: "Total Transactions", value: "32,891", icon: Zap },
+          { label: "Total Volume", value: "$125,430", icon: Wallet },
+          { label: "D7 Retention", value: "48%", icon: BarChart2 },
+          { label: "Network Fees", value: "$4.20", icon: Zap },
+        ].map((stat, i) => (
+          <div key={i} className="flex flex-col gap-3 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-5 shadow-sm">
+            <div className="flex items-center gap-2">
+              <stat.icon size={12} className="text-[var(--accent)]" />
+              <span className="text-[8px] font-black uppercase tracking-widest text-black/40">{stat.label}</span>
+            </div>
+            <span className="font-orbitron text-lg font-black">{stat.value}</span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+
+  const renderTerms = () => (
+    <motion.div key="terms" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
+          <ArrowLeft size={16} />
+        </button>
+        <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Terms</h2>
+      </div>
+      <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 text-sm leading-relaxed text-black/70">
+        <p>Welcome to Crack My Code. By using our Mini App, you agree to these terms.</p>
+        <div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">1. Acceptance of Terms</h3>
+          <p>By accessing or using the application, you agree to be bound by these Terms of Service and all applicable laws and regulations.</p>
+        </div>
+        <div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">2. Gameplay and Staking</h3>
+          <p>Crack My Code allows you to play games using stablecoins (USDT) on the Celo network. All transactions are executed on-chain and are final. You are solely responsible for understanding the risks involved in staking stablecoins.</p>
+        </div>
+        <div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">3. Fees</h3>
+          <p>The platform may take a small fee from the prize pool of cash games to cover protocol operations. Network fees for Celo are abstracted where applicable.</p>
+        </div>
+        <div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">4. Limitation of Liability</h3>
+          <p>We are not liable for any losses of funds, network errors, or disruptions related to the underlying blockchain infrastructure.</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  const renderPrivacy = () => (
+    <motion.div key="privacy" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+      <div className="flex items-center gap-4 mb-4">
+        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
+          <ArrowLeft size={16} />
+        </button>
+        <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Privacy</h2>
+      </div>
+      <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 text-sm leading-relaxed text-black/70">
+        <p>At Crack My Code, we prioritize your privacy and decentralized identity.</p>
+        <div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">1. Data We Collect</h3>
+          <p>We rely on your wallet address as your primary identifier. We track on-chain transactions and basic game history to provide the service.</p>
+        </div>
+        <div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">2. Use of Data</h3>
+          <p>Your on-chain data is publicly available on the Celo blockchain. We index and use this data strictly to facilitate gameplay, leaderboards, and dispute resolution.</p>
+        </div>
+        <div>
+          <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">3. Third Parties</h3>
+          <p>We may use minimal third-party analytics (like Plausible or basic logging) to monitor overall application performance. No personally identifiable information (PII) beyond your wallet address is shared or sold.</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+
   return (
     <main className="relative flex flex-col items-center justify-start min-h-full">
       <div className="w-full max-w-xl px-4 relative">
         {activeTab === 'home' ? renderHomeContent() :
           activeTab === 'games' ? renderOpenGames() :
             activeTab === 'wallet' ? renderWalletContent() :
-              renderAbout()}
+              activeTab === 'stats' ? renderStats() :
+                activeTab === 'terms' ? renderTerms() :
+                  activeTab === 'privacy' ? renderPrivacy() :
+                    renderAbout()}
 
 
       </div>
