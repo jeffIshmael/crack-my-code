@@ -14,17 +14,10 @@ interface SetCodeProps {
 export default function SetCode({ opponentName, onLockCode, onBack, isWaiting }: SetCodeProps) {
   const [code, setCode]    = useState<number[]>([]);
   const [locked, setLocked] = useState(false);
-  const [shakeIdx, setShakeIdx] = useState<number | null>(null);
-
   const addDigit = useCallback((d: number) => {
     if (code.length >= CODE_LENGTH) return;
-    if (code.includes(d)) {
-      setShakeIdx(code.indexOf(d));
-      setTimeout(() => setShakeIdx(null), 400);
-      return;
-    }
     setCode((prev) => [...prev, d]);
-  }, [code]); // Dependency on code needed for includes check
+  }, []);
 
   const removeDigit = useCallback(() => {
     setCode((prev) => prev.slice(0, -1));
@@ -83,7 +76,7 @@ export default function SetCode({ opponentName, onLockCode, onBack, isWaiting }:
           Set Your Secret Code
         </h2>
         <p className="text-sm" style={{ color: 'var(--text-2)' }}>
-          Choose 4 unique digits (0–9). No repeats allowed.
+          Choose 4 digits (0–9). Duplicates allowed.
         </p>
       </motion.div>
 
@@ -128,13 +121,7 @@ export default function SetCode({ opponentName, onLockCode, onBack, isWaiting }:
                   }`,
                   boxShadow: filled ? '0 0 16px var(--accent-glow)' : 'none',
                 }}
-                animate={
-                  shakeIdx === i
-                    ? { x: [-5, 5, -4, 4, 0] }
-                    : locked && filled
-                    ? { scale: [1, 1.08, 1] }
-                    : {}
-                }
+                animate={locked && filled ? { scale: [1, 1.08, 1] } : {}}
                 transition={{ duration: 0.35 }}
               >
                 {/* Cursor blink */}
@@ -149,7 +136,7 @@ export default function SetCode({ opponentName, onLockCode, onBack, isWaiting }:
                 <AnimatePresence mode="popLayout">
                   {filled && (
                     <motion.span
-                      key={digit}
+                      key={`${i}-${digit}`}
                       className="font-code text-3xl font-bold"
                       style={{ color: locked ? 'var(--clue-green)' : 'var(--accent)' }}
                       initial={{ scale: 0, opacity: 0 }}
@@ -199,42 +186,23 @@ export default function SetCode({ opponentName, onLockCode, onBack, isWaiting }:
       >
         <div className="grid grid-cols-5 gap-2.5 mb-3">
           {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((d) => {
-            const isUsed = code.includes(d);
             const isFull = code.length >= CODE_LENGTH;
-            const disabled = isUsed || isFull;
             return (
               <motion.button
                 key={d}
                 onClick={() => addDigit(d)}
-                disabled={disabled}
+                disabled={isFull}
                 className="relative flex h-14 items-center justify-center rounded-xl font-code text-xl font-bold transition-opacity"
                 style={{
-                  background: isUsed
-                    ? 'var(--clue-gray)'
-                    : 'var(--bg-elevated)',
-                  color: isUsed ? 'var(--text-dim)' : 'var(--text)',
-                  border: `1px solid ${isUsed ? 'transparent' : 'var(--border-mid)'}`,
-                  opacity: isFull && !isUsed ? 0.4 : 1,
-                  cursor: disabled ? 'not-allowed' : 'pointer',
+                  background: 'var(--bg-elevated)',
+                  color: 'var(--text)',
+                  border: '1px solid var(--border-mid)',
+                  opacity: isFull ? 0.4 : 1,
+                  cursor: isFull ? 'not-allowed' : 'pointer',
                 }}
-                whileTap={!disabled ? { scale: 0.88, transition: { duration: 0.08 } } : {}}
+                whileTap={!isFull ? { scale: 0.88, transition: { duration: 0.08 } } : {}}
               >
-                {isUsed && (
-                  <svg
-                    className="absolute"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    style={{ color: 'var(--text-dim)' }}
-                  >
-                    <line x1="18" y1="6" x2="6" y2="18"/>
-                    <line x1="6" y1="6" x2="18" y2="18"/>
-                  </svg>
-                )}
-                {!isUsed && d}
+                {d}
               </motion.button>
             );
           })}

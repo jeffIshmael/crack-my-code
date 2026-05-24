@@ -1,24 +1,52 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { type Clue, getHintText } from '@/lib/game';
+import { type TileClue, clueTileStyle, CODE_LENGTH, tileCluesForGuess } from '@/lib/game';
+import type { GuessEntry } from '@/lib/game';
 
 interface GuessRowProps {
   digits: number[];
-  clues: Clue[];
+  clues: GuessEntry['clues'];
+  tileClues?: TileClue[];
   rowIndex: number;
   /** If true, skip the reveal animation (already seen rows) */
   instant?: boolean;
   type?: 'player' | 'opponent';
 }
 
-const CLUE_STYLES: Record<string, { color: string; bg: string }> = {
-  high: { color: 'var(--clue-green)', bg: 'var(--clue-green-dim)' },
-  mid:  { color: 'var(--clue-yellow)', bg: 'var(--clue-yellow-dim)' },
-  none: { color: 'var(--text-dim)', bg: 'var(--bg-card)' },
-};
+export function ClueDigitTile({
+  digit,
+  tileClue,
+  instant = false,
+  delay = 0,
+}: {
+  digit: number;
+  tileClue: TileClue;
+  instant?: boolean;
+  delay?: number;
+}) {
+  const style = clueTileStyle(tileClue);
+  return (
+    <motion.div
+      className="flex h-10 w-10 items-center justify-center rounded-xl"
+      style={{
+        background: style.background,
+        border: style.border,
+        boxShadow: style.boxShadow,
+      }}
+      initial={!instant ? { rotateY: 0 } : false}
+      animate={!instant ? { rotateY: [0, 90, 0] } : {}}
+      transition={{ duration: 0.45, delay }}
+    >
+      <span className="font-code text-base font-bold" style={{ color: style.color }}>
+        {digit}
+      </span>
+    </motion.div>
+  );
+}
 
-export default function GuessRow({ digits, clues, rowIndex, instant = false, type = 'player' }: GuessRowProps) {
+export default function GuessRow({ digits, clues, tileClues, rowIndex, instant = false, type = 'player' }: GuessRowProps) {
+  const tiles = tileClues ?? tileCluesForGuess({ clues, tileClues });
   return (
     <motion.div
       className="flex items-center gap-2"
@@ -26,15 +54,13 @@ export default function GuessRow({ digits, clues, rowIndex, instant = false, typ
       animate={{ opacity: 1, x: 0 }}
       transition={{ duration: 0.3, delay: instant ? 0 : 0.05 }}
     >
-      {/* Side accent for opponent guesses */}
       {type === 'opponent' && (
-        <motion.div 
+        <motion.div
           layoutId={`accent-${rowIndex}`}
           className="w-1 h-8 rounded-full bg-[var(--orange)]"
         />
       )}
-      
-      {/* Row number */}
+
       <span
         className="w-5 text-right text-xs font-medium tabular-nums"
         style={{ color: type === 'opponent' ? 'var(--orange)' : 'var(--text-dim)' }}
@@ -42,54 +68,18 @@ export default function GuessRow({ digits, clues, rowIndex, instant = false, typ
         {rowIndex + 1}
       </span>
 
-      {/* Digit tiles */}
       <div className="flex gap-1.5">
         {digits.map((d, ci) => (
-          <motion.div
+          <ClueDigitTile
             key={ci}
-            className="flex h-10 w-10 items-center justify-center rounded-xl"
-            style={{
-              background: type === 'opponent' ? 'var(--orange-dim)' : 'var(--bg-elevated)',
-              border: type === 'opponent' ? '1px solid var(--orange)' : '1px solid var(--border-mid)',
-            }}
-            initial={!instant ? { rotateY: 0 } : false}
-            animate={!instant ? { rotateY: [0, 90, 0] } : {}}
-            transition={{ duration: 0.45, delay: ci * 0.08 + 0.15 }}
-          >
-            <span className="font-code text-base font-bold" style={{ color: 'var(--text)' }}>
-              {d}
-            </span>
-          </motion.div>
+            digit={d}
+            tileClue={tiles[ci]}
+            instant={instant}
+            delay={ci * 0.08 + 0.15}
+          />
         ))}
       </div>
 
-      {/* Divider */}
-      <div className="h-4 w-px rounded-full" style={{ background: 'var(--border-mid)' }} />
-
-      {/* Verbose Hint */}
-      <motion.div
-        className="flex items-center px-2.5 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider"
-        style={{
-          background: clues.some(c => c === 'green') ? 'var(--clue-green-dim)' : 'var(--bg-card)',
-          borderColor: clues.some(c => c === 'green') ? 'var(--clue-green-mid)' : 'var(--border)',
-          color: clues.some(c => c === 'green') ? 'var(--clue-green)' : 'var(--text-2)',
-        }}
-        animate={
-          !instant
-            ? {
-                scale: [1, 1.05, 1],
-                borderColor: clues.some(c => c === 'green') 
-                  ? ['var(--clue-green-mid)', 'var(--clue-green-high)', 'var(--clue-green-mid)'] 
-                  : ['var(--border)', 'var(--border-bright)', 'var(--border)'],
-              }
-            : {}
-        }
-        transition={{ duration: 0.4, delay: instant ? 0 : 0.6 }}
-      >
-        {getHintText(clues)}
-      </motion.div>
-
-      {/* Win indicator */}
       {clues.every((c) => c === 'green') && (
         <motion.div
           initial={{ scale: 0, opacity: 0 }}
@@ -106,7 +96,6 @@ export default function GuessRow({ digits, clues, rowIndex, instant = false, typ
   );
 }
 
-/* ─── Empty placeholder row ─────────────────────────────────────────────────── */
 export function EmptyGuessRow({ rowIndex }: { rowIndex: number }) {
   return (
     <div className="flex items-center gap-2 opacity-25">
@@ -114,7 +103,7 @@ export function EmptyGuessRow({ rowIndex }: { rowIndex: number }) {
         {rowIndex + 1}
       </span>
       <div className="flex gap-1.5">
-        {Array.from({ length: 4 }).map((_, i) => (
+        {Array.from({ length: CODE_LENGTH }).map((_, i) => (
           <div
             key={i}
             className="h-10 w-10 rounded-xl"
@@ -122,8 +111,6 @@ export function EmptyGuessRow({ rowIndex }: { rowIndex: number }) {
           />
         ))}
       </div>
-      <div className="h-4 w-px rounded-full" style={{ background: 'var(--border)' }} />
-      <div className="flex-1 h-6 rounded-lg" style={{ border: '1px dashed var(--border)', background: 'rgba(0,0,0,0.02)' }} />
     </div>
   );
 }

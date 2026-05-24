@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
+import { generateSecretCode } from '@/lib/game';
 
 export async function POST(req: NextRequest) {
   try {
@@ -75,13 +76,7 @@ export async function POST(req: NextRequest) {
     // Generate AI code if applicable
     let aiCode = null;
     if (isAI) {
-      const digits = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-      const code = [];
-      for (let i = 0; i < 4; i++) {
-        const idx = Math.floor(Math.random() * digits.length);
-        code.push(digits.splice(idx, 1)[0]);
-      }
-      aiCode = code.join('');
+      aiCode = generateSecretCode().join('');
     }
     
     const newGame = await (prisma.game as any).create({

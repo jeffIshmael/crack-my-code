@@ -14,11 +14,12 @@ import {
   GAME_DURATION,
   initialGameState,
   evaluateGuess,
+  toTileClues,
   isWinningClues,
   getClueCounts,
   MAX_GUESSES,
 } from '@/lib/game';
-import type { GameMode, GuessEntry, GameState, GamePhase } from '@/lib/game';
+import type { GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useSendTransaction } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
 import { parseUnits, parseEventLogs, encodeFunctionData, parseEther } from 'viem';
@@ -71,7 +72,7 @@ export default function Home() {
         return;
       }
       for (let i = 0; i <= 9; i++) {
-        if (!current.includes(i)) generate([...current, i]);
+        generate([...current, i]);
       }
     };
     generate([]);
@@ -109,7 +110,7 @@ export default function Home() {
   const [readyGame, setReadyGame] = useState<any | null>(null);
   const [currentOnChainMatchId, setCurrentOnChainMatchId] = useState<string | null>(null);
   const [turnNotification, setTurnNotification] = useState<'player' | 'opponent' | null>(null);
-  const [pendingOpponentClues, setPendingOpponentClues] = useState<any[] | null>(null);
+  const [pendingOpponentTileClues, setPendingOpponentTileClues] = useState<TileClue[] | null>(null);
   const [copied, setCopied] = useState(false);
 
   const [isSendSectionOpen, setIsSendSectionOpen] = useState(false);
@@ -385,10 +386,15 @@ export default function Home() {
       setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: data.input }));
     });
 
-    channel.bind('opponent-guess', (data: { digits: number[], clues: any[], sender: string }) => {
+    channel.bind('opponent-guess', (data: { digits: number[], clues: any[], tileClues?: TileClue[], sender: string }) => {
       if (data.sender === address) return;
       setGs((prev: GameState) => {
-        const entry: GuessEntry = { digits: data.digits, clues: data.clues as any[], id: `opp-${Date.now()}` };
+        const entry: GuessEntry = {
+          digits: data.digits,
+          clues: data.clues as any[],
+          tileClues: data.tileClues,
+          id: `opp-${Date.now()}`,
+        };
         const newGuesses = [...prev.opponentGuesses, entry];
 
         if (isWinningClues(data.clues)) {
@@ -531,14 +537,15 @@ export default function Home() {
         } else {
           // Typing done, evaluate and show result ON THE SAME LINE first
           const clues = evaluateGuess(targetDigits, gsRef.current.playerCode);
-          setPendingOpponentClues(clues);
+          const tileClues = toTileClues(targetDigits, gsRef.current.playerCode);
+          setPendingOpponentTileClues(tileClues);
 
           // Wait 2 seconds so the user can see the result on the current line
           oppTimerRef.current = setTimeout(() => {
             setGs((prev: GameState) => {
               if (prev.phase !== 'playing') return prev;
               
-              const entry: GuessEntry = { digits: targetDigits, clues, id: `opp-${Date.now()}` };
+              const entry: GuessEntry = { digits: targetDigits, clues, tileClues, id: `opp-${Date.now()}` };
               const newGuesses = [...prev.opponentGuesses, entry];
               const newCount = prev.opponentGuessCount + 1;
 
@@ -559,12 +566,12 @@ export default function Home() {
                       opponentCode: data.opponentCode || []
                     }));
                   });
-                setPendingOpponentClues(null);
+                setPendingOpponentTileClues(null);
                 return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
               }
 
               // Return turn to player
-              setPendingOpponentClues(null);
+              setPendingOpponentTileClues(null);
               return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [], isPlayerTurn: true };
             });
           }, 2000); // 2 second pause to show result on the current line
@@ -826,7 +833,12 @@ export default function Home() {
 
         if (data.success) {
           const clues = data.clues;
-          const entry: GuessEntry = { digits, clues: data.clues as any[], id: `${Date.now()}` };
+          const entry: GuessEntry = {
+            digits,
+            clues: data.clues as any[],
+            tileClues: data.tileClues,
+            id: `${Date.now()}`,
+          };
           const newGuesses = [...gs.playerGuesses, entry];
 
           setGs((prev: GameState) => {
@@ -894,7 +906,6 @@ export default function Home() {
     setGs((prev: GameState) => {
       if (!prev.isPlayerTurn || prev.phase !== 'playing') return prev;
       if (prev.currentInput.length >= CODE_LENGTH) return prev;
-      if (prev.currentInput.includes(digit)) return prev; // no repeats
       const newInput = [...prev.currentInput, digit];
       emitTyping(newInput);
       return { ...prev, currentInput: newInput };
@@ -1049,7 +1060,7 @@ export default function Home() {
           onDelete={handleDeleteDigit}
           onSubmit={() => handleSubmitGuess(gs.currentInput)}
           onQuit={handleQuitGame}
-          pendingOpponentClues={pendingOpponentClues}
+          pendingOpponentTileClues={pendingOpponentTileClues}
           turnNotification={turnNotification}
           isAI={gs.gameMode === 'ai'}
         />

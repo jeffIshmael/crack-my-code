@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
-import { evaluateGuess } from '@/lib/game';
+import { evaluateGuess, toTileClues } from '@/lib/game';
 import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
 
@@ -37,6 +37,7 @@ export async function POST(req: NextRequest) {
 
     const opponentCode = opponentCodeStr.split('').map(Number);
     const clues = evaluateGuess(digits, opponentCode);
+    const tileClues = toTileClues(digits, opponentCode);
 
     // Save guess to DB
     await prisma.guess.create({
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
         gameId: gameId,
         isPlayer: isPlayer1,
         digits: digits.join(''),
-        clues: JSON.stringify(clues)
+        clues: JSON.stringify({ clues, tileClues })
       }
     });
 
@@ -142,7 +143,10 @@ export async function POST(req: NextRequest) {
             winner: playerAddress,
             guesses: allGuesses.map(g => ({
               digits: g.digits,
-              clues: JSON.parse(g.clues),
+              clues: (() => {
+                const parsed = JSON.parse(g.clues);
+                return Array.isArray(parsed) ? parsed : parsed.clues;
+              })(),
               isPlayer: g.isPlayer,
               createdAt: g.createdAt
             }))
@@ -189,6 +193,7 @@ export async function POST(req: NextRequest) {
     await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
       digits,
       clues,
+      tileClues,
       sender: playerAddress,
       revealCode: isWin ? opponentCode : undefined
     });
@@ -196,6 +201,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       clues,
+      tileClues,
       opponentCode: revealCode,
       winnerAddress: winner
     });

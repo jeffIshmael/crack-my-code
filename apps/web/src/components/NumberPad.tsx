@@ -3,13 +3,15 @@
 import { motion } from 'framer-motion';
 
 interface NumberPadProps {
-  usedDigits: number[];      // digits already in currentInput
+  inputLength: number;
+  maxLength: number;
   disabled: boolean;
   onDigit: (d: number) => void;
   onDelete: () => void;
 }
 
-export default function NumberPad({ usedDigits, disabled, onDigit, onDelete }: NumberPadProps) {
+export default function NumberPad({ inputLength, maxLength, disabled, onDigit, onDelete }: NumberPadProps) {
+  const isFull = inputLength >= maxLength;
   // Layout: 3×3 grid + 0 centered at bottom with delete
   const rows: (number | null)[][] = [
     [1, 2, 3],
@@ -26,8 +28,7 @@ export default function NumberPad({ usedDigits, disabled, onDigit, onDelete }: N
             <DigitButton
               key={d}
               digit={d!}
-              used={usedDigits.includes(d!)}
-              disabled={disabled}
+              disabled={disabled || isFull}
               onPress={onDigit}
             />
           ))}
@@ -38,13 +39,13 @@ export default function NumberPad({ usedDigits, disabled, onDigit, onDelete }: N
       <div className="flex gap-2">
         <motion.button
           onClick={onDelete}
-          disabled={disabled || usedDigits.length === 0}
+          disabled={disabled || inputLength === 0}
           className="flex h-14 flex-1 items-center justify-center rounded-xl transition-opacity"
           style={{
             background: 'var(--bg-elevated)',
             border: '1px solid var(--border-mid)',
             color: 'var(--text-2)',
-            opacity: disabled || usedDigits.length === 0 ? 0.3 : 1,
+            opacity: disabled || inputLength === 0 ? 0.3 : 1,
           }}
           whileTap={!disabled ? { scale: 0.88 } : {}}
         >
@@ -55,7 +56,7 @@ export default function NumberPad({ usedDigits, disabled, onDigit, onDelete }: N
           </svg>
         </motion.button>
 
-        <DigitButton digit={0} used={usedDigits.includes(0)} disabled={disabled} onPress={onDigit} />
+        <DigitButton digit={0} disabled={disabled || isFull} onPress={onDigit} />
 
         {/* Placeholder to keep layout balanced */}
         <div className="flex-1" />
@@ -68,31 +69,28 @@ export default function NumberPad({ usedDigits, disabled, onDigit, onDelete }: N
 
 interface DigitButtonProps {
   digit: number;
-  used: boolean;
   disabled: boolean;
   onPress: (d: number) => void;
 }
 
-function DigitButton({ digit, used, disabled, onPress }: DigitButtonProps) {
-  const isDisabled = disabled || used;
-
+function DigitButton({ digit, disabled, onPress }: DigitButtonProps) {
   return (
     <motion.button
-      onClick={() => !isDisabled && onPress(digit)}
-      disabled={isDisabled}
+      onClick={() => !disabled && onPress(digit)}
+      disabled={disabled}
       className="relative flex h-14 flex-1 items-center justify-center rounded-xl font-code text-xl font-bold select-none"
       style={{
-        background: used ? 'var(--clue-gray)' : 'var(--bg-elevated)',
-        border: `1px solid ${used ? 'transparent' : 'var(--border-mid)'}`,
-        color: used ? 'var(--text-dim)' : 'var(--text)',
-        cursor: isDisabled ? 'not-allowed' : 'pointer',
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border-mid)',
+        color: 'var(--text)',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.4 : 1,
         transition: 'background 0.15s, color 0.15s',
       }}
-      whileTap={!isDisabled ? { scale: 0.84, transition: { duration: 0.07 } } : {}}
+      whileTap={!disabled ? { scale: 0.84, transition: { duration: 0.07 } } : {}}
       initial={false}
     >
-      {/* Ripple on press */}
-      {!used && !disabled && (
+      {!disabled && (
         <motion.div
           className="absolute inset-0 rounded-xl"
           style={{ background: 'var(--accent-dim)' }}
@@ -100,16 +98,7 @@ function DigitButton({ digit, used, disabled, onPress }: DigitButtonProps) {
           whileTap={{ opacity: [0, 0.5, 0], transition: { duration: 0.2 } }}
         />
       )}
-
-      {used ? (
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-          style={{ color: 'var(--text-dim)' }}>
-          <line x1="18" y1="6" x2="6" y2="18"/>
-          <line x1="6" y1="6" x2="18" y2="18"/>
-        </svg>
-      ) : (
-        digit
-      )}
+      {digit}
     </motion.button>
   );
 }

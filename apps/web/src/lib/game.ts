@@ -2,6 +2,9 @@
 // Added countdown phase for better pre-game sync.
 
 export type Clue = 'green' | 'yellow' | 'gray';
+
+/** Per-tile display state (Wordle-style, with duplicate vs absent grays) */
+export type TileClue = 'green' | 'yellow' | 'absent' | 'duplicate';
 export type GamePhase = 'lobby' | 'matchmaking' | 'setCode' | 'playing' | 'result' | 'countdown';
 export type GameMode = 'ai' | 'fun' | 'cash';
 export type GameResult = 'win' | 'lose' | 'draw' | null;
@@ -9,6 +12,8 @@ export type GameResult = 'win' | 'lose' | 'draw' | null;
 export interface GuessEntry {
   digits: number[];
   clues: Clue[];
+  /** Per-tile display clues; falls back to `clues` when missing (older games) */
+  tileClues?: TileClue[];
   id: string;
 }
 
@@ -80,8 +85,33 @@ export function evaluateGuess(guess: number[], secret: number[]): Clue[] {
   return clues;
 }
 
+/** Map evaluation clues to tile colors (splits gray into absent vs duplicate) */
+export function toTileClues(guess: number[], secret: number[]): TileClue[] {
+  const clues = evaluateGuess(guess, secret);
+  return clues.map((clue, i) => {
+    if (clue === 'green') return 'green';
+    if (clue === 'yellow') return 'yellow';
+    const digit = guess[i];
+    if (!secret.includes(digit)) return 'absent';
+    return 'duplicate';
+  });
+}
+
+/** Random 4-digit code; duplicates allowed */
+export function generateSecretCode(length = CODE_LENGTH): number[] {
+  return Array.from({ length }, () => Math.floor(Math.random() * 10));
+}
+
 export function isWinningClues(clues: Clue[]): boolean {
   return clues.filter((c) => c === 'green').length === CODE_LENGTH;
+}
+
+/** Resolve tile clues for display (supports guesses saved before tileClues existed) */
+export function tileCluesForGuess(entry: Pick<GuessEntry, 'clues' | 'tileClues'>): TileClue[] {
+  if (entry.tileClues && entry.tileClues.length === CODE_LENGTH) {
+    return entry.tileClues;
+  }
+  return entry.clues.map((c) => (c === 'gray' ? 'absent' : c) as TileClue);
 }
 
 export function getClueCounts(clues: Clue[]) {
@@ -89,6 +119,45 @@ export function getClueCounts(clues: Clue[]) {
     green: clues.filter((c) => c === 'green').length,
     yellow: clues.filter((c) => c === 'yellow').length,
   };
+}
+
+/** Wordle-style tile colors for each tile clue state */
+export function clueTileStyle(tileClue: TileClue | Clue): {
+  background: string;
+  border: string;
+  color: string;
+  boxShadow?: string;
+} {
+  switch (tileClue) {
+    case 'green':
+      return {
+        background: 'var(--clue-green)',
+        border: '1px solid var(--clue-green-mid)',
+        color: '#fff',
+        boxShadow: '0 0 10px rgba(5, 150, 105, 0.4)',
+      };
+    case 'yellow':
+      return {
+        background: 'var(--clue-yellow)',
+        border: '1px solid rgba(217, 119, 6, 0.5)',
+        color: '#fff',
+        boxShadow: '0 0 10px rgba(217, 119, 6, 0.35)',
+      };
+    case 'duplicate':
+      return {
+        background: 'var(--clue-gray)',
+        border: '1px solid rgba(75, 85, 99, 0.35)',
+        color: '#fff',
+      };
+    case 'absent':
+    case 'gray':
+    default:
+      return {
+        background: 'var(--bg-elevated)',
+        border: '1px solid var(--border-mid)',
+        color: 'var(--text-dim)',
+      };
+  }
 }
 
 export function randomOpponentName(): string {

@@ -2,10 +2,10 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import GuessRow, { EmptyGuessRow } from '@/components/GuessRow';
+import GuessRow, { ClueDigitTile, EmptyGuessRow } from '@/components/GuessRow';
 import NumberPad from '@/components/NumberPad';
-import type { GuessEntry } from '@/lib/game';
-import { CODE_LENGTH, MAX_GUESSES, getHintText } from '@/lib/game';
+import type { TileClue, GuessEntry } from '@/lib/game';
+import { CODE_LENGTH, MAX_GUESSES } from '@/lib/game';
 
 interface GameBoardProps {
   playerGuesses: GuessEntry[];
@@ -23,7 +23,7 @@ interface GameBoardProps {
   onDelete: () => void;
   onSubmit: () => void;
   onQuit?: () => void;
-  pendingOpponentClues?: any[] | null;
+  pendingOpponentTileClues?: TileClue[] | null;
   turnNotification?: 'player' | 'opponent' | null;
 }
 
@@ -43,7 +43,7 @@ export default function GameBoard({
   onDelete,
   onSubmit,
   onQuit,
-  pendingOpponentClues = null,
+  pendingOpponentTileClues = null,
   turnNotification = null,
 }: GameBoardProps) {
   const historyRef = useRef<HTMLDivElement>(null);
@@ -252,12 +252,12 @@ export default function GameBoard({
         <AnimatePresence mode="popLayout">
           {view === 'player' ? (
             playerGuesses.map((g, i) => (
-              <GuessRow key={g.id} digits={g.digits} clues={g.clues} rowIndex={i} type="player" />
+              <GuessRow key={g.id} digits={g.digits} clues={g.clues} tileClues={g.tileClues} rowIndex={i} type="player" />
             ))
           ) : (
             <>
               {opponentGuesses.map((g, i) => (
-                <GuessRow key={g.id} digits={g.digits} clues={g.clues} rowIndex={i} type="opponent" />
+                <GuessRow key={g.id} digits={g.digits} clues={g.clues} tileClues={g.tileClues} rowIndex={i} type="opponent" />
               ))}
               {/* Active Typing Row */}
               {!isPlayerTurn && (opponentCurrentInput.length > 0 || view === 'opponent') && (
@@ -272,14 +272,24 @@ export default function GameBoard({
                   <div className="flex gap-1.5">
                     {Array.from({ length: CODE_LENGTH }).map((_, i) => {
                       const filled = i < opponentCurrentInput.length;
+                      if (filled && pendingOpponentTileClues) {
+                        return (
+                          <ClueDigitTile
+                            key={i}
+                            digit={opponentCurrentInput[i]}
+                            tileClue={pendingOpponentTileClues[i]}
+                            instant
+                          />
+                        );
+                      }
                       return (
                         <motion.div
                           key={i}
                           className="flex h-10 w-10 items-center justify-center rounded-xl"
-                          style={{ 
-                            background: filled ? 'var(--orange-dim)' : 'var(--bg-elevated)', 
-                            border: `1px solid ${filled ? 'var(--orange)' : 'var(--border)'}`, 
-                            opacity: filled ? 1 : 0.3 
+                          style={{
+                            background: filled ? 'var(--orange-dim)' : 'var(--bg-elevated)',
+                            border: `1px solid ${filled ? 'var(--orange)' : 'var(--border)'}`,
+                            opacity: filled ? 1 : 0.3,
                           }}
                           animate={filled ? { scale: [1, 1.1, 1] } : {}}
                           transition={{ duration: 0.2 }}
@@ -291,19 +301,15 @@ export default function GameBoard({
                       );
                     })}
                   </div>
-                  <div className="h-4 w-px rounded-full bg-[var(--orange)] mx-1" />
-                  <div className="flex items-center gap-1">
-                    <motion.div 
-                      animate={pendingOpponentClues ? { scale: [1, 1.05, 1] } : { opacity: [0.3, 1, 0.3] }}
+                  {!pendingOpponentTileClues && opponentCurrentInput.length < CODE_LENGTH && (
+                    <motion.span
+                      animate={{ opacity: [0.3, 1, 0.3] }}
                       transition={{ duration: 0.8, repeat: Infinity }}
-                      className="text-[10px] uppercase font-bold text-[var(--orange)] px-2 py-0.5 rounded-md"
-                      style={pendingOpponentClues ? { background: 'rgba(255, 107, 43, 0.1)', border: '1px solid rgba(255, 107, 43, 0.3)' } : {}}
+                      className="text-[10px] uppercase font-bold text-[var(--orange)]"
                     >
-                      {pendingOpponentClues 
-                        ? getHintText(pendingOpponentClues) 
-                        : (opponentCurrentInput.length === CODE_LENGTH ? '' : isAI ? 'Processing...' : 'Typing…')}
-                    </motion.div>
-                  </div>
+                      {isAI ? 'Processing...' : 'Typing…'}
+                    </motion.span>
+                  )}
                 </motion.div>
               )}
             </>
@@ -324,11 +330,6 @@ export default function GameBoard({
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
             {isPlayerTurn ? 'Your Guess' : isAI ? `${opponentName} is thinking...` : 'Waiting…'}
           </span>
-          {isPlayerTurn && (
-            <span className="text-xs" style={{ color: 'var(--text-dim)' }}>
-              No repeats
-            </span>
-          )}
         </div>
 
         <div className="flex gap-2">
@@ -353,7 +354,7 @@ export default function GameBoard({
                 <AnimatePresence mode="popLayout">
                   {filled ? (
                     <motion.span
-                      key={currentInput[i]}
+                      key={`${i}-${currentInput[i]}`}
                       className="font-code text-2xl font-bold"
                       style={{ color: 'var(--accent)' }}
                       initial={{ scale: 0, opacity: 0, y: -8 }}
@@ -382,7 +383,8 @@ export default function GameBoard({
       {/* ── Number pad ── */}
       <div className="mb-3 flex-1">
         <NumberPad
-          usedDigits={currentInput}
+          inputLength={currentInput.length}
+          maxLength={CODE_LENGTH}
           disabled={!isPlayerTurn}
           onDigit={onDigitPress}
           onDelete={onDelete}
