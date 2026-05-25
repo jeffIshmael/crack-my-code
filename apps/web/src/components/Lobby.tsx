@@ -280,7 +280,7 @@ export default function Lobby({
                     className="relative mb-4 max-w-[200px] rounded-2xl border-2 border-[var(--accent)] bg-white p-3 shadow-[0_4px_20px_rgba(37,99,235,0.15)] -translate-y-2"
                   >
                     <p className="font-orbitron text-[9px] font-black leading-tight text-[var(--accent)] text-center uppercase tracking-wider">
-                      I&apos;m <span className="text-blue-500">Cipher</span>. I crack your code in 3 tries. You&apos;ll never crack mine. Let&apos;s begin.
+                      I&apos;m <span className="text-blue-500">Cipher</span>. I read every green, yellow, and gray hint. Think you can crack my code first?
                     </p>
 
                     {/* Bubble Tail */}
@@ -559,7 +559,7 @@ export default function Lobby({
                           <span className="font-orbitron text-sm font-black tracking-wider text-black">ANYONE CAN JOIN</span>
                           <span className="text-xl">🌍</span>
                         </div>
-                        <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Public challenge • Visible on Global Board</p>
+                        <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Live matchmaking • Pairs when another player is searching</p>
                       </button>
 
                       <button

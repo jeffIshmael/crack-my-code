@@ -16,7 +16,9 @@ import {
   evaluateGuess,
   toTileClues,
   isWinningClues,
-  getClueCounts,
+  allSecretCodes,
+  filterSecretCandidates,
+  pickAIGuess,
   MAX_GUESSES,
 } from '@/lib/game';
 import type { GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
@@ -64,19 +66,9 @@ export default function Home() {
   const gsRef = useRef(gs);
   useEffect(() => { gsRef.current = gs; }, [gs]);
 
-  const allPermutations = useRef<number[][]>([]);
-  if (allPermutations.current.length === 0) {
-    const generate = (current: number[]) => {
-      if (current.length === 4) {
-        allPermutations.current.push(current);
-        return;
-      }
-      for (let i = 0; i <= 9; i++) {
-        generate([...current, i]);
-      }
-    };
-    generate([]);
-  }
+  const aiTurnRunningRef = useRef(false);
+  const playerReviewUntilRef = useRef(0);
+  const PLAYER_GUESS_REVIEW_MS = 2800;
 
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     if (typeof window !== 'undefined') {
@@ -96,7 +88,6 @@ export default function Home() {
       }
     }
   }, [activeTab]);
-  const [lobbyGames, setLobbyGames] = useState<any[]>([]);
   const [isJoining, setIsJoining] = useState<string | null>(null);
   const oppTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
@@ -107,7 +98,6 @@ export default function Home() {
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
   const [searchTime, setSearchTime] = useState(0);
   const [countdown, setCountdown] = useState<number | 'GO' | null>(null);
-  const [readyGame, setReadyGame] = useState<any | null>(null);
   const [currentOnChainMatchId, setCurrentOnChainMatchId] = useState<string | null>(null);
   const [turnNotification, setTurnNotification] = useState<'player' | 'opponent' | null>(null);
   const [pendingOpponentTileClues, setPendingOpponentTileClues] = useState<TileClue[] | null>(null);
@@ -226,21 +216,7 @@ export default function Home() {
 
   const clearOppTimer = () => { if (oppTimerRef.current) clearTimeout(oppTimerRef.current); };
 
-  const fetchLobby = useCallback(async () => {
-    try {
-      const res = await fetch('/api/games/lobby');
-      const data = await res.json();
-      setLobbyGames(data);
-    } catch (err) {
-      console.error('Lobby fetch failed', err);
-    }
-  }, []);
-
-  useEffect(() => {
-    fetchLobby();
-  }, [fetchLobby]);
-
-  // 1.2 Fetch my active challenges
+  // 1.2 Fetch my private invite challenges
   const fetchMyActive = useCallback(async () => {
     if (!authenticated || !address) return;
     try {
@@ -344,23 +320,6 @@ export default function Home() {
       return () => clearInterval(timer);
     }
   }, [gs.phase]);
-
-  // 2. Subscribe to Lobby events
-  useEffect(() => {
-    const channel = pusherClient.subscribe('lobby-channel');
-
-    channel.bind('challenge-created', (data: any) => {
-      setLobbyGames(prev => [data, ...prev]);
-    });
-
-    channel.bind('challenge-joined', (data: any) => {
-      setLobbyGames(prev => prev.filter(g => g.id !== data.gameId));
-    });
-
-    return () => {
-      pusherClient.unsubscribe('lobby-channel');
-    };
-  }, [address]);
 
   const updateBackendPoints = useCallback(async (rDelta: number, pDelta: number) => {
     if (!address) return;
@@ -472,120 +431,104 @@ export default function Home() {
 
   const scheduleOpponentTurn = useCallback(() => {
     if (gsRef.current.gameMode !== 'ai') return;
+    if (gsRef.current.phase !== 'playing') return;
+    if (aiTurnRunningRef.current) return;
     clearOppTimer();
 
-    // Wait 1.5s so the player can see their own guess result
+    const waitForPlayerReview = Math.max(0, playerReviewUntilRef.current - Date.now());
+
     oppTimerRef.current = setTimeout(() => {
       const currentGs = gsRef.current;
+      if (currentGs.phase !== 'playing' || currentGs.isPlayerTurn) return;
+
       const history = currentGs.opponentGuesses;
       const playerCode = currentGs.playerCode;
-
       if (!playerCode || playerCode.length === 0) return;
 
-      // 1. Filter candidates based on history
-      const candidates = allPermutations.current.filter((cand) => {
-        return history.every((h: GuessEntry) => {
-          const candClues = evaluateGuess(h.digits, cand);
-          const c1 = getClueCounts(candClues);
-          const c2 = getClueCounts(h.clues);
-          return c1.green === c2.green && c1.yellow === c2.yellow;
-        });
-      });
+      aiTurnRunningRef.current = true;
 
-      // 2. Pick next guess
-      let targetDigits: number[];
-      if (history.length === 0) {
-        targetDigits = [0, 1, 2, 3];
-      } else if (candidates.length === 1) {
-        targetDigits = candidates[0];
-      } else {
-        if (candidates.length > 200) {
-          targetDigits = candidates[Math.floor(Math.random() * candidates.length)];
-        } else {
-          let bestGuess = candidates[0];
-          let minMaxRemaining = Infinity;
-          const testPool = candidates.length > 50 ? candidates.slice(0, 50) : candidates;
+      const candidates = filterSecretCandidates(allSecretCodes(), history);
+      const targetDigits = pickAIGuess(candidates, history.length);
 
-          for (const guess of testPool) {
-            const groups: Record<string, number> = {};
-            for (const secret of candidates) {
-              const clues = evaluateGuess(guess, secret);
-              const { green, yellow } = getClueCounts(clues);
-              const key = `${green}-${yellow}`;
-              groups[key] = (groups[key] || 0) + 1;
-            }
-            const maxInGroup = Math.max(...Object.values(groups));
-            if (maxInGroup < minMaxRemaining) {
-              minMaxRemaining = maxInGroup;
-              bestGuess = guess;
-            }
-          }
-          targetDigits = bestGuess;
-        }
-      }
-
-      // 3. Execute Turn Fast Typing Simulation
       let typeIndex = 0;
       const typeDigit = () => {
         if (typeIndex < CODE_LENGTH) {
           setGs((prev: GameState) => ({
             ...prev,
-            opponentCurrentInput: [...prev.opponentCurrentInput, targetDigits[typeIndex]]
+            opponentCurrentInput: [...prev.opponentCurrentInput, targetDigits[typeIndex]],
           }));
           typeIndex++;
-          oppTimerRef.current = setTimeout(typeDigit, 400); // Slower typing, 400ms per digit
+          oppTimerRef.current = setTimeout(typeDigit, 320);
         } else {
-          // Typing done, evaluate and show result ON THE SAME LINE first
           const clues = evaluateGuess(targetDigits, gsRef.current.playerCode);
           const tileClues = toTileClues(targetDigits, gsRef.current.playerCode);
           setPendingOpponentTileClues(tileClues);
 
-          // Wait 2 seconds so the user can see the result on the current line
+          const won = isWinningClues(clues);
+          const revealMs = won ? 1400 : 1800;
+
           oppTimerRef.current = setTimeout(() => {
+            const entry: GuessEntry = {
+              digits: targetDigits,
+              clues,
+              tileClues,
+              id: `opp-${Date.now()}`,
+            };
+
+            if (won) {
+              clearOppTimer();
+              aiTurnRunningRef.current = false;
+              setPendingOpponentTileClues(null);
+              updateBackendPoints(-5, -10);
+
+              setGs((prev: GameState) => ({
+                ...prev,
+                phase: 'result',
+                result: 'lose',
+                ratingDelta: -5,
+                opponentGuesses: [...prev.opponentGuesses, entry],
+                opponentGuessCount: prev.opponentGuessCount + 1,
+                opponentCurrentInput: [],
+                opponentCode: prev.playerCode,
+                isPlayerTurn: false,
+              }));
+
+              fetch('/api/games/reveal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
+              }).catch((err) => console.error('AI reveal sync failed', err));
+              return;
+            }
+
             setGs((prev: GameState) => {
               if (prev.phase !== 'playing') return prev;
-              
-              const entry: GuessEntry = { digits: targetDigits, clues, tileClues, id: `opp-${Date.now()}` };
-              const newGuesses = [...prev.opponentGuesses, entry];
-              const newCount = prev.opponentGuessCount + 1;
-
-              if (isWinningClues(clues)) {
-                // Reveal AI's code and end game
-                fetch('/api/games/reveal', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' })
-                })
-                  .then(res => res.json())
-                  .then(data => {
-                    setGs((p: GameState) => ({
-                      ...p,
-                      phase: 'result',
-                      result: 'lose',
-                      ratingDelta: -5,
-                      opponentCode: data.opponentCode || []
-                    }));
-                  });
-                setPendingOpponentTileClues(null);
-                return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [] };
-              }
-
-              // Return turn to player
-              setPendingOpponentTileClues(null);
-              return { ...prev, opponentGuesses: newGuesses, opponentGuessCount: newCount, opponentCurrentInput: [], isPlayerTurn: true };
+              return {
+                ...prev,
+                opponentGuesses: [...prev.opponentGuesses, entry],
+                opponentGuessCount: prev.opponentGuessCount + 1,
+                opponentCurrentInput: [],
+                isPlayerTurn: true,
+              };
             });
-          }, 2000); // 2 second pause to show result on the current line
+            setPendingOpponentTileClues(null);
+            aiTurnRunningRef.current = false;
+          }, revealMs);
         }
       };
 
+      setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: [] }));
       typeDigit();
-    }, 1500);
-  }, [currentGameId, address]); 
+    }, waitForPlayerReview);
+  }, [currentGameId, address, updateBackendPoints]); 
 
   // AI Turn Trigger
   useEffect(() => {
     if (gs.phase === 'playing' && !gs.isPlayerTurn && gs.gameMode === 'ai') {
       scheduleOpponentTurn();
+    }
+    if (gs.isPlayerTurn || gs.phase !== 'playing') {
+      aiTurnRunningRef.current = false;
     }
   }, [gs.phase, gs.isPlayerTurn, gs.gameMode, scheduleOpponentTurn]);
 
@@ -611,6 +554,28 @@ export default function Home() {
       ratingDelta: null,
     }));
   }, []);
+
+  // Poll for public matchmaking pairing (backup to websocket match-found)
+  useEffect(() => {
+    if (gs.phase !== 'matchmaking' || gs.opponentName === 'WAITING' || !currentGameId) return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/games/lobby?id=${currentGameId}`);
+        if (!res.ok) return;
+        const game = await res.json();
+        if (game?.player2Address) {
+          handleMatchFound(game.id, game.player2Address);
+        }
+      } catch (err) {
+        console.error('Matchmaking poll failed', err);
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 2500);
+    return () => clearInterval(interval);
+  }, [gs.phase, gs.opponentName, currentGameId, handleMatchFound]);
 
   const handleCancelChallenge = async (gameId: string, onChainMatchId?: string) => {
     if (!isConnected || !address) return;
@@ -887,7 +852,10 @@ export default function Home() {
               return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false };
             }
 
-            // Opponent's turn (now handled by useEffect)
+            // Hold on your board so you can read green/yellow/gray feedback before Cipher moves
+            if (prev.gameMode === 'ai') {
+              playerReviewUntilRef.current = Date.now() + PLAYER_GUESS_REVIEW_MS;
+            }
             return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
           });
         }
@@ -1063,6 +1031,7 @@ export default function Home() {
           pendingOpponentTileClues={pendingOpponentTileClues}
           turnNotification={turnNotification}
           isAI={gs.gameMode === 'ai'}
+          phase={gs.phase}
         />
 
         <AnimatePresence>
@@ -1183,8 +1152,6 @@ export default function Home() {
     }
   };
 
-  const [lobbyTab, setLobbyTab] = useState<'open' | 'mine'>('open');
-
   const renderOpenGames = () => (
     <motion.div key="games" className="flex w-full flex-col gap-8 px-5 pt-12 pb-48 text-left" {...screenVariants}>
       {!address ? (
@@ -1221,24 +1188,18 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex w-full overflow-hidden rounded-xl border-2 border-black/10 bg-black/5 p-1 shadow-sm">
-            <button 
-              onClick={() => setLobbyTab('open')}
-              className={`flex-1 rounded-lg py-3 text-[10px] font-black uppercase tracking-widest transition-all ${lobbyTab === 'open' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
-            >
-              Open Challenges
-            </button>
-            <button 
-              onClick={() => setLobbyTab('mine')}
-              className={`flex-1 rounded-lg py-3 text-[10px] font-black uppercase tracking-widest transition-all ${lobbyTab === 'mine' ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm' : 'text-black/40'}`}
-            >
-              My Open Challenges
-            </button>
+          <div className="flex flex-col gap-2 mb-2">
+            <h3 className="font-orbitron text-xs font-black tracking-[0.2em] text-black/50 uppercase">
+              My Invite Links
+            </h3>
+            <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">
+              Private challenges only — copy or cancel while you wait
+            </p>
           </div>
 
           <div className="flex flex-col gap-4">
-            {(lobbyTab === 'open' ? lobbyGames : myActiveGames).length > 0 ? (
-              (lobbyTab === 'open' ? lobbyGames : myActiveGames).map((game) => (
+            {myActiveGames.length > 0 ? (
+              myActiveGames.map((game) => (
                 <motion.div key={game.id} className="relative flex flex-col gap-3 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-md">
                   <div className="absolute top-4 right-6 text-[10px] font-black uppercase tracking-widest text-black/40">
                     {game.mode === 'cash' ? `${game.stake} USDT` : 'Free'}
@@ -1250,65 +1211,51 @@ export default function Home() {
                     <span className="text-[10px] font-black text-black/30 tracking-widest uppercase">(1200 CMC)</span>
                   </div>
                   <div className="flex w-full justify-end gap-2">
-                    {game.player1Address.toLowerCase() === address.toLowerCase() ? (
-                      <>
-                        {!game.isPublic && (
-                          <button 
-                            onClick={() => {
-                              const inviteUrl = `${window.location.origin}/?invite=${game.id}`;
-                              navigator.clipboard.writeText(inviteUrl);
-                              toast.success("Invite link copied!");
-                            }}
-                            className="rounded-lg border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] shadow-sm"
-                          >
-                            COPY LINK
-                          </button>
-                        )}
-                        <button 
-                          disabled={isJoining === game.id}
-                          onClick={async () => {
-                            if (isJoining) return;
-                            setIsJoining(game.id);
-                            const toastId = toast.loading("Closing challenge...");
-                            try {
-                              console.log('Closing game:', game);
-                              if (game.onChainId) {
-                                console.log('Calling on-chain cancelChallenge for ID:', game.onChainId);
-                                await cancelChallenge(game.onChainId);
-                              }
-                              
-                              console.log('Calling API to cancel game:', game.id);
-                              const res = await fetch('/api/games/cancel', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ gameId: game.id, address })
-                              });
-
-                              if (!res.ok) throw new Error('API cancellation failed');
-                              
-                              toast.success("Challenge closed", { id: toastId });
-                              fetchLobby();
-                            } catch (err) {
-                              console.error('Failed to close challenge:', err);
-                              toast.error(getErrorMessage(err), { id: toastId });
-                            } finally {
-                              setIsJoining(null);
-                            }
-                          }}
-                          className="rounded-lg border-2 border-red-500/20 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 shadow-sm disabled:opacity-50"
-                        >
-                          {isJoining === game.id ? 'CLOSING...' : 'CLOSE'}
-                        </button>
-                      </>
-                    ) : (
-                      <button onClick={() => setReadyGame(game)} className="rounded-lg border-2 border-black/10 bg-[var(--bg-elevated)] px-8 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] shadow-sm">JOIN</button>
-                    )}
+                    <button
+                      onClick={() => {
+                        const inviteUrl = `${window.location.origin}/?invite=${game.id}`;
+                        navigator.clipboard.writeText(inviteUrl);
+                        toast.success('Invite link copied!');
+                      }}
+                      className="rounded-lg border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] shadow-sm"
+                    >
+                      COPY LINK
+                    </button>
+                    <button
+                      disabled={isJoining === game.id}
+                      onClick={async () => {
+                        if (isJoining) return;
+                        setIsJoining(game.id);
+                        const toastId = toast.loading('Closing challenge...');
+                        try {
+                          if (game.onChainMatchId) {
+                            await cancelChallenge(game.onChainMatchId);
+                          }
+                          const res = await fetch('/api/games/cancel', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ gameId: game.id, address }),
+                          });
+                          if (!res.ok) throw new Error('API cancellation failed');
+                          toast.success('Challenge closed', { id: toastId });
+                          fetchMyActive();
+                        } catch (err) {
+                          console.error('Failed to close challenge:', err);
+                          toast.error(getErrorMessage(err), { id: toastId });
+                        } finally {
+                          setIsJoining(null);
+                        }
+                      }}
+                      className="rounded-lg border-2 border-red-500/20 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 shadow-sm disabled:opacity-50"
+                    >
+                      {isJoining === game.id ? 'CLOSING...' : 'CANCEL'}
+                    </button>
                   </div>
                 </motion.div>
               ))
             ) : (
               <div className="flex items-center justify-center py-20 text-center opacity-30">
-                <span className="text-[10px] font-black uppercase tracking-widest">No challenges found</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">No open invite links</span>
               </div>
             )}
           </div>
@@ -1340,32 +1287,6 @@ export default function Home() {
         </>
       )}
 
-      <AnimatePresence>
-        {readyGame && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6">
-            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setReadyGame(null)} className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <motion.div initial={{ opacity: 0, scale: 0.9, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.9, y: 20 }} className="relative w-full max-w-sm overflow-hidden rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-8 shadow-2xl">
-              <div className="flex flex-col items-center gap-6 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]"><ShieldCheck size={32} /></div>
-                <div className="flex flex-col gap-2">
-                  <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Ready to Duel?</h2>
-                  <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">You are about to join a {readyGame.mode === 'cash' ? 'Paid' : 'Free'} match.</p>
-                </div>
-                {readyGame.mode === 'cash' && (
-                  <div className="w-full rounded-2xl bg-black/5 border-2 border-black/10 p-4">
-                    <p className="text-[10px] font-black text-black/40 uppercase tracking-widest mb-1">Stake Required</p>
-                    <p className="text-2xl font-black text-[var(--text)]">{readyGame.stake} <span className="text-xs opacity-60">USDT</span></p>
-                  </div>
-                )}
-                <div className="flex w-full flex-col gap-3">
-                  <button onClick={() => { handleJoinChallenge(readyGame.id, readyGame.player1Address); setReadyGame(null); }} disabled={isJoining === readyGame.id} className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] transition-transform active:scale-95 shadow-lg">{isJoining === readyGame.id ? 'PROCESSING...' : 'INITIALIZE DUEL'}</button>
-                  <button onClick={() => setReadyGame(null)} className="w-full rounded-2xl border-2 border-black/10 bg-black/5 py-4 text-[10px] font-black uppercase tracking-widest text-black/40 transition-all">ABORT</button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </motion.div>
   );
 
@@ -1377,8 +1298,9 @@ export default function Home() {
       </div>
       <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6">
         {[
-          { t: 'Objective', d: 'Crack your opponent\'s secret 4-digit code before they crack yours.' },
-          { t: 'The Clues', d: 'The game provides numerical feedback: "X in the right place" and "Y reallocated" (right digit, wrong place).' },
+          { t: 'Objective', d: 'Crack your opponent\'s secret 4-digit code before they crack yours. Codes can repeat digits (e.g. 1122).' },
+          { t: 'The Clues', d: 'Each digit is colored Wordle-style: green = correct digit in the correct spot, yellow = digit is in the code but wrong spot, light gray = not in the code. A dark gray tile means that digit appears in the code but you already used all copies of it in this guess.' },
+          { t: 'How to Play', d: 'Take turns submitting 4-digit guesses. You have 8 attempts. Use the colors on your guess row to narrow down the secret code.' },
           { t: 'USDT Staking', d: 'In Professional mode, both players stake USDT. Winner takes 99% of the pool.' },
           { t: 'Fair Play', d: 'Quitting during a cash game results in an automatic loss.' }
         ].map((rule, i) => (

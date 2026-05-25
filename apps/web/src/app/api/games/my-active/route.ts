@@ -16,10 +16,10 @@ export async function GET(req: NextRequest) {
 
     const games = await prisma.game.findMany({
       where: {
-        OR: [
-          { player1Address: normalizedAddress, status: { in: ['PENDING', 'ACTIVE'] } },
-          { player2Address: normalizedAddress, status: 'ACTIVE' }
-        ]
+        player1Address: normalizedAddress,
+        status: 'PENDING',
+        isPublic: false,
+        player2Address: null,
       },
       orderBy: {
         createdAt: 'desc'

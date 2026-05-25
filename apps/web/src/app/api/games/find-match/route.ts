@@ -33,17 +33,18 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Guests can only play against AI' }, { status: 403 });
     }
 
-    // 2. Check for an existing PENDING game of the same mode
-    // (For Free matches, we auto-pair. For Cash, we create a challenge for the board).
-    if (mode === 'fun') {
+    // 2. Auto-pair public challenges via live matchmaking (not the lobby board)
+    if (mode === 'fun' || mode === 'cash') {
       const pendingGame = await prisma.game.findFirst({
         where: {
           status: 'PENDING',
-          mode: 'fun',
+          mode,
           isPublic: true,
           player2Address: null,
-          player1Address: { not: address }
-        }
+          player1Address: { not: effectiveAddress },
+          ...(mode === 'cash' ? { stake: parseFloat(stake) || 0 } : {}),
+        },
+        orderBy: { createdAt: 'asc' },
       });
 
       if (pendingGame) {
@@ -93,20 +94,8 @@ export async function POST(req: NextRequest) {
       }
     });
     
-    if (!isAI && isPublic) {
-       // Broadcast to everyone that a new challenge is on the board
-       try {
-         await pusherServer.trigger('lobby-channel', 'challenge-created', {
-           id: newGame.id,
-           player1Address: address,
-           mode: mode,
-           stake: stake
-         });
-       } catch (pusherError) {
-         console.error('Pusher broadcast failed:', pusherError);
-         // Don't fail the whole request if pusher fails, but log it
-       }
-    }
+    // Public challenges match via live matchmaking (websocket + DB queue), not the lobby board.
+    // Only private (invite-link) challenges appear in "My Open Challenges".
 
     return NextResponse.json({ 
       status: isAI ? 'matched' : 'searching', 

@@ -6,6 +6,7 @@ import GuessRow, { ClueDigitTile, EmptyGuessRow } from '@/components/GuessRow';
 import NumberPad from '@/components/NumberPad';
 import type { TileClue, GuessEntry } from '@/lib/game';
 import { CODE_LENGTH, MAX_GUESSES } from '@/lib/game';
+import type { GamePhase } from '@/lib/game';
 
 interface GameBoardProps {
   playerGuesses: GuessEntry[];
@@ -25,6 +26,7 @@ interface GameBoardProps {
   onQuit?: () => void;
   pendingOpponentTileClues?: TileClue[] | null;
   turnNotification?: 'player' | 'opponent' | null;
+  phase?: GamePhase;
 }
 
 export default function GameBoard({
@@ -45,19 +47,35 @@ export default function GameBoard({
   onQuit,
   pendingOpponentTileClues = null,
   turnNotification = null,
+  phase = 'playing',
 }: GameBoardProps) {
   const historyRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<'player' | 'opponent'>('player');
   const canSubmit = isPlayerTurn && currentInput.length === CODE_LENGTH;
+  const aiReviewingPlayerGuess =
+    isAI &&
+    !isPlayerTurn &&
+    phase === 'playing' &&
+    opponentCurrentInput.length === 0 &&
+    pendingOpponentTileClues === null;
+  const aiCrackedCode =
+    isAI &&
+    pendingOpponentTileClues !== null &&
+    pendingOpponentTileClues.every((c) => c === 'green');
 
-  // Auto-switch view logic (when opponent starts typing)
+  // Stay on your board to read colored feedback; switch when Cipher actually starts guessing
   useEffect(() => {
-    if (!isPlayerTurn && opponentCurrentInput.length > 0) {
-      if (view !== 'opponent') setView('opponent');
+    if (
+      isAI &&
+      phase === 'playing' &&
+      !isPlayerTurn &&
+      (opponentCurrentInput.length > 0 || pendingOpponentTileClues !== null)
+    ) {
+      setView('opponent');
     }
-  }, [isPlayerTurn, opponentCurrentInput.length]);
+  }, [isAI, phase, isPlayerTurn, opponentCurrentInput.length, pendingOpponentTileClues]);
 
-  // Return to player view
+  // Return to player view when it's the player's turn again
   useEffect(() => {
     if (isPlayerTurn) {
       if (isAI) {
@@ -85,7 +103,15 @@ export default function GameBoard({
     if (historyRef.current) {
       historyRef.current.scrollTop = historyRef.current.scrollHeight;
     }
-  }, [playerGuesses.length, opponentGuesses.length, view]);
+  }, [playerGuesses.length, opponentGuesses.length, view, pendingOpponentTileClues]);
+
+  // After you submit, scroll your guess list so the latest feedback is visible
+  useEffect(() => {
+    if (isPlayerTurn || view !== 'player') return;
+    if (historyRef.current) {
+      historyRef.current.scrollTop = historyRef.current.scrollHeight;
+    }
+  }, [playerGuesses.length, isPlayerTurn, view]);
 
 
   return (
@@ -260,7 +286,7 @@ export default function GameBoard({
                 <GuessRow key={g.id} digits={g.digits} clues={g.clues} tileClues={g.tileClues} rowIndex={i} type="opponent" />
               ))}
               {/* Active Typing Row */}
-              {!isPlayerTurn && (opponentCurrentInput.length > 0 || view === 'opponent') && (
+              {!isPlayerTurn && phase === 'playing' && (opponentCurrentInput.length > 0 || pendingOpponentTileClues) && (
                 <motion.div 
                   initial={{ opacity: 0, x: -10 }}
                   animate={{ opacity: 1, x: 0 }}
@@ -328,7 +354,17 @@ export default function GameBoard({
       <div className="mb-3">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
-            {isPlayerTurn ? 'Your Guess' : isAI ? `${opponentName} is thinking...` : 'Waiting…'}
+            {isPlayerTurn
+              ? 'Your Guess'
+              : aiReviewingPlayerGuess
+              ? 'Review your hints above'
+              : aiCrackedCode
+              ? `${opponentName} cracked your code!`
+              : isAI && opponentCurrentInput.length > 0
+              ? `Watch ${opponentName}'s guess`
+              : isAI
+              ? `${opponentName} is guessing…`
+              : 'Waiting…'}
           </span>
         </div>
 
@@ -418,15 +454,27 @@ export default function GameBoard({
              />
              <span className="animate-pulse tracking-widest">ANALYZING...</span>
           </div>
-        ) : !isPlayerTurn ? (
+        ) : aiReviewingPlayerGuess ? (
+          <span className="text-xs opacity-60 tracking-[0.15em]">CIPHER WAITING…</span>
+        ) : !isPlayerTurn && phase === 'playing' ? (
           <span className="flex items-center justify-center gap-2 opacity-60">
-            <motion.span
-              animate={{ opacity: [0.4, 1, 0.4] }}
-              transition={{ duration: 1, repeat: Infinity }}
-            >
-              ···
-            </motion.span>
-            {isAI ? `${opponentName.toUpperCase()} THINKING` : 'OPPONENT THINKING'}
+            {aiCrackedCode ? (
+              <span className="tracking-widest text-[var(--orange)]">CODE BREACHED</span>
+            ) : (
+              <>
+                <motion.span
+                  animate={{ opacity: [0.4, 1, 0.4] }}
+                  transition={{ duration: 1, repeat: Infinity }}
+                >
+                  ···
+                </motion.span>
+                {isAI && opponentCurrentInput.length >= CODE_LENGTH
+                  ? 'REVEALING GUESS'
+                  : isAI
+                  ? `${opponentName.toUpperCase()} GUESSING`
+                  : 'OPPONENT THINKING'}
+              </>
+            )}
           </span>
         ) : canSubmit ? (
           'SUBMIT GUESS →'
