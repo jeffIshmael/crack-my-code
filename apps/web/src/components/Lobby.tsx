@@ -6,14 +6,12 @@ import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTr
 import { usePrivy } from "@privy-io/react-auth";
 import { ConnectButton } from "@/components/connect-button";
 import type { GameMode } from '@/lib/game';
-import { pusherClient } from '@/lib/pusher-client';
+import { PROFESSIONAL_MODE_ENABLED } from '@/lib/game';
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import Image from 'next/image';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { ShieldCheck, Lock } from 'lucide-react';
-
 interface LobbyProps {
   rating: number;
   points: number;
@@ -24,7 +22,7 @@ interface LobbyProps {
   onWalletClick?: () => void;
   searchTime?: number;
   onCancelMatchmaking?: () => void;
-  gameId?: string;
+  shareableJoinCode?: string;
 }
 
 const stagger = {
@@ -45,7 +43,7 @@ export default function Lobby({
   onWalletClick,
   searchTime = 0,
   onCancelMatchmaking,
-  gameId
+  shareableJoinCode,
 }: LobbyProps) {
   const { isConnected, address } = useAccount();
   const { login } = usePrivy();
@@ -108,21 +106,13 @@ export default function Lobby({
     }
   }, [stake]);
 
-  // 3. Subscribe to User-specific Match Found events
-  useEffect(() => {
-    if (!address) return;
-    const channel = pusherClient.subscribe(`private-user-${address}`);
-
-    channel.bind('match-found', (data: any) => {
-      onMatchFound(data.gameId, data.opponentAddress);
-    });
-
-    return () => {
-      pusherClient.unsubscribe(`private-user-${address}`);
-    };
-  }, [address, onMatchFound]);
-
   const handleStartPvP = (mode: GameMode) => {
+    if (mode === 'cash' && !PROFESSIONAL_MODE_ENABLED) {
+      toast.info('Professional mode coming soon', {
+        description: 'Free friendly matches and Cipher AI are live now.',
+      });
+      return;
+    }
     setSelectedMode(mode);
     if (mode === 'cash') {
       setPvpStep('config');
@@ -231,11 +221,11 @@ export default function Lobby({
           {isMatchmaking ? (
             <div className="w-full">
               {opponentName === 'WAITING' ? (
-                gameId ? (
+                shareableJoinCode ? (
                   <InviteWaiting
                     searchTime={searchTime}
                     onCancel={onCancelMatchmaking}
-                    gameId={gameId}
+                    joinCode={shareableJoinCode}
                     isCreating={isCreating}
                   />
                 ) : (
@@ -335,53 +325,6 @@ export default function Lobby({
         </div>
       </div>
 
-      {/* ── Incoming Invite Modal ── */}
-      <AnimatePresence>
-        {!isMatchmaking && gameId && !isCreating && (
-          <div className="fixed inset-x-0 inset-y-0 z-[110] flex items-center justify-center pointer-events-none p-6">
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-xl pointer-events-auto"
-            />
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.9, y: 20 }}
-              className="relative w-full max-w-[400px] rounded-3xl border-2 border-black/10 bg-[var(--bg-card)] p-8 shadow-2xl pointer-events-auto"
-            >
-              <div className="flex flex-col items-center gap-6 text-center">
-                <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[var(--accent)]/10 text-[var(--accent)]">
-                  <ShieldCheck size={32} />
-                </div>
-                <div className="flex flex-col gap-2">
-                  <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Duel Invite</h2>
-                  <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">
-                    You have been summoned to a private match.
-                  </p>
-                </div>
-                {!isConnected ? (
-                  <button
-                    onClick={() => login()}
-                    className="w-full rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] transition-transform active:scale-95"
-                  >
-                    SIGN IN TO ACCEPT
-                  </button>
-                ) : (
-                  <div className="flex flex-col items-center gap-4 py-2">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-ping" />
-                      <span className="text-[10px] font-black text-[var(--accent)] uppercase tracking-[0.2em]">Authenticating...</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-
       {/* ── PvP Mode Selection Bottom Sheet ── */}
       <AnimatePresence>
         {showPvPModal && (
@@ -452,17 +395,21 @@ export default function Lobby({
                         <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Free Match • Play for Global Ranking</p>
                       </button>
 
-                      {/* Paid Option */}
-                      <button
-                        onClick={() => handleStartPvP('cash')}
-                        className="group flex flex-col gap-2 rounded-2xl border border-[var(--orange)]/30 bg-[var(--orange)]/5 p-5 text-left transition-all hover:bg-[var(--orange)]/10 hover:translate-y-[-2px] active:translate-y-[1px] shadow-sm hover:shadow-md"
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="font-orbitron text-sm font-black tracking-wider text-[var(--orange)]">PROFESSIONAL</span>
-                          <span className="text-xl transition-transform group-hover:scale-125">💰</span>
+                      {/* Professional (coming soon) */}
+                      <div className="relative flex flex-col gap-2 rounded-2xl border border-black/10 bg-black/[0.03] p-5 opacity-70">
+                        <div className="absolute top-3 right-3 rounded-full bg-[var(--orange)]/15 px-2.5 py-1">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--orange)]">
+                            Coming Soon
+                          </span>
                         </div>
-                        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Stake USDT • Winner Takes 99%</p>
-                      </button>
+                        <div className="flex items-center justify-between">
+                          <span className="font-orbitron text-sm font-black tracking-wider text-black/50">PROFESSIONAL</span>
+                          <span className="text-xl grayscale">💰</span>
+                        </div>
+                        <p className="text-[10px] font-bold text-black/35 uppercase tracking-widest pr-16">
+                          USDT stakes • Winner takes 99%
+                        </p>
+                      </div>
                     </div>
                   </motion.div>
                 ) : pvpStep === 'config' ? (
@@ -571,7 +518,7 @@ export default function Lobby({
                           <span className="font-orbitron text-sm font-black tracking-wider text-[var(--accent)]">INVITE ONLY</span>
                           <span className="text-xl">🔐</span>
                         </div>
-                        <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Private challenge • Generate secret link</p>
+                        <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Private challenge • Share Game ID</p>
                       </button>
 
                       <button
@@ -702,23 +649,22 @@ function MatchmakingPulse({
 function InviteWaiting({
   searchTime,
   onCancel,
-  gameId,
+  joinCode,
   isCreating
 }: {
   searchTime: number,
   onCancel?: () => void,
-  gameId: string,
+  joinCode: string,
   isCreating?: boolean
 }) {
   const [copied, setCopied] = useState(false);
-  const inviteUrl = typeof window !== 'undefined' ? `${window.location.origin}/?invite=${gameId}` : '';
   const timeLeft = Math.max(0, 300 - searchTime); // 5 minutes
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(inviteUrl);
+    navigator.clipboard.writeText(joinCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
-    toast.success("Link Copied!");
+    toast.success("Game ID Copied!");
   };
 
   return (
@@ -734,20 +680,23 @@ function InviteWaiting({
 
       <div className="flex flex-col items-center gap-2 text-center">
         <h3 className="font-orbitron text-base font-black tracking-widest text-[var(--accent)] uppercase">Waiting for Friend</h3>
-        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest max-w-[200px]">
-          Share the link below. The match will expire in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}.
+        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest max-w-[240px]">
+          Share this Game ID. Friends paste it under Join Challenge on Home or Open. Expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}.
         </p>
       </div>
 
       <div className="flex w-full max-w-[300px] flex-col gap-3">
         <div
           onClick={handleCopy}
-          className="relative flex cursor-pointer items-center justify-between overflow-hidden rounded-2xl border border-black/10 bg-black/5 p-4 transition-all hover:bg-black/10"
+          className="relative flex cursor-pointer flex-col gap-2 overflow-hidden rounded-2xl border border-black/10 bg-black/5 p-4 transition-all hover:bg-black/10"
         >
-          <span className="truncate pr-4 text-[10px] font-bold text-black/60">{inviteUrl}</span>
-          <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">
-            {copied ? 'COPIED' : 'COPY'}
-          </span>
+          <span className="text-[8px] font-black uppercase tracking-widest text-black/40">Game ID</span>
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-code text-lg font-black tracking-[0.25em] text-[var(--accent)]">{joinCode}</span>
+            <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">
+              {copied ? 'COPIED' : 'COPY'}
+            </span>
+          </div>
         </div>
 
         <button

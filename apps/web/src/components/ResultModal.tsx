@@ -11,9 +11,13 @@ interface ResultModalProps {
   opponentCode: number[];
   opponentName: string;
   ratingDelta: number;
+  /** Points at match start (before this game’s delta). */
+  pointsBefore: number;
+  /** Authoritative points after settlement (from DB). */
+  pointsAfter: number;
   playerRating: number;
-  playerPoints: number;
   guessCount: number;
+  statsLoading?: boolean;
   onPlayAgain: () => void;
   onHome: () => void;
 }
@@ -27,9 +31,11 @@ export default function ResultModal({
   opponentCode,
   opponentName,
   ratingDelta,
+  pointsBefore,
+  pointsAfter,
   playerRating,
-  playerPoints,
   guessCount,
+  statsLoading = false,
   onPlayAgain,
   onHome,
 }: ResultModalProps) {
@@ -223,10 +229,10 @@ export default function ResultModal({
             <div className="flex flex-col">
               <span className="text-xs" style={{ color: 'var(--text-2)' }}>CMC Points</span>
               <span className="font-orbitron text-xl font-bold" style={{ color: 'var(--text)' }}>
-                {playerPoints}
+                {statsLoading ? '…' : pointsBefore}
               </span>
             </div>
-            {gameMode !== 'ai' && (
+            {gameMode !== 'ai' && ratingDelta !== 0 && (
               <motion.div
                 className="flex items-center gap-1 rounded-lg px-3 py-1.5 font-orbitron text-lg font-bold"
                 style={{
@@ -243,8 +249,8 @@ export default function ResultModal({
             <div className="flex flex-col items-end">
               <span className="text-xs" style={{ color: 'var(--text-2)' }}>Updated CMC</span>
               <span className="font-orbitron text-xl font-bold"
-                style={{ color: gameMode === 'ai' ? 'var(--text)' : (ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)') }}>
-                {gameMode === 'ai' ? playerPoints : playerPoints + ratingDelta}
+                style={{ color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)' }}>
+                {statsLoading ? '…' : pointsAfter}
               </span>
             </div>
           </motion.div>
@@ -276,26 +282,25 @@ export default function ResultModal({
             ))}
           </motion.div>
 
-          {/* Play again */}
-          <motion.button
-            onClick={onPlayAgain}
-            className="group relative w-full overflow-hidden rounded-2xl py-5 font-orbitron text-base font-black tracking-[0.25em] transition-all hover:translate-y-[-2px] active:translate-y-[1px]"
-            style={{
-              background: isWin
-                ? 'var(--clue-green)'
-                : 'var(--accent)',
-              color: 'var(--bg-base)',
-              boxShadow: isWin 
-                ? '0 12px 24px rgba(5,150,105,0.25), 0 0 0 1px rgba(0,0,0,0.1) inset' 
-                : '0 12px 24px rgba(37,99,235,0.25), 0 0 0 1px rgba(0,0,0,0.1) inset',
-            }}
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.75 }}
-          >
-            <div className="absolute inset-0 bg-white/10 opacity-0 transition-opacity group-hover:opacity-100" />
-            <span className="relative z-10">PLAY AGAIN</span>
-          </motion.button>
+          {gameMode === 'ai' && (
+            <motion.button
+              onClick={onPlayAgain}
+              className="group relative w-full overflow-hidden rounded-2xl py-5 font-orbitron text-base font-black tracking-[0.25em] transition-all hover:translate-y-[-2px] active:translate-y-[1px]"
+              style={{
+                background: isWin ? 'var(--clue-green)' : 'var(--accent)',
+                color: 'var(--bg-base)',
+                boxShadow: isWin
+                  ? '0 12px 24px rgba(5,150,105,0.25), 0 0 0 1px rgba(0,0,0,0.1) inset'
+                  : '0 12px 24px rgba(37,99,235,0.25), 0 0 0 1px rgba(0,0,0,0.1) inset',
+              }}
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.75 }}
+            >
+              <div className="absolute inset-0 bg-white/10 opacity-0 transition-opacity group-hover:opacity-100" />
+              <span className="relative z-10">PLAY AGAIN</span>
+            </motion.button>
+          )}
 
           <motion.p
             className="text-xs"

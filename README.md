@@ -1,58 +1,103 @@
-# my-celo-app
+<p align="center">
+  <img src="apps/web/public/logo.png" alt="Crack My Code logo" width="220" />
+</p>
 
-A new Celo blockchain project
+# Crack My Code
 
-A modern Celo blockchain application built with Next.js, TypeScript, and Turborepo.
+A competitive **code-cracking duel** built on **Celo**, playable in the browser and inside **MiniPay** / Farcaster mini apps. Two players each hide a secret 4-digit code; whoever cracks the opponent’s code first wins.
 
-## Getting Started
+<p align="center">
+  <video src="apps/web/public/crack-my-code.mp4" controls width="720" poster="apps/web/public/logo.png">
+    Your browser does not support the video tag.
+  </video>
+</p>
 
-1. Install dependencies:
-   ```bash
-   pnpm install
-   ```
+## How the game works
 
-2. Start the development server:
-   ```bash
-   pnpm dev
-   ```
+1. **Set your code** — Pick a secret 4-digit code (digits 0–9, repeats allowed, e.g. `1122`).
+2. **Take turns guessing** — Submit guesses against your opponent’s hidden code.
+3. **Read the clues** — Each guess is colored Wordle-style:
+   - **Green** — correct digit, correct position
+   - **Yellow** — digit is in the code, wrong position
+   - **Gray** — digit is not in the code (duplicate tiles may show darker gray when you’ve already used all copies)
+4. **Win** — First to crack the opponent’s code wins (up to 8 guesses per side).
 
-3. Open [http://localhost:3000](http://localhost:3000) in your browser.
+## Game modes
 
-## Project Structure
+| Mode | Status | Description |
+|------|--------|-------------|
+| **Cipher AI** | Live | Play against **Cipher**, an entropy-based AI that narrows 10,000 possible codes using logic, not random guesses. |
+| **Friendly (PvP)** | Live | Free human vs human — public matchmaking or **invite-only** with a shareable **Game ID**. |
+| **Professional (USDT)** | Coming soon | Staked USDT matches on Celo; winner takes ~99% of the pool. |
 
-This is a monorepo managed by Turborepo with the following structure:
+### Private challenges (Game ID)
 
-- `apps/web` - Next.js application with embedded UI components and utilities
-- `apps/hardhat` - Smart contract development environment
+1. Host creates an **invite-only** friendly match on **Home**.
+2. Host copies the **Game ID** (e.g. `K7M3NP2X`) from the waiting screen.
+3. Friend opens **Open** → **Join Challenge**, pastes the ID, and joins.
+4. Both players set their codes; the match starts when both lock in.
 
-## Available Scripts
+## Cipher AI
 
-- `pnpm dev` - Start development servers
-- `pnpm build` - Build all packages and apps
-- `pnpm lint` - Lint all packages and apps
-- `pnpm type-check` - Run TypeScript type checking
+Cipher is documented in:
 
-### Smart Contract Scripts
+- [`apps/web/docs/cipher-ai-strategy.md`](apps/web/docs/cipher-ai-strategy.md) — how the live solver works
+- [`apps/web/cipher.md`](apps/web/cipher.md) — architecture overview
+- [`apps/web/src/lib/cipher.ts`](apps/web/src/lib/cipher.ts) — implementation
 
-- `pnpm contracts:compile` - Compile smart contracts
-- `pnpm contracts:test` - Run smart contract tests
-- `pnpm contracts:deploy` - Deploy contracts to local network
-- `pnpm contracts:deploy:celo-sepolia` - Deploy to Celo Sepolia Testnet
-- `pnpm contracts:deploy:celo` - Deploy to Celo Mainnet
+High level: maintain all valid codes, eliminate inconsistent secrets after each guess, then pick probes that maximize information (entropy + minimax), with opening book `0123` → `4567`.
 
-## Tech Stack
+## Getting started
 
-- **Framework**: Next.js 14 with App Router
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **UI Components**: shadcn/ui
-- **Smart Contracts**: Hardhat with Viem
-- **Monorepo**: Turborepo
-- **Package Manager**: PNPM
+### Prerequisites
 
-## Learn More
+- Node.js 18+
+- PNPM 8+
+- PostgreSQL (for game state) — see `apps/web/.env.template`
 
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Celo Documentation](https://docs.celo.org/)
-- [Turborepo Documentation](https://turbo.build/repo/docs)
-- [shadcn/ui Documentation](https://ui.shadcn.com/)
+### Install & run
+
+```bash
+pnpm install
+cd apps/web && cp .env.template .env   # configure DATABASE_URL, Pusher, etc.
+pnpm dev
+```
+
+Open [http://localhost:3000](http://localhost:3000).
+
+## Project structure
+
+| Path | Purpose |
+|------|---------|
+| `apps/web` | Next.js app — UI, API routes, Prisma, Cipher AI |
+| `apps/contracts` | `GuessMyCode` smart contract (Hardhat) |
+| `apps/promo-video` | Remotion promo for social |
+
+## Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Start dev servers (Turborepo) |
+| `pnpm build` | Production build |
+| `pnpm video:studio` | Remotion preview |
+| `pnpm video:render` | Render promo MP4 |
+| `pnpm contracts:compile` | Compile Solidity |
+| `pnpm contracts:deploy:celo-sepolia` | Deploy to Celo Sepolia |
+
+## Tech stack
+
+- **Frontend:** Next.js 14, React, Tailwind, Framer Motion
+- **Chain:** Celo, USDT, Viem / Wagmi, Privy smart wallets
+- **Backend:** Prisma + PostgreSQL, Pusher for realtime PvP
+- **AI:** Custom constraint + entropy solver (`cipher.ts`)
+- **Video:** Remotion
+
+## Learn more
+
+- [Celo docs](https://docs.celo.org/)
+- [MiniPay](https://docs.celo.org/build-on-celo/build-on-minipay)
+- [Remotion](https://www.remotion.dev/docs/)
+
+## License
+
+Private / project-specific — see repository owner for terms.

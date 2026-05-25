@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { findGameByJoinInput } from '@/lib/game-lookup';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,11 +8,15 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const id = searchParams.get('id');
+    const joinCode = searchParams.get('joinCode');
+
+    if (joinCode) {
+      const game = await findGameByJoinInput(joinCode);
+      return NextResponse.json(game);
+    }
 
     if (id) {
-      const game = await prisma.game.findUnique({
-        where: { id }
-      });
+      const game = await findGameByJoinInput(id);
       return NextResponse.json(game);
     }
 

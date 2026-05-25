@@ -4,6 +4,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import Lobby from '@/components/Lobby';
+import { normalizeJoinCodeInput } from '@/lib/join-code';
+import JoinStakeModal from '@/components/JoinStakeModal';
+import OpenGamesPanel from '@/components/OpenGamesPanel';
 import Image from 'next/image';
 import SetCode from '@/components/SetCode';
 import GameBoard from '@/components/GameBoard';
@@ -16,10 +19,9 @@ import {
   evaluateGuess,
   toTileClues,
   isWinningClues,
-  allSecretCodes,
-  filterSecretCandidates,
-  pickAIGuess,
+  cipherNextGuess,
   MAX_GUESSES,
+  PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
 import type { GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useSendTransaction } from 'wagmi';
@@ -91,6 +93,14 @@ export default function Home() {
   const [isJoining, setIsJoining] = useState<string | null>(null);
   const oppTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
+  const [shareableJoinCode, setShareableJoinCode] = useState<string | null>(null);
+  const [joinGameIdInput, setJoinGameIdInput] = useState('');
+  const [pendingJoinStake, setPendingJoinStake] = useState<{
+    gameId: string;
+    stake: number;
+    player1Address: string;
+    opponentLabel: string;
+  } | null>(null);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [myActiveGames, setMyActiveGames] = useState<any[]>([]);
@@ -102,6 +112,14 @@ export default function Home() {
   const [turnNotification, setTurnNotification] = useState<'player' | 'opponent' | null>(null);
   const [pendingOpponentTileClues, setPendingOpponentTileClues] = useState<TileClue[] | null>(null);
   const [copied, setCopied] = useState(false);
+
+  const matchStartStatsRef = useRef({ points: 1000, rating: 1000 });
+  const [resultStats, setResultStats] = useState<{
+    pointsBefore: number;
+    pointsAfter: number;
+    rating: number;
+    loading: boolean;
+  } | null>(null);
 
   const [isSendSectionOpen, setIsSendSectionOpen] = useState(false);
   const [sendTab, setSendTab] = useState<'celo' | 'usdt'>('usdt');
@@ -237,6 +255,10 @@ export default function Home() {
     fetchMyActive();
   }, [fetchMyActive]);
 
+  useEffect(() => {
+    if (activeTab === 'games' && address) fetchMyActive();
+  }, [activeTab, address, fetchMyActive]);
+
   // 1.5 User Registration / Fetch Rating
   useEffect(() => {
     if (authenticated && address) {
@@ -288,17 +310,35 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [gs.phase, gs.gameMode, gs.opponentName]);
 
-  // 1.7 Handle Invite Link on Mount
+  // Prefill Game ID from legacy ?invite= or ?game= query (no auto-join — user taps Join)
   useEffect(() => {
-    const inviteId = searchParams.get('invite');
-    if (inviteId && address && isConnected && gs.phase === 'lobby') {
-      // If using Privy, wait for smartWalletClient to be ready if it's supposed to be there
-      if (authenticated && !smartWalletClient) return;
-      
-      // Auto-join if user is connected
-      handleJoinChallenge(inviteId, 'INVITE_LINK');
+    const fromQuery = searchParams.get('game') || searchParams.get('invite');
+    if (fromQuery && !joinGameIdInput) {
+      setJoinGameIdInput(fromQuery);
+      setActiveTab('games');
+      if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href);
+        url.searchParams.delete('invite');
+        url.searchParams.delete('game');
+        window.history.replaceState(null, '', url.pathname + url.search);
+      }
     }
-  }, [searchParams, address, isConnected, smartWalletClient, authenticated]); // eslint-disable-line
+  }, [searchParams]); // eslint-disable-line
+
+  const snappedMatchStatsRef = useRef(false);
+  // Snapshot CMC points once when a match starts (for accurate result modal)
+  useEffect(() => {
+    if (gs.phase === 'playing' && !snappedMatchStatsRef.current) {
+      matchStartStatsRef.current = {
+        points: gs.playerPoints,
+        rating: gs.playerRating,
+      };
+      snappedMatchStatsRef.current = true;
+    }
+    if (gs.phase !== 'playing' && gs.phase !== 'result') {
+      snappedMatchStatsRef.current = false;
+    }
+  }, [gs.phase, gs.playerPoints, gs.playerRating]);
 
   // 1.8 Countdown Timer
   useEffect(() => {
@@ -334,6 +374,64 @@ export default function Home() {
     }
   }, [address]);
 
+  const refreshUserStats = useCallback(async (): Promise<{
+    points: number;
+    rating: number;
+  } | null> => {
+    if (!address) return null;
+    try {
+      const res = await fetch('/api/users/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ address }),
+      });
+      const data = await res.json();
+      if (data.rating !== undefined && data.points !== undefined) {
+        setGs((prev) => ({
+          ...prev,
+          playerRating: data.rating,
+          playerPoints: data.points,
+        }));
+        return { points: data.points, rating: data.rating };
+      }
+    } catch (err) {
+      console.error('Failed to refresh user stats', err);
+    }
+    return null;
+  }, [address]);
+
+  const syncResultStats = useCallback(
+    async (ratingDelta: number, serverStats?: { points: number; rating: number } | null) => {
+      const before = matchStartStatsRef.current;
+      setResultStats({
+        pointsBefore: before.points,
+        pointsAfter: before.points,
+        rating: before.rating,
+        loading: true,
+      });
+
+      const stats = serverStats ?? (await refreshUserStats());
+      const afterPoints = stats?.points ?? before.points + ratingDelta;
+      const afterRating = stats?.rating ?? before.rating + ratingDelta;
+
+      setResultStats({
+        pointsBefore: before.points,
+        pointsAfter: afterPoints,
+        rating: afterRating,
+        loading: false,
+      });
+
+      if (stats) {
+        setGs((prev) => ({
+          ...prev,
+          playerPoints: stats.points,
+          playerRating: stats.rating,
+        }));
+      }
+    },
+    [refreshUserStats]
+  );
+
   // ─── Real-time Gameplay Logic ───────────────────────────────────────────
 
   useEffect(() => {
@@ -358,9 +456,10 @@ export default function Home() {
 
         if (isWinningClues(data.clues)) {
           const delta = prev.gameMode === 'ai' ? -5 : -15;
-          const pointsDelta = delta * 2;
-          
-          updateBackendPoints(delta, pointsDelta);
+          if (prev.gameMode === 'ai') {
+            updateBackendPoints(delta, delta * 2);
+            void syncResultStats(delta);
+          }
 
           // Reveal code on loss
           fetch('/api/games/reveal', {
@@ -379,6 +478,9 @@ export default function Home() {
                 opponentCurrentInput: [],
                 opponentCode: revealData.opponentCode || []
               }));
+              if (prev.gameMode !== 'ai') {
+                void syncResultStats(delta);
+              }
             });
 
           return {
@@ -406,7 +508,7 @@ export default function Home() {
     return () => {
       pusherClient.unsubscribe(`private-game-${currentGameId}`);
     };
-  }, [currentGameId, gs.gameMode, address, updateBackendPoints]);
+  }, [currentGameId, gs.gameMode, address, updateBackendPoints, syncResultStats]);
 
   // Turn notification effect
   useEffect(() => {
@@ -447,8 +549,7 @@ export default function Home() {
 
       aiTurnRunningRef.current = true;
 
-      const candidates = filterSecretCandidates(allSecretCodes(), history);
-      const targetDigits = pickAIGuess(candidates, history.length);
+      const targetDigits = cipherNextGuess(history);
 
       let typeIndex = 0;
       const typeDigit = () => {
@@ -492,6 +593,7 @@ export default function Home() {
                 opponentCode: prev.playerCode,
                 isPlayerTurn: false,
               }));
+              void syncResultStats(-5);
 
               fetch('/api/games/reveal', {
                 method: 'POST',
@@ -520,7 +622,7 @@ export default function Home() {
       setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: [] }));
       typeDigit();
     }, waitForPlayerReview);
-  }, [currentGameId, address, updateBackendPoints]); 
+  }, [currentGameId, address, updateBackendPoints, syncResultStats]);
 
   // AI Turn Trigger
   useEffect(() => {
@@ -534,15 +636,22 @@ export default function Home() {
 
   // ─── Phase: Lobby → Matchmaking ───────────────────────────────────────────
 
-  const handleMatchFound = useCallback((gameId: string, opponentAddress: string) => {
+  const handleMatchFound = useCallback((
+    gameId: string,
+    opponentAddress: string,
+    meta?: { mode?: GameMode; stake?: number }
+  ) => {
     setCurrentGameId(gameId);
+    setResultStats(null);
     const isAIMatch = opponentAddress === 'AI_BOT' || opponentAddress === 'AI';
+    const mode = isAIMatch ? 'ai' : (meta?.mode ?? 'fun');
     
     setGs((prev: GameState) => ({
       ...prev,
       phase: 'setCode',
-      gameMode: isAIMatch ? 'ai' : prev.gameMode,
-      opponentName: isAIMatch ? 'Cipher' : opponentAddress.slice(0, 6),
+      gameMode: mode,
+      stakeAmount: meta?.stake ?? prev.stakeAmount,
+      opponentName: isAIMatch ? 'Cipher' : `${opponentAddress.slice(0, 6)}...`,
       playerCode: [],
       playerGuesses: [],
       opponentGuesses: [],
@@ -555,9 +664,27 @@ export default function Home() {
     }));
   }, []);
 
-  // Poll for public matchmaking pairing (backup to websocket match-found)
+  // User channel: match-found
   useEffect(() => {
-    if (gs.phase !== 'matchmaking' || gs.opponentName === 'WAITING' || !currentGameId) return;
+    if (!address) return;
+    const channelName = `private-user-${address.toLowerCase()}`;
+    const channel = pusherClient.subscribe(channelName);
+
+    channel.bind('match-found', (data: { gameId: string; opponentAddress: string }) => {
+      handleMatchFound(data.gameId, data.opponentAddress);
+      setActiveTab('home');
+      toast.success('Opponent joined!', { description: 'Set your secret code to begin.' });
+    });
+
+    return () => {
+      channel.unbind('match-found');
+      pusherClient.unsubscribe(channelName);
+    };
+  }, [address, handleMatchFound]);
+
+  // Poll while matchmaking (public queue + private invite) — backup if Pusher misses
+  useEffect(() => {
+    if (gs.phase !== 'matchmaking' || !currentGameId || gs.gameMode === 'ai') return;
 
     const poll = async () => {
       try {
@@ -565,7 +692,11 @@ export default function Home() {
         if (!res.ok) return;
         const game = await res.json();
         if (game?.player2Address) {
-          handleMatchFound(game.id, game.player2Address);
+          handleMatchFound(game.id, game.player2Address, {
+            mode: game.mode === 'cash' ? 'cash' : 'fun',
+            stake: parseFloat(String(game.stake)) || 0,
+          });
+          if (game.joinCode) setShareableJoinCode(game.joinCode);
         }
       } catch (err) {
         console.error('Matchmaking poll failed', err);
@@ -573,9 +704,53 @@ export default function Home() {
     };
 
     poll();
-    const interval = setInterval(poll, 2500);
+    const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [gs.phase, gs.opponentName, currentGameId, handleMatchFound]);
+  }, [gs.phase, currentGameId, gs.gameMode, handleMatchFound]);
+
+  // Fetch shareable Game ID for private invites (e.g. older games created before joinCode existed)
+  useEffect(() => {
+    if (gs.phase !== 'matchmaking' || shareableJoinCode || !currentGameId) return;
+    if (gs.opponentName !== 'WAITING') return;
+
+    const fetchCode = async () => {
+      try {
+        const res = await fetch(`/api/games/lobby?id=${currentGameId}`);
+        if (!res.ok) return;
+        const game = await res.json();
+        if (game?.joinCode) setShareableJoinCode(game.joinCode);
+        else if (game?.id) setShareableJoinCode(game.id);
+      } catch {
+        /* ignore */
+      }
+    };
+    fetchCode();
+    const interval = setInterval(fetchCode, 2000);
+    return () => clearInterval(interval);
+  }, [gs.phase, gs.opponentName, shareableJoinCode, currentGameId]);
+
+  // Poll while setting code — backup if game-started Pusher event is missed
+  useEffect(() => {
+    if (gs.phase !== 'setCode' || !currentGameId || gs.gameMode === 'ai') return;
+
+    const poll = async () => {
+      try {
+        const res = await fetch(`/api/games/lobby?id=${currentGameId}`);
+        if (!res.ok) return;
+        const game = await res.json();
+        if (game?.player1Code && game?.player2Code) {
+          setIsWaiting(false);
+          setGs((prev: GameState) => ({ ...prev, phase: 'countdown' }));
+        }
+      } catch (err) {
+        console.error('Set-code sync poll failed', err);
+      }
+    };
+
+    poll();
+    const interval = setInterval(poll, 2000);
+    return () => clearInterval(interval);
+  }, [gs.phase, currentGameId, gs.gameMode]);
 
   const handleCancelChallenge = async (gameId: string, onChainMatchId?: string) => {
     if (!isConnected || !address) return;
@@ -619,6 +794,13 @@ export default function Home() {
   };
 
   const handleFindMatch = async (mode: GameMode, stake: number, isPublic: boolean = true, userBalance?: number) => {
+    if (mode === 'cash' && !PROFESSIONAL_MODE_ENABLED) {
+      toast.info('Professional mode coming soon', {
+        description: 'Play free friendly matches or challenge Cipher AI today.',
+      });
+      return;
+    }
+
     setSearchTime(0);
     if (mode !== 'ai') {
       setGs(curr => ({ ...curr, phase: 'matchmaking', gameMode: mode, opponentName: 'SEARCHING...' }));
@@ -694,9 +876,14 @@ export default function Home() {
       }
 
       if (data.status === 'matched') {
-        handleMatchFound(data.gameId, data.opponentAddress || 'AI_BOT');
+        handleMatchFound(data.gameId, data.opponentAddress || 'AI_BOT', {
+          mode,
+          stake: mode === 'cash' ? stake : 0,
+        });
       } else {
         setCurrentGameId(data.gameId);
+        // Short join code when migrated; internal id still works for join lookup
+        setShareableJoinCode(data.joinCode ?? (!isPublic ? data.gameId : null) ?? null);
         if (onChainMatchId) setCurrentOnChainMatchId(onChainMatchId);
         
         setGs((prev: GameState): GameState => ({
@@ -706,6 +893,7 @@ export default function Home() {
           stakeAmount: stake,
           opponentName: !isPublic ? 'WAITING' : (mode === 'ai' ? 'Cipher' : 'Searching...')
         }));
+        if (!isPublic) fetchMyActive();
       }
     } catch (err: any) {
       console.error('Matchmaking failed', err);
@@ -727,6 +915,7 @@ export default function Home() {
     setGs((prev: GameState): GameState => ({ ...prev, phase: 'lobby' }));
     setSearchTime(0);
     setCurrentGameId(null);
+    setShareableJoinCode(null);
     setCurrentOnChainMatchId(null);
     toast.info("Search Cancelled");
   }, [currentGameId, currentOnChainMatchId, handleCancelChallenge]);
@@ -811,9 +1000,13 @@ export default function Home() {
             if (isWinningClues(clues)) {
               clearOppTimer();
               const delta = gs.gameMode === 'ai' ? 10 : 25;
-              const pointsDelta = delta * 2;
-              updateBackendPoints(delta, pointsDelta);
-              
+              if (gs.gameMode === 'ai') {
+                updateBackendPoints(delta, delta * 2);
+                void syncResultStats(delta);
+              } else {
+                void syncResultStats(delta, data.playerStats ?? null);
+              }
+
               return {
                 ...prev,
                 playerGuesses: newGuesses,
@@ -828,8 +1021,10 @@ export default function Home() {
             // Max guesses exhausted?
             if (newGuesses.length >= MAX_GUESSES) {
               const delta = gs.gameMode === 'ai' ? -5 : -15;
-              const pointsDelta = delta * 2;
-              updateBackendPoints(delta, pointsDelta);
+              if (gs.gameMode === 'ai') {
+                updateBackendPoints(delta, delta * 2);
+                void syncResultStats(delta);
+              }
 
               // Reveal the code even on loss
               fetch('/api/games/reveal', {
@@ -848,6 +1043,7 @@ export default function Home() {
                     currentInput: [],
                     opponentCode: data.opponentCode || []
                   }));
+                  if (prev.gameMode !== 'ai') void syncResultStats(delta);
                 });
               return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false };
             }
@@ -866,7 +1062,7 @@ export default function Home() {
         setIsSubmitting(false);
       }
     }
-  }, [gs, currentGameId, address, scheduleOpponentTurn, isSubmitting]);
+  }, [gs, currentGameId, address, scheduleOpponentTurn, isSubmitting, updateBackendPoints, syncResultStats]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
@@ -890,29 +1086,27 @@ export default function Home() {
 
   // ─── Phase: Result → Lobby ────────────────────────────────────────────────
 
-  const handlePlayAgain = useCallback(() => {
+  const exitResultScreen = useCallback(() => {
     clearOppTimer();
-    const nextRating = gs.playerRating + (gs.ratingDelta ?? 0);
-    const nextPoints = gs.playerPoints + (gs.gameMode === 'ai' ? 0 : (gs.ratingDelta ?? 0) * 2);
-    
-    setGs(initialGameState(nextRating, nextPoints));
-    
-    // If it was an AI game, we can go straight back to setCode
-    if (gs.gameMode === 'ai') {
-      setTimeout(() => {
-        handleFindMatch('ai', 0, true);
-      }, 100);
-    }
-  }, [gs.playerRating, gs.playerPoints, gs.ratingDelta, gs.gameMode, handleFindMatch]);
+    const rating = resultStats?.rating ?? gs.playerRating;
+    const points = resultStats?.pointsAfter ?? gs.playerPoints;
+    setGs(initialGameState(rating, points));
+    setResultStats(null);
+    setCurrentGameId(null);
+    setShareableJoinCode(null);
+  }, [gs.playerRating, gs.playerPoints, resultStats]);
+
+  const handlePlayAgain = useCallback(() => {
+    if (gs.gameMode !== 'ai') return;
+    exitResultScreen();
+    setTimeout(() => {
+      handleFindMatch('ai', 0, true);
+    }, 100);
+  }, [gs.gameMode, exitResultScreen, handleFindMatch]);
 
   const handleHome = useCallback(() => {
-    clearOppTimer();
-    const nextRating = gs.playerRating + (gs.ratingDelta ?? 0);
-    const nextPoints = gs.playerPoints + (gs.gameMode === 'ai' ? 0 : (gs.ratingDelta ?? 0) * 2);
-    
-    setGs(initialGameState(nextRating, nextPoints));
-    setCurrentGameId(null);
-  }, [gs.playerRating, gs.playerPoints, gs.ratingDelta, gs.gameMode]);
+    exitResultScreen();
+  }, [exitResultScreen]);
 
   // ─── Cleanup on unmount ───────────────────────────────────────────────────
 
@@ -932,14 +1126,177 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKey);
   }, [gs.phase, gs.currentInput, handleDigitPress, handleDeleteDigit, handleSubmitGuess]);
 
+  const executeJoinGame = async (gameData: {
+    id: string;
+    mode: string;
+    stake: number;
+    player1Address: string;
+  }) => {
+    const actualChallenger = gameData.player1Address;
+    const isPaid = gameData.mode === 'cash';
+    const joinMode: GameMode = isPaid ? 'cash' : 'fun';
+    const stake = parseFloat(String(gameData.stake)) || 0;
+
+    if (isPaid) {
+      if (smartWalletClient) {
+        const data = encodeFunctionData({
+          abi: CONTRACT_ABI,
+          functionName: 'joinChallenge',
+          args: [actualChallenger as `0x${string}`],
+        });
+        const txHash = await smartWalletClient.sendTransaction({
+          to: CONTRACT_ADDRESS as `0x${string}`,
+          data,
+          value: BigInt(0),
+        });
+        if (!publicClient) throw new Error('Public client not available');
+        await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+      } else {
+        const hash = await writeContractAsync({
+          address: CONTRACT_ADDRESS,
+          abi: CONTRACT_ABI,
+          functionName: 'joinChallenge',
+          args: [actualChallenger as `0x${string}`],
+        });
+        if (!publicClient) throw new Error('Public client not available');
+        await publicClient.waitForTransactionReceipt({ hash });
+      }
+    }
+
+    const res = await fetch('/api/games/join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ address, gameId: gameData.id }),
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Join failed');
+
+    if (data.status === 'matched') {
+      setJoinGameIdInput('');
+      setPendingJoinStake(null);
+      handleMatchFound(data.gameId, data.opponentAddress, { mode: joinMode, stake });
+      setActiveTab('home');
+      toast.success('Joined!', {
+        description: isPaid
+          ? 'Stake locked. Set your secret code to start.'
+          : 'Set your secret code — game starts when both players lock in.',
+      });
+    }
+  };
+
+  const handleJoinChallenge = async (gameIdOrCode: string) => {
+    if (!isConnected || !address) return;
+
+    const lookupKey = normalizeJoinCodeInput(gameIdOrCode) || gameIdOrCode.trim();
+    setIsJoining(lookupKey);
+    try {
+      const gameRes = await fetch(`/api/games/lobby?joinCode=${encodeURIComponent(lookupKey)}`);
+      const gameData = await gameRes.json();
+
+      if (!gameData || gameData.error) throw new Error('Challenge not found or expired');
+
+      if (gameData.player1Address?.toLowerCase() === address.toLowerCase()) {
+        toast.error('Invalid Action', { description: 'You cannot join your own challenge.' });
+        return;
+      }
+
+      if (gameData.player2Address) {
+        toast.error('Challenge full', { description: 'Someone already joined this game.' });
+        return;
+      }
+
+      if (gameData.mode === 'cash') {
+        if (!PROFESSIONAL_MODE_ENABLED) {
+          toast.info('Professional mode coming soon', {
+            description: 'This challenge uses USDT stakes, which are not live yet.',
+          });
+          return;
+        }
+        setPendingJoinStake({
+          gameId: gameData.id,
+          stake: parseFloat(String(gameData.stake)) || 0,
+          player1Address: gameData.player1Address,
+          opponentLabel: `${gameData.player1Address.slice(0, 6)}...`,
+        });
+        setIsJoining(null);
+        return;
+      }
+
+      await executeJoinGame(gameData);
+    } catch (err) {
+      console.error('Join failed', err);
+      const errMsg = getErrorMessage(err);
+      toast.error('Join Error', { description: errMsg });
+      if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
+        setTimeout(() => {
+          window.location.href = 'https://link.minipay.xyz/add_cash?tokens=USDT';
+        }, 1500);
+      }
+    } finally {
+      setIsJoining(null);
+    }
+  };
+
+  const handleConfirmJoinStake = async () => {
+    if (!pendingJoinStake) return;
+    setIsJoining(pendingJoinStake.gameId);
+    try {
+      const gameRes = await fetch(`/api/games/lobby?id=${pendingJoinStake.gameId}`);
+      const gameData = await gameRes.json();
+      if (!gameData || gameData.error) throw new Error('Challenge not found or expired');
+      if (gameData.player2Address) throw new Error('Challenge full');
+      await executeJoinGame(gameData);
+    } catch (err) {
+      console.error('Paid join failed', err);
+      const errMsg = getErrorMessage(err);
+      toast.error('Join Error', { description: errMsg });
+    } finally {
+      setIsJoining(null);
+    }
+  };
+
+  const handleJoinByGameId = useCallback(async () => {
+    const code = normalizeJoinCodeInput(joinGameIdInput);
+    if (!code) {
+      toast.error('Enter a Game ID', { description: 'Ask your friend for the code shown on their invite screen.' });
+      return;
+    }
+    if (!isConnected || !address) {
+      toast.error('Sign in required', { description: 'Connect your wallet to join a challenge.' });
+      login();
+      return;
+    }
+    await handleJoinChallenge(code);
+  }, [joinGameIdInput, isConnected, address, login]);
+
   // ─── Sub-views ────────────────────────────────────────────────────────────
 
-  const renderHomeContent = () => {
-    const inviteId = searchParams.get('invite');
-    
-    return gs.phase === 'lobby' || gs.phase === 'matchmaking' ? (
-      <motion.div key="lobby" className="w-full relative" {...screenVariants}>
+  const handleCancelOpenChallenge = useCallback(async (gameId: string, onChainMatchId?: string) => {
+    if (!address) return;
+    setIsCancelling(gameId);
+    const toastId = toast.loading('Closing challenge...');
+    try {
+      if (onChainMatchId) {
+        await cancelChallenge(onChainMatchId as `0x${string}`);
+      }
+      const res = await fetch('/api/games/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId, address }),
+      });
+      if (!res.ok) throw new Error('API cancellation failed');
+      toast.success('Challenge closed', { id: toastId });
+      fetchMyActive();
+    } catch (err) {
+      toast.error(getErrorMessage(err), { id: toastId });
+    } finally {
+      setIsCancelling(null);
+    }
+  }, [address, cancelChallenge, fetchMyActive]);
 
+  const renderHomeContent = () => {
+    return gs.phase === 'lobby' || gs.phase === 'matchmaking' ? (
+      <motion.div key="lobby" className="w-full relative flex flex-col gap-4" {...screenVariants}>
         <Lobby
           rating={gs.playerRating}
           points={gs.playerPoints}
@@ -950,7 +1307,10 @@ export default function Home() {
           onWalletClick={() => setActiveTab('wallet')}
           searchTime={searchTime}
           onCancelMatchmaking={handleCancelMatchmaking}
-          gameId={currentGameId || inviteId || undefined}
+          shareableJoinCode={
+            shareableJoinCode ??
+            (gs.phase === 'matchmaking' && gs.opponentName === 'WAITING' ? currentGameId ?? undefined : undefined)
+          }
         />
       </motion.div>
     ) : gs.phase === 'setCode' ? (
@@ -962,6 +1322,7 @@ export default function Home() {
             clearOppTimer();
             setGs(initialGameState(gs.playerRating, gs.playerPoints));
             setCurrentGameId(null);
+            setShareableJoinCode(null);
             setCurrentOnChainMatchId(null);
           }}
           isWaiting={isWaiting}
@@ -1067,8 +1428,10 @@ export default function Home() {
               opponentCode={gs.opponentCode}
               opponentName={gs.opponentName}
               ratingDelta={gs.ratingDelta ?? 0}
-              playerRating={gs.playerRating}
-              playerPoints={gs.playerPoints}
+              pointsBefore={resultStats?.pointsBefore ?? matchStartStatsRef.current.points}
+              pointsAfter={resultStats?.pointsAfter ?? gs.playerPoints}
+              playerRating={resultStats?.rating ?? gs.playerRating}
+              statsLoading={resultStats?.loading ?? false}
               guessCount={gs.playerGuesses.length}
               onPlayAgain={handlePlayAgain}
               onHome={handleHome}
@@ -1077,79 +1440,6 @@ export default function Home() {
         </AnimatePresence>
       </motion.div>
     ) : null;
-  };
-
-  const handleJoinChallenge = async (gameId: string, challengerAddress: string) => {
-    if (!isConnected || !address) return;
-    
-    // Prevent joining own challenge
-    if (challengerAddress.toLowerCase() === address.toLowerCase()) {
-      toast.error("Invalid Action", { description: "You cannot join your own challenge." });
-      return;
-    }
-
-    setIsJoining(gameId);
-    try {
-      // Fetch game details if not already available
-      const gameRes = await fetch(`/api/games/lobby?id=${gameId}`);
-      const gameData = await gameRes.json();
-      
-      if (!gameData) throw new Error("Challenge not found or expired");
-      const actualChallenger = gameData.player1Address;
-      const isPaid = gameData.mode === 'cash';
-
-      if (isPaid) {
-        console.log("On-chain joinChallenge required for paid match");
-        
-
-        let receipt;
-        if (smartWalletClient) {
-          const data = encodeFunctionData({
-            abi: CONTRACT_ABI,
-            functionName: 'joinChallenge',
-            args: [actualChallenger as `0x${string}`]
-          });
-          const txHash = await smartWalletClient.sendTransaction({
-            to: CONTRACT_ADDRESS as `0x${string}`,
-            data: data,
-            value: BigInt(0)
-          });
-          if (!publicClient) throw new Error("Public client not available");
-          receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
-        } else {
-          const hash = await writeContractAsync({
-            address: CONTRACT_ADDRESS,
-            abi: CONTRACT_ABI,
-            functionName: 'joinChallenge',
-            args: [actualChallenger as `0x${string}`],
-          });
-          if (!publicClient) throw new Error("Public client not available");
-          receipt = await publicClient.waitForTransactionReceipt({ hash });
-        }
-      }
-
-      const res = await fetch('/api/games/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, gameId })
-      });
-      const data = await res.json();
-      if (data.status === 'matched') {
-        handleMatchFound(data.gameId, data.opponentAddress);
-        setActiveTab('home');
-      }
-    } catch (err) {
-      console.error('Join failed', err);
-      const errMsg = getErrorMessage(err);
-      toast.error('Join Error', { description: errMsg });
-      if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
-        setTimeout(() => {
-          window.location.href = "https://link.minipay.xyz/add_cash?tokens=USDT";
-        }, 1500);
-      }
-    } finally {
-      setIsJoining(null);
-    }
   };
 
   const renderOpenGames = () => (
@@ -1188,77 +1478,16 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="flex flex-col gap-2 mb-2">
-            <h3 className="font-orbitron text-xs font-black tracking-[0.2em] text-black/50 uppercase">
-              My Invite Links
-            </h3>
-            <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">
-              Private challenges only — copy or cancel while you wait
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            {myActiveGames.length > 0 ? (
-              myActiveGames.map((game) => (
-                <motion.div key={game.id} className="relative flex flex-col gap-3 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-md">
-                  <div className="absolute top-4 right-6 text-[10px] font-black uppercase tracking-widest text-black/40">
-                    {game.mode === 'cash' ? `${game.stake} USDT` : 'Free'}
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="font-code text-sm font-bold text-black/70">
-                      {game.player1Address.slice(0, 8)}...{game.player1Address.slice(-4)}
-                    </span>
-                    <span className="text-[10px] font-black text-black/30 tracking-widest uppercase">(1200 CMC)</span>
-                  </div>
-                  <div className="flex w-full justify-end gap-2">
-                    <button
-                      onClick={() => {
-                        const inviteUrl = `${window.location.origin}/?invite=${game.id}`;
-                        navigator.clipboard.writeText(inviteUrl);
-                        toast.success('Invite link copied!');
-                      }}
-                      className="rounded-lg border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-2 text-[10px] font-black uppercase tracking-widest text-[var(--accent)] shadow-sm"
-                    >
-                      COPY LINK
-                    </button>
-                    <button
-                      disabled={isJoining === game.id}
-                      onClick={async () => {
-                        if (isJoining) return;
-                        setIsJoining(game.id);
-                        const toastId = toast.loading('Closing challenge...');
-                        try {
-                          if (game.onChainMatchId) {
-                            await cancelChallenge(game.onChainMatchId);
-                          }
-                          const res = await fetch('/api/games/cancel', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ gameId: game.id, address }),
-                          });
-                          if (!res.ok) throw new Error('API cancellation failed');
-                          toast.success('Challenge closed', { id: toastId });
-                          fetchMyActive();
-                        } catch (err) {
-                          console.error('Failed to close challenge:', err);
-                          toast.error(getErrorMessage(err), { id: toastId });
-                        } finally {
-                          setIsJoining(null);
-                        }
-                      }}
-                      className="rounded-lg border-2 border-red-500/20 bg-red-500/5 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-red-500 shadow-sm disabled:opacity-50"
-                    >
-                      {isJoining === game.id ? 'CLOSING...' : 'CANCEL'}
-                    </button>
-                  </div>
-                </motion.div>
-              ))
-            ) : (
-              <div className="flex items-center justify-center py-20 text-center opacity-30">
-                <span className="text-[10px] font-black uppercase tracking-widest">No open invite links</span>
-              </div>
-            )}
-          </div>
+          <OpenGamesPanel
+            joinGameIdInput={joinGameIdInput}
+            onJoinGameIdInputChange={setJoinGameIdInput}
+            onJoinByGameId={handleJoinByGameId}
+            isJoining={!!isJoining}
+            isConnected={!!isConnected}
+            myActiveGames={myActiveGames}
+            onCancelOpenChallenge={handleCancelOpenChallenge}
+            isCancellingId={isCancelling}
+          />
 
           {gameHistory.length > 0 && (
             <div className="flex flex-col gap-6 mt-8">
@@ -1301,8 +1530,8 @@ export default function Home() {
           { t: 'Objective', d: 'Crack your opponent\'s secret 4-digit code before they crack yours. Codes can repeat digits (e.g. 1122).' },
           { t: 'The Clues', d: 'Each digit is colored Wordle-style: green = correct digit in the correct spot, yellow = digit is in the code but wrong spot, light gray = not in the code. A dark gray tile means that digit appears in the code but you already used all copies of it in this guess.' },
           { t: 'How to Play', d: 'Take turns submitting 4-digit guesses. You have 8 attempts. Use the colors on your guess row to narrow down the secret code.' },
-          { t: 'USDT Staking', d: 'In Professional mode, both players stake USDT. Winner takes 99% of the pool.' },
-          { t: 'Fair Play', d: 'Quitting during a cash game results in an automatic loss.' }
+          { t: 'Professional Mode', d: 'USDT staking duels are coming soon. Free friendly matches and Cipher AI are available now.' },
+          { t: 'Fair Play', d: 'Quitting mid-match counts as a loss once ranked stakes go live.' }
         ].map((rule, i) => (
           <div key={i} className="flex flex-col gap-1.5">
             <span className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">{rule.t}</span>
@@ -1566,6 +1795,16 @@ export default function Home() {
 
   return (
     <main className="relative flex flex-col items-center justify-start min-h-full">
+      <JoinStakeModal
+        open={!!pendingJoinStake}
+        stake={pendingJoinStake?.stake ?? 0}
+        opponentLabel={pendingJoinStake?.opponentLabel}
+        isJoining={!!isJoining && !!pendingJoinStake}
+        onConfirm={handleConfirmJoinStake}
+        onCancel={() => {
+          if (!isJoining) setPendingJoinStake(null);
+        }}
+      />
       <div className="w-full max-w-xl px-4 relative">
         {activeTab === 'home' ? renderHomeContent() :
           activeTab === 'games' ? renderOpenGames() :
@@ -1585,7 +1824,7 @@ export default function Home() {
         activeTab={activeTab}
         onTabChange={(t) => {
           setActiveTab(t);
-          if (gs.phase === 'result') handlePlayAgain();
+          if (gs.phase === 'result') handleHome();
         }}
         visible={gs.phase === 'lobby' || gs.phase === 'matchmaking'}
       />

@@ -107,3 +107,6 @@ apps/video-explainer/
 
 # Agent Skills
 .agents/
+
+# Promo video
+apps/promo-video/

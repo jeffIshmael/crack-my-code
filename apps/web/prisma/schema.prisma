@@ -1,5 +1,6 @@
 generator client {
   provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
 }
 
 datasource db {
@@ -20,6 +21,7 @@ model User {
 
 model Game {
   id              String   @id @default(cuid())
+  joinCode        String?  @unique // Short shareable Game ID for private invites
   userId          Int      // Creator ID
   player1Address  String   // Address of creator
   player2Address  String?  // Address of opponent (null until matched)
@@ -30,7 +32,9 @@ model Game {
   isPublic        Boolean  @default(true)
   player1Code     String?  // Code set by player 1
   player2Code     String?  // Code set by player 2 (or AI code)
-  winnerAddress   String? 
+  winnerAddress   String?
+  player1WantsRematch Boolean @default(false)
+  player2WantsRematch Boolean @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

@@ -7,6 +7,9 @@ export type Clue = 'green' | 'yellow' | 'gray';
 export type TileClue = 'green' | 'yellow' | 'absent' | 'duplicate';
 export type GamePhase = 'lobby' | 'matchmaking' | 'setCode' | 'playing' | 'result' | 'countdown';
 export type GameMode = 'ai' | 'fun' | 'cash';
+
+/** USDT staking / Professional mode — disabled until launch */
+export const PROFESSIONAL_MODE_ENABLED = false;
 export type GameResult = 'win' | 'lose' | 'draw' | null;
 
 export interface GuessEntry {
@@ -121,94 +124,12 @@ export function allSecretCodes(): number[][] {
   return ALL_SECRET_CODES_CACHE;
 }
 
-/** Aggregate hint key: greens = in place, yellows = relocated (Wordle-style counts) */
-export function clueCountKey(clues: Clue[]): string {
-  const { green, yellow } = getClueCounts(clues);
-  return `${green}-${yellow}`;
-}
-
-/** Whether a secret would produce the same green/yellow counts for a past guess */
-export function secretMatchesGuessFeedback(
-  secret: number[],
-  guess: number[],
-  expectedClues: Clue[]
-): boolean {
-  const simulated = evaluateGuess(guess, secret);
-  return clueCountKey(simulated) === clueCountKey(expectedClues);
-}
-
-/** Filter secrets using green/yellow counts (same logic as "X correct, Y relocated") */
-export function filterSecretCandidates(
-  secrets: number[][],
-  history: Pick<GuessEntry, 'digits' | 'clues'>[]
-): number[][] {
-  if (history.length === 0) return secrets;
-  return secrets.filter((secret) =>
-    history.every((h) => secretMatchesGuessFeedback(secret, h.digits, h.clues))
-  );
-}
-
-const OPENING_GUESSES: number[][] = [
-  [0, 1, 2, 3],
-  [4, 5, 6, 7],
-  [8, 9, 0, 1],
-  [2, 4, 6, 8],
-  [1, 3, 5, 7],
-  [0, 2, 4, 6],
-  [5, 1, 9, 3],
-  [0, 0, 1, 2],
-  [3, 3, 6, 6],
-];
-
-/** Probe guesses for minimax when the candidate pool is still large */
-function buildProbeGuessPool(): number[][] {
-  const probes = [...OPENING_GUESSES];
-  const all = allSecretCodes();
-  const step = Math.max(1, Math.floor(all.length / 100));
-  for (let i = 0; i < all.length; i += step) {
-    probes.push(all[i]);
-  }
-  return probes;
-}
-
-/**
- * Pick a strong guess: minimax on green/yellow count buckets (not per-tile strings).
- * When few candidates remain, guess directly from the remaining secrets.
- */
-export function pickAIGuess(candidates: number[][], historyLength: number): number[] {
-  if (historyLength === 0) return [...OPENING_GUESSES[0]];
-  if (candidates.length === 1) return [...candidates[0]];
-  if (candidates.length === 0) return [1, 2, 3, 4];
-
-  const guessPool =
-    candidates.length <= 10
-      ? candidates
-      : candidates.length > 250
-        ? buildProbeGuessPool()
-        : candidates.slice(0, Math.min(80, candidates.length));
-
-  let bestGuess = guessPool[0];
-  let bestWorst = Infinity;
-  let bestSplits = -1;
-
-  for (const guess of guessPool) {
-    const buckets = new Map<string, number>();
-    for (const secret of candidates) {
-      const key = clueCountKey(evaluateGuess(guess, secret));
-      buckets.set(key, (buckets.get(key) || 0) + 1);
-    }
-    const sizes = [...buckets.values()];
-    const worst = Math.max(...sizes);
-    const splits = buckets.size;
-    if (worst < bestWorst || (worst === bestWorst && splits > bestSplits)) {
-      bestWorst = worst;
-      bestSplits = splits;
-      bestGuess = guess;
-    }
-  }
-
-  return [...bestGuess];
-}
+// Cipher AI lives in ./cipher.ts (see apps/web/cipher.md)
+export {
+  getPossibleCodes as filterSecretCandidates,
+  cipherNextGuess,
+  pickCipherGuess as pickAIGuess,
+} from './cipher';
 
 export function isWinningClues(clues: Clue[]): boolean {
   return clues.filter((c) => c === 'green').length === CODE_LENGTH;

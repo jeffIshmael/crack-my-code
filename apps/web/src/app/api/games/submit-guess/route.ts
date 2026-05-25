@@ -63,47 +63,46 @@ export async function POST(req: NextRequest) {
         data: { status: 'COMPLETED', winnerAddress: normalizedPlayerAddress }
       });
 
-      // Update player rating (points handled separately for AI vs PVP)
+      const isAI = game.mode === 'ai';
+
+      // Score updates once on the server (client must not duplicate via update-points)
       if (normalizedPlayerAddress !== 'GUEST') {
-        const isAI = game.mode === 'ai';
-        const playerUser = await prisma.user.findFirst({
+        const winnerUser = await prisma.user.findFirst({
           where: {
-            address: {
-              equals: normalizedPlayerAddress,
-              mode: 'insensitive'
-            }
-          }
+            address: { equals: normalizedPlayerAddress, mode: 'insensitive' },
+          },
         });
-        if (playerUser) {
+        if (winnerUser) {
           await prisma.user.update({
-            where: { id: playerUser.id },
-            data: {
-              rating: { increment: isAI ? 10 : 25 }
-            }
+            where: { id: winnerUser.id },
+            data: isAI
+              ? { rating: { increment: 10 } }
+              : { rating: { increment: 25 }, points: { increment: 25 } },
           });
         } else {
           console.warn(`[Submit Guess] Player user not found for address: ${normalizedPlayerAddress}`);
         }
       }
 
-      // Decrement opponent rating in PVP
-      if (game.mode !== 'ai') {
+      if (!isAI) {
         const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;
-        if (opponentAddress && opponentAddress !== 'GUEST' && opponentAddress !== 'AI_BOT' && opponentAddress !== 'AI') {
+        if (
+          opponentAddress &&
+          opponentAddress !== 'GUEST' &&
+          opponentAddress !== 'AI_BOT' &&
+          opponentAddress !== 'AI'
+        ) {
           const opponentUser = await prisma.user.findFirst({
             where: {
-              address: {
-                equals: opponentAddress,
-                mode: 'insensitive'
-              }
-            }
+              address: { equals: opponentAddress, mode: 'insensitive' },
+            },
           });
           if (opponentUser) {
+            const newRating = Math.max(0, (opponentUser.rating || 1000) - 15);
+            const newPoints = Math.max(0, (opponentUser.points || 1000) - 15);
             await prisma.user.update({
               where: { id: opponentUser.id },
-              data: {
-                rating: { decrement: 15 }
-              }
+              data: { rating: newRating, points: newPoints },
             });
           } else {
             console.warn(`[Submit Guess] Opponent user not found for address: ${opponentAddress}`);
@@ -113,7 +112,6 @@ export async function POST(req: NextRequest) {
 
       // --- ON-CHAIN: Track Game On-Chain ---
       try {
-        const isAI = game.mode === 'ai';
         const matchType = game.mode === 'cash' ? 1 : 0;
         console.log(`[Blockchain] Tracking game on-chain: matchType=${matchType}, isAI=${isAI}`);
         await trackGameOnChain(matchType, isAI);
@@ -160,29 +158,9 @@ export async function POST(req: NextRequest) {
             p2GuessCount,
             game.player1Code || '',
             game.player2Code || '',
-            ipfsHash || '', 
+            ipfsHash || '',
             guessArray
           );
-
-          // Only update points in backend AFTER successful on-chain resolution
-          if (normalizedPlayerAddress !== 'GUEST') {
-            const playerUser = await prisma.user.findFirst({
-              where: {
-                address: {
-                  equals: normalizedPlayerAddress,
-                  mode: 'insensitive'
-                }
-              }
-            });
-            if (playerUser) {
-              await prisma.user.update({
-                where: { id: playerUser.id },
-                data: { points: { increment: 50 } }
-              });
-            } else {
-              console.warn(`[Submit Guess] Player user not found for points update: ${normalizedPlayerAddress}`);
-            }
-          }
         } catch (err) {
           console.error('[Blockchain] Resolve failed:', err);
         }
@@ -198,12 +176,28 @@ export async function POST(req: NextRequest) {
       revealCode: isWin ? opponentCode : undefined
     });
 
+    let playerStats: { points: number; rating: number } | null = null;
+    if (isWin && normalizedPlayerAddress !== 'GUEST') {
+      const updatedUser = await prisma.user.findFirst({
+        where: {
+          address: { equals: normalizedPlayerAddress, mode: 'insensitive' },
+        },
+      });
+      if (updatedUser) {
+        playerStats = {
+          points: updatedUser.points,
+          rating: updatedUser.rating,
+        };
+      }
+    }
+
     return NextResponse.json({
       success: true,
       clues,
       tileClues,
       opponentCode: revealCode,
-      winnerAddress: winner
+      winnerAddress: winner,
+      playerStats,
     });
   } catch (error) {
     console.error('Submit guess error:', error);

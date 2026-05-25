@@ -4,6 +4,8 @@ import { prisma } from '@/lib/prisma';
 export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
 import { generateSecretCode } from '@/lib/game';
+import { generateJoinCode } from '@/lib/join-code';
+import { createGameRecord } from '@/lib/prisma-game';
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,14 +55,14 @@ export async function POST(req: NextRequest) {
           where: { id: pendingGame.id },
           data: {
             status: 'ACTIVE',
-            player2Address: address
+            player2Address: effectiveAddress
           }
         });
 
         // Notify Player 1 (the creator) via Pusher
-        await pusherServer.trigger(`private-user-${pendingGame.player1Address}`, 'match-found', {
+        await pusherServer.trigger(`private-user-${pendingGame.player1Address.toLowerCase()}`, 'match-found', {
           gameId: updatedGame.id,
-          opponentAddress: address
+          opponentAddress: effectiveAddress
         });
 
         return NextResponse.json({ 
@@ -80,26 +82,31 @@ export async function POST(req: NextRequest) {
       aiCode = generateSecretCode().join('');
     }
     
-    const newGame = await (prisma.game as any).create({
-      data: {
-        userId: user.id, 
-        player1Address: effectiveAddress,
-        mode: mode,
-        stake: parseFloat(stake) || 0,
-        onChainMatchId: onChainMatchId || null,
-        status: isAI ? 'ACTIVE' : 'PENDING',
-        isPublic: isAI ? false : isPublic,
-        player2Address: isAI ? 'AI' : null,
-        player2Code: aiCode
-      }
+    let joinCode: string | undefined;
+    if (!isAI && !isPublic) {
+      joinCode = generateJoinCode();
+    }
+
+    const newGame = await createGameRecord({
+      userId: user.id,
+      player1Address: effectiveAddress,
+      mode: mode,
+      stake: parseFloat(stake) || 0,
+      onChainMatchId: onChainMatchId || null,
+      status: isAI ? 'ACTIVE' : 'PENDING',
+      isPublic: isAI ? false : isPublic,
+      player2Address: isAI ? 'AI' : null,
+      player2Code: aiCode,
+      ...(joinCode ? { joinCode } : {}),
     });
     
     // Public challenges match via live matchmaking (websocket + DB queue), not the lobby board.
-    // Only private (invite-link) challenges appear in "My Open Challenges".
+    // Only private (invite) challenges appear in "My Open Challenges".
 
     return NextResponse.json({ 
       status: isAI ? 'matched' : 'searching', 
-      gameId: newGame.id 
+      gameId: newGame.id,
+      joinCode: newGame.joinCode,
     });
 
   } catch (error: any) {
