@@ -65,6 +65,15 @@ pnpm dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Deploy on Vercel
+
+This repo is a pnpm + Turborepo monorepo. The Next.js app lives in `apps/web`.
+
+1. Import the repo in Vercel (root directory = repository root, not `apps/web`).
+2. Build uses `vercel.json`: `pnpm turbo build --filter=web` → output `apps/web/.next`.
+3. Set environment variables from `apps/web/.env.template` (`DATABASE_URL`, Pusher keys, Privy, etc.).
+4. Optional: set **Root Directory** to `apps/web` instead — then use **Build Command** `prisma generate && next build` and **Install Command** `cd ../.. && pnpm install`.
+
 ## Project structure
 
 | Path | Purpose |

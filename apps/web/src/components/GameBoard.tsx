@@ -244,7 +244,7 @@ export default function GameBoard({
           onClick={() => setView('opponent')}
           className={`flex-1 py-2 text-xs font-bold rounded-lg transition-all ${view === 'opponent' ? 'bg-[var(--orange)] text-[var(--bg-base)] shadow-lg' : 'text-[var(--text-dim)]'}`}
         >
-          OPPONENT'S BOARD
+          OPPONENT&apos;S BOARD
         </button>
       </div>
 

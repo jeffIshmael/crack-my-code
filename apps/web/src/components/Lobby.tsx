@@ -453,7 +453,7 @@ export default function Lobby({
 
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1 rounded-2xl bg-[var(--clue-green)]/5 p-4 border border-[var(--clue-green)]/10">
-                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Winner's Reward</span>
+                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Winner&apos;s Reward</span>
                           <span className="text-xl font-black text-[var(--clue-green)] tracking-tight">
                             {((parseFloat(stake) || 0) * 2 * 0.99).toFixed(3)} <span className="text-[10px]">USDT</span>
                           </span>
