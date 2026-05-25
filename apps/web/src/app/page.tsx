@@ -752,7 +752,7 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [gs.phase, currentGameId, gs.gameMode]);
 
-  const handleCancelChallenge = async (gameId: string, onChainMatchId?: string) => {
+  const handleCancelChallenge = useCallback(async (gameId: string, onChainMatchId?: string) => {
     if (!isConnected || !address) return;
     setIsCancelling(gameId);
     try {
@@ -791,9 +791,9 @@ export default function Home() {
     } finally {
       setIsCancelling(null);
     }
-  };
+  }, [isConnected, address, smartWalletClient, publicClient, cancelChallenge]);
 
-  const handleFindMatch = async (mode: GameMode, stake: number, isPublic: boolean = true, userBalance?: number) => {
+  const handleFindMatch = useCallback(async (mode: GameMode, stake: number, isPublic: boolean = true, userBalance?: number) => {
     if (mode === 'cash' && !PROFESSIONAL_MODE_ENABLED) {
       toast.info('Professional mode coming soon', {
         description: 'Play free friendly matches or challenge Cipher AI today.',
@@ -906,7 +906,7 @@ export default function Home() {
         }, 1500);
       }
     }
-  };
+  }, [address, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive]);
 
   const handleCancelMatchmaking = useCallback(async () => {
     if (currentGameId) {
@@ -1062,7 +1062,7 @@ export default function Home() {
         setIsSubmitting(false);
       }
     }
-  }, [gs, currentGameId, address, scheduleOpponentTurn, isSubmitting, updateBackendPoints, syncResultStats]);
+  }, [gs, currentGameId, address, isSubmitting, updateBackendPoints, syncResultStats]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
@@ -1126,7 +1126,7 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKey);
   }, [gs.phase, gs.currentInput, handleDigitPress, handleDeleteDigit, handleSubmitGuess]);
 
-  const executeJoinGame = async (gameData: {
+  const executeJoinGame = useCallback(async (gameData: {
     id: string;
     mode: string;
     stake: number;
@@ -1182,9 +1182,9 @@ export default function Home() {
           : 'Set your secret code — game starts when both players lock in.',
       });
     }
-  };
+  }, [smartWalletClient, publicClient, writeContractAsync, address, handleMatchFound]);
 
-  const handleJoinChallenge = async (gameIdOrCode: string) => {
+  const handleJoinChallenge = useCallback(async (gameIdOrCode: string) => {
     if (!isConnected || !address) return;
 
     const lookupKey = normalizeJoinCodeInput(gameIdOrCode) || gameIdOrCode.trim();
@@ -1235,7 +1235,7 @@ export default function Home() {
     } finally {
       setIsJoining(null);
     }
-  };
+  }, [isConnected, address, executeJoinGame]);
 
   const handleConfirmJoinStake = async () => {
     if (!pendingJoinStake) return;
@@ -1267,7 +1267,7 @@ export default function Home() {
       return;
     }
     await handleJoinChallenge(code);
-  }, [joinGameIdInput, isConnected, address, login]);
+  }, [joinGameIdInput, isConnected, address, login, handleJoinChallenge]);
 
   // ─── Sub-views ────────────────────────────────────────────────────────────
 

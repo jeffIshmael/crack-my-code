@@ -15,8 +15,10 @@ export default function SetCode({ opponentName, onLockCode, onBack, isWaiting }:
   const [code, setCode]    = useState<number[]>([]);
   const [locked, setLocked] = useState(false);
   const addDigit = useCallback((d: number) => {
-    if (code.length >= CODE_LENGTH) return;
-    setCode((prev) => [...prev, d]);
+    setCode((prev) => {
+      if (prev.length >= CODE_LENGTH) return prev;
+      return [...prev, d];
+    });
   }, []);
 
   const removeDigit = useCallback(() => {
