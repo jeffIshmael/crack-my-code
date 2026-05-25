@@ -129,7 +129,7 @@ export async function POST(req: NextRequest) {
             where: { gameId },
             orderBy: { createdAt: 'asc' }
           });
-          const guessArray = allGuesses.map(g => g.digits);
+          const guessArray = allGuesses.map((g: any) => g.digits);
 
           // Upload game history to IPFS via Pinata
           const ipfsHash = await uploadToIPFS({
