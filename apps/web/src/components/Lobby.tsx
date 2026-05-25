@@ -270,7 +270,7 @@ export default function Lobby({
                     className="relative mb-4 max-w-[200px] rounded-2xl border-2 border-[var(--accent)] bg-white p-3 shadow-[0_4px_20px_rgba(37,99,235,0.15)] -translate-y-2"
                   >
                     <p className="font-orbitron text-[9px] font-black leading-tight text-[var(--accent)] text-center uppercase tracking-wider">
-                      I&apos;m <span className="text-blue-500">Cipher</span>. I read every green, yellow, and gray hint. Think you can crack my code first?
+                      I&apos;m <span className="text-blue-500">Cipher</span>. I crack codes in 3 attempts. Think you can crack my code first?
                     </p>
 
                     {/* Bubble Tail */}
