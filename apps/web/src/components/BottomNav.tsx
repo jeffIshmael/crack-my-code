@@ -1,9 +1,18 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Home, LayoutGrid, Info, User, Settings } from 'lucide-react';
+import { Home, LayoutGrid, Info, Settings, Trophy } from 'lucide-react';
 
-export type NavTab = 'home' | 'games' | 'about' | 'wallet' | 'stats' | 'terms' | 'privacy' | 'contact';
+export type NavTab =
+  | 'home'
+  | 'games'
+  | 'leaderboard'
+  | 'about'
+  | 'wallet'
+  | 'stats'
+  | 'terms'
+  | 'privacy'
+  | 'contact';
 
 interface BottomNavProps {
   activeTab: NavTab;
@@ -17,6 +26,7 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
   const tabs = [
     { id: 'games' as const, label: 'Open', icon: LayoutGrid },
     { id: 'home' as const, label: 'Home', icon: Home },
+    { id: 'leaderboard' as const, label: 'Ranks', icon: Trophy },
     { id: 'about' as const, label: 'About', icon: Info },
     { id: 'wallet' as const, label: 'Settings', icon: Settings },
   ];
@@ -27,8 +37,8 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        className="pointer-events-auto flex items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-4 py-3 backdrop-blur-xl shadow-[0_8px_30px_rgba(0,0,0,0.15)]"
-        style={{ width: '100%', maxWidth: '320px' }}
+        className="theme-bottom-nav pointer-events-auto flex items-center justify-between px-2 py-3 backdrop-blur-xl"
+        style={{ width: '100%', maxWidth: '380px' }}
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
@@ -49,7 +59,7 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
                   <div className="h-full w-full rounded-full bg-white/5" />
                   <motion.div
                     layoutId="active-dot"
-                    className="absolute bottom-[-1px] h-1.5 w-1.5 rounded-full bg-[var(--accent)] shadow-[0_0_8px_var(--accent)]"
+                    className="theme-bottom-nav__active-dot absolute bottom-[-1px] h-1.5 w-1.5 rounded-full shadow-[0_0_8px_var(--accent-glow)]"
                   />
                 </motion.div>
               )}
@@ -60,7 +70,7 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
                 }`}
               />
               <span
-                className={`relative z-10 mt-1 text-[10px] font-bold uppercase tracking-widest transition-colors duration-200 ${
+                className={`relative z-10 mt-1 text-[9px] font-bold uppercase tracking-wide transition-colors duration-200 ${
                   isActive ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
                 }`}
               >

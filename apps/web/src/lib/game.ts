@@ -161,30 +161,32 @@ export function clueTileStyle(tileClue: TileClue | Clue): {
     case 'green':
       return {
         background: 'var(--clue-green)',
-        border: '1px solid var(--clue-green-mid)',
-        color: '#fff',
-        boxShadow: '0 0 10px rgba(5, 150, 105, 0.4)',
+        border: '2px solid transparent',
+        color: 'var(--clue-green-text)',
+        boxShadow: 'var(--tile-shadow)',
       };
     case 'yellow':
       return {
         background: 'var(--clue-yellow)',
-        border: '1px solid rgba(217, 119, 6, 0.5)',
-        color: '#fff',
-        boxShadow: '0 0 10px rgba(217, 119, 6, 0.35)',
+        border: '2px solid transparent',
+        color: 'var(--clue-yellow-text)',
+        boxShadow: 'var(--tile-shadow)',
       };
     case 'duplicate':
       return {
-        background: 'var(--clue-gray)',
-        border: '1px solid rgba(75, 85, 99, 0.35)',
-        color: '#fff',
+        background: 'var(--tile-absent)',
+        border: '2px solid transparent',
+        color: 'var(--tile-absent-text)',
+        boxShadow: 'var(--tile-shadow)',
       };
     case 'absent':
     case 'gray':
     default:
       return {
-        background: 'var(--bg-elevated)',
-        border: '1px solid var(--border-mid)',
+        background: 'var(--tile-default)',
+        border: '2px solid var(--border-mid)',
         color: 'var(--text-dim)',
+        boxShadow: 'var(--tile-shadow)',
       };
   }
 }

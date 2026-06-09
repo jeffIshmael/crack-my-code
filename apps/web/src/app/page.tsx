@@ -6,12 +6,15 @@ import { AnimatePresence, motion } from 'framer-motion';
 import Lobby from '@/components/Lobby';
 import { normalizeJoinCodeInput } from '@/lib/join-code';
 import JoinStakeModal from '@/components/JoinStakeModal';
-import OpenGamesPanel from '@/components/OpenGamesPanel';
+import OpenChallengesList from '@/components/OpenChallengesList';
+import { LeaderboardPanel } from '@/components/LeaderboardPanel';
 import Image from 'next/image';
 import SetCode from '@/components/SetCode';
 import GameBoard from '@/components/GameBoard';
 import ResultModal from '@/components/ResultModal';
 import { BottomNav, type NavTab } from '@/components/BottomNav';
+import { AboutHowToPlay } from '@/components/AboutHowToPlay';
+import { SettingsPanel } from '@/components/SettingsPanel';
 import {
   CODE_LENGTH,
   GAME_DURATION,
@@ -75,7 +78,7 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.replace('/', '');
-      if (['games', 'wallet', 'about', 'stats', 'terms', 'privacy', 'contact'].includes(path)) {
+      if (['games', 'leaderboard', 'wallet', 'about', 'stats', 'terms', 'privacy', 'contact'].includes(path)) {
         return path as NavTab;
       }
     }
@@ -1311,6 +1314,10 @@ export default function Home() {
             shareableJoinCode ??
             (gs.phase === 'matchmaking' && gs.opponentName === 'WAITING' ? currentGameId ?? undefined : undefined)
           }
+          joinGameIdInput={joinGameIdInput}
+          onJoinGameIdInputChange={setJoinGameIdInput}
+          onJoinByGameId={handleJoinByGameId}
+          isJoining={!!isJoining}
         />
       </motion.div>
     ) : gs.phase === 'setCode' ? (
@@ -1443,46 +1450,22 @@ export default function Home() {
   };
 
   const renderOpenGames = () => (
-    <motion.div key="games" className="flex w-full flex-col gap-8 px-5 pt-12 pb-48 text-left" {...screenVariants}>
+    <motion.div key="games" className="flex w-full flex-col gap-6 px-5 pt-12 pb-48 text-left" {...screenVariants}>
       {!address ? (
-        <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-8">
-          <div className="text-5xl grayscale opacity-30">🛡️</div>
-          <p className="text-[10px] font-black tracking-widest text-[var(--text-dim)] uppercase">Connect wallet to view board</p>
-          <button onClick={() => login()} className="rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Sign In</button>
+        <div className="theme-card flex flex-col items-center justify-center gap-4 py-16 text-center">
+          <span className="text-4xl" aria-hidden>🛡️</span>
+          <p className="font-body text-sm text-[var(--text-dim)]">Connect wallet to view your open challenges</p>
+          <button
+            onClick={() => login()}
+            className="theme-game-btn theme-game-btn--pvp max-w-[200px] min-h-0 py-3"
+            type="button"
+          >
+            <span className="theme-game-btn__title text-sm">Sign In</span>
+          </button>
         </div>
       ) : (
         <>
-          <div className="flex w-full flex-col gap-4 mb-6">
-            {/* Row 1: Logo (Centered) */}
-            <div className="flex w-full justify-center">
-              <span className="font-['Dancing_Script'] text-3xl font-bold leading-none bg-blue-500 bg-clip-text text-transparent drop-shadow-sm">
-                Crack My Code
-              </span>
-            </div>
-
-            {/* Row 2: Stats */}
-            <div className="flex items-center justify-between">
-              {/* CMC Points */}
-              <div className="flex items-center gap-1.5 rounded-xl bg-white/80 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-black/5 px-3 py-1.5">
-                <span className="text-[10px] font-black text-black/40 uppercase tracking-widest">CMC</span>
-                <span className="font-orbitron text-xs font-black text-[var(--clue-yellow)]">{gs.playerPoints}</span>
-              </div>
-
-              {/* USDT Balance */}
-              <div className="flex items-center gap-1.5 rounded-xl bg-white/80 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-[var(--accent)]/10 px-3 py-1.5">
-                <div className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-pulse" />
-                <span className="font-orbitron text-xs font-black text-[var(--accent)]">
-                  {usdtData && parseFloat(usdtData.formatted) > 0 ? parseFloat(usdtData.formatted).toFixed(3) : '0.000'} <span className="text-[8px] opacity-60">USDT</span>
-                </span>
-              </div>
-            </div>
-          </div>
-
-          <OpenGamesPanel
-            joinGameIdInput={joinGameIdInput}
-            onJoinGameIdInputChange={setJoinGameIdInput}
-            onJoinByGameId={handleJoinByGameId}
-            isJoining={!!isJoining}
+          <OpenChallengesList
             isConnected={!!isConnected}
             myActiveGames={myActiveGames}
             onCancelOpenChallenge={handleCancelOpenChallenge}
@@ -1490,10 +1473,10 @@ export default function Home() {
           />
 
           {gameHistory.length > 0 && (
-            <div className="flex flex-col gap-6 mt-8">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-black/5 text-black/40"><History size={16} /></div>
-                <h3 className="font-orbitron text-xs font-black tracking-[0.2em] text-black/40 uppercase">Match History</h3>
+            <div className="flex flex-col gap-4 mt-4">
+              <div className="flex items-center gap-2">
+                <span className="text-lg" aria-hidden>📜</span>
+                <h3 className="font-ui text-sm font-bold text-[var(--text)]">Match History</h3>
               </div>
               <div className="flex flex-col gap-3">
                 {gameHistory.map((game) => {
@@ -1501,12 +1484,18 @@ export default function Home() {
                   const isDraw = !game.winnerAddress;
                   const opponentAddr = game.player1Address.toLowerCase() === (address?.toLowerCase() || '') ? game.player2Address : game.player1Address;
                   return (
-                    <div key={game.id} className="flex items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-4 shadow-sm">
+                    <div key={game.id} className="theme-card flex items-center justify-between p-4">
                       <div className="flex flex-col gap-1">
-                        <span className={`text-[8px] font-black uppercase tracking-widest ${isWinner ? 'text-green-600' : isDraw ? 'text-blue-600' : 'text-red-600'}`}>{isWinner ? 'Victory' : isDraw ? 'Draw' : 'Defeat'}</span>
-                        <span className="text-[10px] font-bold text-black/60 uppercase tracking-widest">vs {opponentAddr ? `${opponentAddr.slice(0, 6)}...${opponentAddr.slice(-4)}` : 'AI'}</span>
+                        <span className={`font-ui text-[10px] font-bold uppercase tracking-wider ${isWinner ? 'text-[var(--clue-green)]' : isDraw ? 'text-[var(--accent)]' : 'text-red-500'}`}>
+                          {isWinner ? 'Victory' : isDraw ? 'Draw' : 'Defeat'}
+                        </span>
+                        <span className="font-body text-xs text-[var(--text-dim)]">
+                          vs {opponentAddr ? `${opponentAddr.slice(0, 6)}…${opponentAddr.slice(-4)}` : 'AI'}
+                        </span>
                       </div>
-                      <div className="text-[10px] font-black text-black/70">{game.mode === 'cash' ? (isWinner ? `+${(game.stake * 2 * 0.99).toFixed(2)}` : `-${game.stake}`) : 'FREE'}</div>
+                      <div className="font-ui text-xs font-bold text-[var(--text)]">
+                        {game.mode === 'cash' ? (isWinner ? `+${(game.stake * 2 * 0.99).toFixed(2)}` : `-${game.stake}`) : 'FREE'}
+                      </div>
                     </div>
                   );
                 })}
@@ -1515,171 +1504,47 @@ export default function Home() {
           )}
         </>
       )}
+    </motion.div>
+  );
 
+  const renderLeaderboard = () => (
+    <motion.div key="leaderboard" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32" {...screenVariants}>
+      <LeaderboardPanel currentAddress={address} />
     </motion.div>
   );
 
   const renderAbout = () => (
-    <motion.div key="about" className="flex w-full flex-col gap-8 px-5 pt-24 pb-32 text-left" {...screenVariants}>
-      <div className="flex flex-col gap-2 text-center">
-        <h2 className="font-orbitron text-2xl font-black tracking-widest text-[var(--text)]">ABOUT GAME</h2>
-        <p className="text-xs text-[var(--text-dim)] uppercase tracking-widest">Rules & Rewards</p>
-      </div>
-      <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6">
-        {[
-          { t: 'Objective', d: 'Crack your opponent\'s secret 4-digit code before they crack yours. Codes can repeat digits (e.g. 1122).' },
-          { t: 'The Clues', d: 'Each digit is colored Wordle-style: green = correct digit in the correct spot, yellow = digit is in the code but wrong spot, light gray = not in the code. A dark gray tile means that digit appears in the code but you already used all copies of it in this guess.' },
-          { t: 'How to Play', d: 'Take turns submitting 4-digit guesses. You have 8 attempts. Use the colors on your guess row to narrow down the secret code.' },
-          { t: 'Professional Mode', d: 'USDT staking duels are coming soon. Free friendly matches and Cipher AI are available now.' },
-          { t: 'Fair Play', d: 'Quitting mid-match counts as a loss once ranked stakes go live.' }
-        ].map((rule, i) => (
-          <div key={i} className="flex flex-col gap-1.5">
-            <span className="text-xs font-bold uppercase tracking-widest text-[var(--accent)]">{rule.t}</span>
-            <p className="text-sm leading-relaxed text-black/60">{rule.d}</p>
-          </div>
-        ))}
-      </div>
-
+    <motion.div key="about" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32" {...screenVariants}>
+      <AboutHowToPlay />
     </motion.div>
   );
 
   const renderWalletContent = () => (
-    <motion.div key="wallet" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
-      {!address ? (
-        <div className="flex flex-col items-center justify-center gap-6 py-20 text-center rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-8">
-          <div className="text-5xl grayscale opacity-30">🛡️</div>
-          <div className="flex flex-col gap-2">
-            <h2 className="font-orbitron text-lg font-black tracking-widest text-[var(--text)] uppercase">Sign In Required</h2>
-            <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-widest max-w-[200px] mx-auto">Connect your wallet to view your account details</p>
-          </div>
-          <button onClick={() => login()} className="rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-8 py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Sign In</button>
-        </div>
-      ) : (
-        <div className="flex flex-col gap-6">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="flex flex-col gap-2 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-sm">
-              <span className="text-[10px] font-black uppercase tracking-widest text-black/40">USDT</span>
-              <span className="font-orbitron text-2xl font-black text-[var(--accent)]">{usdtData ? parseFloat(usdtData.formatted).toFixed(3) : '0.000'}</span>
-            </div>
-            <div className="flex flex-col gap-2 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-sm">
-              <span className="text-[10px] font-black uppercase tracking-widest text-black/40">CMC</span>
-              <span className="font-orbitron text-2xl font-black text-[var(--clue-yellow)]">{gs.playerPoints}</span>
-            </div>
-          </div>
-          <div className="flex flex-col gap-3 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-md">
-            <span className="text-[10px] font-black uppercase tracking-widest text-black/40 text-center">Wallet Address</span>
-            <div className="flex items-center gap-3">
-              <div className="flex-1 rounded-xl border-2 border-black/10 bg-black/5 px-4 py-3 font-code text-xs font-bold text-black/60 truncate">{address}</div>
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-black/10 bg-black/5"><div className="h-4 w-4 rotate-45 border-2 border-black/30" /></div>
-            </div>
-          </div>
-
-          <div className="flex flex-col gap-3 mt-4">
-            {/* <button onClick={() => setActiveTab('stats' as any)} className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[var(--accent)]/10 text-[var(--accent)]">
-                  <Activity size={16} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Platform Stats</span>
-              </div>
-              <ChevronRight size={16} className="text-black/30" />
-            </button> */}
-
-            <button onClick={() => setActiveTab('terms' as any)} className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/5 text-black/60">
-                  <ShieldCheck size={16} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Terms of Service</span>
-              </div>
-              <ChevronRight size={16} className="text-black/30" />
-            </button>
-
-            <button onClick={() => setActiveTab('privacy' as any)} className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/5 text-black/60">
-                  <Users size={16} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Privacy Policy</span>
-              </div>
-              <ChevronRight size={16} className="text-black/30" />
-            </button>
-
-            <button onClick={() => setActiveTab('contact' as any)} className="flex w-full items-center justify-between rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-4 shadow-sm hover:bg-black/5 transition-all">
-              <div className="flex items-center gap-3">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#0088cc]/10 text-[#0088cc]">
-                  <ExternalLink size={16} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text)]">Telegram Support</span>
-              </div>
-              <ChevronRight size={16} className="text-black/30" />
-            </button>
-          </div>
-
-          {/* <AnimatePresence initial={false}>
-            {isSendSectionOpen ? (
-              <motion.div
-                key="send-section"
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                className="overflow-hidden"
-              >
-                <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 shadow-md">
-                  <div className="flex justify-between items-center">
-                    <h3 className="font-orbitron text-xs font-black tracking-[0.2em] text-black/40 uppercase">Send Stablecoin</h3>
-                  </div>
-
-                  <div className="flex flex-col gap-4 text-left">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-black/40">Address</label>
-                      <input 
-                        type="text" 
-                        placeholder="0x..." 
-                        value={sendAddress}
-                        onChange={(e) => setSendAddress(e.target.value)}
-                        className="w-full rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-code text-xs font-bold text-black focus:border-[var(--accent)] focus:outline-none"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-black/40">Amount</label>
-                      <input 
-                        type="number" 
-                        placeholder="0.00" 
-                        value={sendAmount}
-                        onChange={(e) => setSendAmount(e.target.value)}
-                        className="w-full rounded-xl border-2 border-black/10 bg-transparent px-4 py-3 font-orbitron text-sm font-bold text-black focus:border-[var(--accent)] focus:outline-none"
-                      />
-                      <span className="text-[10px] font-bold text-black/40 px-1">
-                        Balance: {usdtData ? parseFloat(usdtData.formatted).toFixed(2) : '0.00'} USDT
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="flex w-full gap-3 mt-2">
-                    <button onClick={() => setIsSendSectionOpen(false)} className="flex-1 rounded-2xl border-2 border-black/10 bg-black/5 py-4 text-[10px] font-black uppercase tracking-widest text-black/40 transition-all">
-                      CANCEL
-                    </button>
-                    <button onClick={handleSend} disabled={isSending || !sendAddress || !sendAmount} className="flex-1 rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] transition-transform active:scale-95 shadow-lg disabled:opacity-50">
-                      {isSending ? 'PROCESSING...' : 'SEND'}
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ) : (
-              <button onClick={() => setIsSendSectionOpen(true)} className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[var(--accent)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] shadow-md transition-all active:scale-95">
-                 <Send size={16} /> Send Stablecoin
-              </button>
-            )}
-          </AnimatePresence> */}
-
-          {!(typeof window !== 'undefined' && ((window as any).ethereum?.isMiniPay || (window as any).ethereum?.isFarcaster)) && (
-            <button onClick={() => { logout(); setActiveTab('home'); }} className="flex w-full items-center justify-center gap-3 rounded-2xl border-2 border-red-500/10 bg-red-500/5 py-4 text-[10px] font-black uppercase tracking-widest text-red-500/60 hover:bg-red-500/10 transition-all">
-              <LogOut size={16} />
-              Sign Out Account
-            </button>
-          )}
-        </div>
+    <motion.div key="wallet" className="flex w-full flex-col gap-5 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+      <SettingsPanel
+        address={address}
+        points={gs.playerPoints}
+        usdtFormatted={usdtData?.formatted}
+        copied={copied}
+        onLogin={() => login()}
+        onCopyAddress={() => {
+          if (address) {
+            navigator.clipboard.writeText(address);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          }
+        }}
+        onTabChange={setActiveTab}
+      />
+      {address && !(typeof window !== 'undefined' && ((window as any).ethereum?.isMiniPay || (window as any).ethereum?.isFarcaster)) && (
+        <button
+          type="button"
+          onClick={() => { logout(); setActiveTab('home'); }}
+          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-100/80 py-3.5 font-ui text-sm font-bold text-red-600 transition-colors hover:bg-red-100"
+        >
+          <LogOut size={16} />
+          Sign Out
+        </button>
       )}
     </motion.div>
   );
@@ -1808,6 +1673,7 @@ export default function Home() {
       <div className="w-full max-w-xl px-4 relative">
         {activeTab === 'home' ? renderHomeContent() :
           activeTab === 'games' ? renderOpenGames() :
+            activeTab === 'leaderboard' ? renderLeaderboard() :
             activeTab === 'wallet' ? renderWalletContent() :
               activeTab === 'stats' ? renderStats() :
                 activeTab === 'terms' ? renderTerms() :

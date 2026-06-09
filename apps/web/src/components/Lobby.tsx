@@ -9,9 +9,13 @@ import type { GameMode } from '@/lib/game';
 import { PROFESSIONAL_MODE_ENABLED } from '@/lib/game';
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
-import Image from 'next/image';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
+import { ChevronRight } from 'lucide-react';
+import { ThemeLogo } from '@/components/ThemeLogo';
+import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
+import JoinChallenge from '@/components/JoinChallenge';
+
 interface LobbyProps {
   rating: number;
   points: number;
@@ -23,6 +27,10 @@ interface LobbyProps {
   searchTime?: number;
   onCancelMatchmaking?: () => void;
   shareableJoinCode?: string;
+  joinGameIdInput?: string;
+  onJoinGameIdInputChange?: (value: string) => void;
+  onJoinByGameId?: () => void;
+  isJoining?: boolean;
 }
 
 const stagger = {
@@ -44,6 +52,10 @@ export default function Lobby({
   searchTime = 0,
   onCancelMatchmaking,
   shareableJoinCode,
+  joinGameIdInput = '',
+  onJoinGameIdInputChange,
+  onJoinByGameId,
+  isJoining = false,
 }: LobbyProps) {
   const { isConnected, address } = useAccount();
   const { login } = usePrivy();
@@ -159,65 +171,31 @@ export default function Lobby({
       {/* ── Top row with Sign Up ── */}
       {/* ── Top Header Row ── */}
       {/* ── Top Header Section ── */}
-      <div className="flex w-full flex-col gap-4 px-2">
-        {/* Row 1: Logo (Centered) */}
-        <div className="flex w-full justify-center">
-          <span className="font-['Dancing_Script'] text-3xl font-bold leading-none bg-blue-500 bg-clip-text text-transparent drop-shadow-sm">
-            Crack My Code
-          </span>
+      <div className="flex w-full flex-col px-2">
+        <div className="mb-6 flex w-full justify-center">
+          <ThemeLogo />
         </div>
 
-        {/* Row 2: Stats (When Connected) */}
         {isConnected ? (
-          <div className="flex items-center justify-between">
-            {/* CMC Points */}
-            <div className="flex items-center gap-1.5 rounded-xl bg-white/80 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-black/5 px-3 py-1.5">
-              <span className="font-orbitron text-xs font-black text-[var(--clue-yellow)]">{points}</span>
-              <span className="text-[10px] font-black text-black/40 uppercase tracking-widest">CMC</span>
-            </div>
-
-            {/* USDT Balance */}
-            <div className="flex items-center gap-1.5 rounded-xl bg-white/80 backdrop-blur-sm shadow-[0_2px_8px_rgba(0,0,0,0.05)] border border-[var(--accent)]/10 px-3 py-1.5">
-              <span className="font-orbitron text-xs font-black text-[var(--accent)]">
-                {usdtData && parseFloat(usdtData.formatted) > 0 ? parseFloat(usdtData.formatted).toFixed(3) : '0.000'} <span className="text-[8px] opacity-60">USDT</span>
-              </span>
-            </div>
-          </div>
+          <ThemePlayfulHeader
+            points={points}
+            usdtFormatted={usdtData?.formatted}
+          />
         ) : (
-          <div className="flex w-full justify-center">
+          <div className="mt-2 flex w-full justify-center">
             <button
               onClick={() => login()}
-              className="flex items-center gap-2 rounded-xl border-2 border-black/10 bg-[var(--bg-elevated)] px-6 py-2 shadow-sm hover:scale-105 transition-transform"
+              className="theme-card flex items-center gap-2 px-6 py-2 transition-transform hover:scale-105"
             >
-              <span className="text-[10px] font-black tracking-widest text-[var(--text)] uppercase">Connect Wallet</span>
+              <span className="font-ui text-[10px] uppercase tracking-widest text-[var(--text)]">Connect Wallet</span>
             </button>
           </div>
         )}
       </div>
 
-      {/* ── Center: Interactive Detective Zone ── */}
-      <div className="flex flex-1 w-full flex-col items-center justify-center py-4 relative">
-
-        {/* Background Narrative Layer (Scribbles) */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 0.15 }}
-          className="absolute inset-0 flex items-center justify-center pointer-events-none"
-        >
-          <div className="relative w-full h-full max-w-sm">
-            <span className="absolute top-4 left-4 font-handwritten text-4xl -rotate-12 text-black">1042?</span>
-            <span className="absolute bottom-4 right-4 font-handwritten text-3xl rotate-6 text-black underline">Classified</span>
-            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col items-center opacity-40">
-              <span className="font-orbitron text-5xl font-black tracking-[0.4em] text-black">TOP SECRET</span>
-              <div className="h-1 w-64 bg-black mt-2" />
-            </div>
-            <div className="absolute top-1/4 right-0 h-12 w-12 rounded-full border-2 border-black flex items-center justify-center font-handwritten text-xl rotate-12">7</div>
-            <div className="absolute bottom-1/4 left-0 h-10 w-10 rounded-full border-2 border-black flex items-center justify-center font-handwritten text-lg -rotate-12">3</div>
-          </div>
-        </motion.div>
-
-        {/* Buttons and Peeking Cipher */}
-        <div className="z-10 flex w-full max-w-sm flex-col gap-8 px-4">
+      {/* ── Center: Play actions ── */}
+      <div className="flex flex-1 w-full flex-col items-center justify-center py-2 relative">
+        <div className="z-10 flex w-full flex-col px-5">
           {isMatchmaking ? (
             <div className="w-full">
               {opponentName === 'WAITING' ? (
@@ -244,82 +222,60 @@ export default function Lobby({
               )}
             </div>
           ) : (
-            <div className="flex flex-col gap-4">
-              {/* Cipher AI Section */}
-              <div className="relative pt-12">
-                {/* Floating Cipher and Bubble */}
-                <motion.div
-                  className="absolute -top-32 left-1/2 -translate-x-1/2 z-20 flex flex-col items-center pointer-events-none"
-                  initial={{ opacity: 0, y: 40 }}
-                  animate={{
-                    opacity: 1,
-                    y: [0, -4, 0],
-                    rotate: [0, -1, 1, -1, 0]
-                  }}
-                  transition={{
-                    opacity: { delay: 0.3, duration: 0.8 },
-                    y: { repeat: Infinity, duration: 4, ease: "easeInOut" },
-                    rotate: { repeat: Infinity, duration: 6, ease: "easeInOut" }
-                  }}
-                >
-                  {/* Speech Bubble */}
-                  <motion.div
-                    initial={{ scale: 0, opacity: 0, y: 10 }}
-                    animate={{ scale: 1, opacity: 1, y: 0 }}
-                    transition={{ delay: 0.8, duration: 0.4, type: 'spring' }}
-                    className="relative mb-4 max-w-[200px] rounded-2xl border-2 border-[var(--accent)] bg-white p-3 shadow-[0_4px_20px_rgba(37,99,235,0.15)] -translate-y-2"
-                  >
-                    <p className="font-orbitron text-[9px] font-black leading-tight text-[var(--accent)] text-center uppercase tracking-wider">
-                      I&apos;m <span className="text-blue-500">Cipher</span>. I crack codes in 3 attempts. Think you can crack my code first?
-                    </p>
-
-                    {/* Bubble Tail */}
-                    <div className="absolute -bottom-2 left-1/2 h-4 w-4 -translate-x-1/2 rotate-45 border-r-2 border-b-2 border-[var(--accent)] bg-white" />
-                  </motion.div>
-
-                  {/* Character (On Top) */}
-                  <div className="h-28 w-28 -mt-8">
-                    <Image
-                      src="/robot.png"
-                      alt="Cipher AI"
-                      width={112}
-                      height={112}
-                      className="drop-shadow-2xl mix-blend-multiply"
-                      priority
-                    />
-                  </div>
-                </motion.div>
-
+            <div className="theme-play-zone">
+              <div className="flex flex-col gap-[1.25rem]">
                 <button
                   onClick={handleStartAI}
                   disabled={isCreating}
-                  className="group relative z-10 flex w-full h-20 items-center justify-center rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] shadow-[0_8px_24px_rgba(0,0,0,0.06)] transition-all hover:translate-y-[-2px] active:translate-y-[1px] disabled:opacity-50 overflow-hidden"
+                  className="theme-game-btn theme-game-btn--ai group"
                 >
-                  <div className="absolute inset-0 bg-gradient-to-tr from-black/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="font-orbitron text-sm font-black tracking-[0.1em] text-[var(--text)] uppercase px-4 text-center">
-                      Play Against Cipher AI
-                    </span>
-                    <span className="text-[8px] font-black text-black/30 tracking-[0.3em] uppercase">Computer Match</span>
+                  <div className="theme-game-btn__inner">
+                    <span className="theme-game-btn__emoji" aria-hidden>🤖</span>
+                    <div className="theme-game-btn__content flex-1">
+                      <span className="theme-game-btn__title">Play Against Cipher AI</span>
+                      <span className="theme-game-btn__subtitle">Computer Match</span>
+                    </div>
+                    <ChevronRight
+                      size={20}
+                      className="theme-game-btn__chevron flex-shrink-0 text-[var(--text-dim)]"
+                      aria-hidden
+                    />
+                  </div>
+                </button>
+
+                <button
+                  onClick={isConnected ? openPvPModal : () => login()}
+                  disabled={!isConnected}
+                  className="theme-game-btn theme-game-btn--pvp group"
+                >
+                  <div className="theme-game-btn__inner">
+                    <span className="theme-game-btn__emoji" aria-hidden>👥</span>
+                    <div className="theme-game-btn__content flex-1">
+                      <span className="theme-game-btn__title">Play Against Opponent</span>
+                      <span className="theme-game-btn__subtitle">Human Opponent</span>
+                    </div>
+                    <ChevronRight
+                      size={20}
+                      className="theme-game-btn__chevron theme-game-btn__chevron--light flex-shrink-0"
+                      aria-hidden
+                    />
                   </div>
                 </button>
               </div>
 
-              {/* PvP Button */}
-              <button
-                onClick={isConnected ? openPvPModal : () => login()}
-                className={`group relative z-10 flex h-20 items-center justify-center rounded-3xl border-2 transition-all shadow-[0_8px_24px_rgba(0,0,0,0.06)] ${isConnected
-                    ? "border-black/10 bg-[var(--bg-elevated)] hover:translate-y-[-2px] active:translate-y-[1px]"
-                    : "border-black/10 bg-black/5 opacity-80"
-                  }`}
-              >
-                <div className="flex flex-col items-center gap-1">
-                  <span className="font-orbitron text-sm font-black tracking-[0.1em] text-[var(--text)] uppercase px-4 text-center">
-                    Play Against Opponent
-                  </span>
-                  <span className="text-[8px] font-black text-black/30 tracking-[0.3em] uppercase">Human Opponent</span>
-                </div>
-              </button>
+              {onJoinByGameId && onJoinGameIdInputChange && (
+                <>
+                  <div className="border-t border-[var(--border-mid)]" aria-hidden />
+                  <JoinChallenge
+                    value={joinGameIdInput}
+                    onChange={onJoinGameIdInputChange}
+                    onJoin={onJoinByGameId}
+                    isJoining={isJoining}
+                    disabled={!isConnected}
+                    collapsible
+                  />
+                </>
+              )}
             </div>
           )}
         </div>
