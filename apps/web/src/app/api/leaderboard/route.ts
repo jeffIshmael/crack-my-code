@@ -1,8 +1,40 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
-export async function GET() {
+async function getUserRank(address: string) {
+  const user = await prisma.user.findUnique({
+    where: { address: address.toLowerCase() },
+    select: { address: true, points: true, name: true, rating: true },
+  });
+
+  if (!user?.address) return null;
+
+  const ahead = await prisma.user.count({
+    where: {
+      address: { not: null },
+      OR: [
+        { points: { gt: user.points } },
+        {
+          points: user.points,
+          rating: { gt: user.rating },
+        },
+      ],
+    },
+  });
+
+  return {
+    rank: ahead + 1,
+    address: user.address,
+    name: user.name,
+    points: user.points,
+    rating: user.rating,
+  };
+}
+
+export async function GET(req: NextRequest) {
   try {
+    const address = req.nextUrl.searchParams.get('address')?.toLowerCase();
+
     const users = await prisma.user.findMany({
       where: { address: { not: null } },
       orderBy: [{ points: 'desc' }, { rating: 'desc' }],
@@ -23,7 +55,13 @@ export async function GET() {
       rating: user.rating,
     }));
 
-    return NextResponse.json({ leaderboard });
+    let viewer = null;
+    if (address) {
+      const inList = leaderboard.find((e) => e.address.toLowerCase() === address);
+      viewer = inList ?? (await getUserRank(address));
+    }
+
+    return NextResponse.json({ leaderboard, viewer });
   } catch (error) {
     console.error('Leaderboard error:', error);
     return NextResponse.json({ error: 'Failed to load leaderboard' }, { status: 500 });

@@ -50,7 +50,7 @@ export function AboutHowToPlay() {
     <div className="flex w-full flex-col gap-8">
       <div className="flex flex-col gap-4">
         <h2 className="font-ui text-xl font-bold text-[var(--text)]">
-          How to play with Crack My Code?
+          How to play Crack My Code?
         </h2>
         <p className="font-body text-sm leading-relaxed text-[var(--text-2)]">
           Each player sets a secret 4-digit code. Take turns guessing your opponent&apos;s code —
