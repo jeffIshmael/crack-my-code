@@ -49,6 +49,7 @@ const screenVariants = {
 };
 
 import { pusherClient } from '@/lib/pusher-client';
+import { scoreDeltaForMode } from '@/lib/scoring';
 
 export default function Home() {
   const searchParams = useSearchParams();
@@ -74,7 +75,9 @@ export default function Home() {
 
   const aiTurnRunningRef = useRef(false);
   const playerReviewUntilRef = useRef(0);
-  const PLAYER_GUESS_REVIEW_MS = 2800;
+  const PLAYER_GUESS_REVIEW_MS = 1500;
+  const AI_DIGIT_MS = 300;
+  const AI_REVEAL_MS = 2200;
 
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     if (typeof window !== 'undefined') {
@@ -365,19 +368,6 @@ export default function Home() {
     }
   }, [gs.phase]);
 
-  const updateBackendPoints = useCallback(async (rDelta: number, pDelta: number) => {
-    if (!address) return;
-    try {
-      await fetch('/api/users/update-points', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address, ratingDelta: rDelta, pointsDelta: pDelta })
-      });
-    } catch (err) {
-      console.error('Failed to update points on backend', err);
-    }
-  }, [address]);
-
   const refreshUserStats = useCallback(async (): Promise<{
     points: number;
     rating: number;
@@ -403,6 +393,12 @@ export default function Home() {
     }
     return null;
   }, [address]);
+
+  useEffect(() => {
+    if ((activeTab === 'home' || activeTab === 'wallet') && address && gs.phase === 'lobby') {
+      void refreshUserStats();
+    }
+  }, [activeTab, address, gs.phase, refreshUserStats]);
 
   const syncResultStats = useCallback(
     async (ratingDelta: number, serverStats?: { points: number; rating: number } | null) => {
@@ -459,13 +455,8 @@ export default function Home() {
         const newGuesses = [...prev.opponentGuesses, entry];
 
         if (isWinningClues(data.clues)) {
-          const delta = prev.gameMode === 'ai' ? -5 : -15;
-          if (prev.gameMode === 'ai') {
-            updateBackendPoints(delta, delta * 2);
-            void syncResultStats(delta);
-          }
+          const loss = scoreDeltaForMode(prev.gameMode === 'ai' ? 'ai' : prev.gameMode, false);
 
-          // Reveal code on loss
           fetch('/api/games/reveal', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -478,13 +469,11 @@ export default function Home() {
                 opponentGuesses: newGuesses,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: delta,
+                ratingDelta: loss.rating,
                 opponentCurrentInput: [],
                 opponentCode: revealData.opponentCode || []
               }));
-              if (prev.gameMode !== 'ai') {
-                void syncResultStats(delta);
-              }
+              void syncResultStats(loss.rating);
             });
 
           return {
@@ -512,7 +501,7 @@ export default function Home() {
     return () => {
       pusherClient.unsubscribe(`private-game-${currentGameId}`);
     };
-  }, [currentGameId, gs.gameMode, address, updateBackendPoints, syncResultStats]);
+  }, [currentGameId, gs.gameMode, address, syncResultStats]);
 
   // Turn notification effect
   useEffect(() => {
@@ -538,20 +527,27 @@ export default function Home() {
   const scheduleOpponentTurn = useCallback(() => {
     if (gsRef.current.gameMode !== 'ai') return;
     if (gsRef.current.phase !== 'playing') return;
+    if (gsRef.current.isPlayerTurn) return;
     if (aiTurnRunningRef.current) return;
+
+    aiTurnRunningRef.current = true;
     clearOppTimer();
 
     const waitForPlayerReview = Math.max(0, playerReviewUntilRef.current - Date.now());
 
     oppTimerRef.current = setTimeout(() => {
       const currentGs = gsRef.current;
-      if (currentGs.phase !== 'playing' || currentGs.isPlayerTurn) return;
+      if (currentGs.phase !== 'playing' || currentGs.isPlayerTurn) {
+        aiTurnRunningRef.current = false;
+        return;
+      }
 
       const history = currentGs.opponentGuesses;
       const playerCode = currentGs.playerCode;
-      if (!playerCode || playerCode.length === 0) return;
-
-      aiTurnRunningRef.current = true;
+      if (!playerCode || playerCode.length === 0) {
+        aiTurnRunningRef.current = false;
+        return;
+      }
 
       const targetDigits = cipherNextGuess(history);
 
@@ -560,17 +556,17 @@ export default function Home() {
         if (typeIndex < CODE_LENGTH) {
           setGs((prev: GameState) => ({
             ...prev,
-            opponentCurrentInput: [...prev.opponentCurrentInput, targetDigits[typeIndex]],
+            opponentCurrentInput: targetDigits.slice(0, typeIndex + 1),
           }));
           typeIndex++;
-          oppTimerRef.current = setTimeout(typeDigit, 320);
+          oppTimerRef.current = setTimeout(typeDigit, AI_DIGIT_MS);
         } else {
           const clues = evaluateGuess(targetDigits, gsRef.current.playerCode);
           const tileClues = toTileClues(targetDigits, gsRef.current.playerCode);
           setPendingOpponentTileClues(tileClues);
 
           const won = isWinningClues(clues);
-          const revealMs = won ? 1400 : 1800;
+          const revealMs = won ? AI_REVEAL_MS : AI_REVEAL_MS;
 
           oppTimerRef.current = setTimeout(() => {
             const entry: GuessEntry = {
@@ -581,29 +577,32 @@ export default function Home() {
             };
 
             if (won) {
-              clearOppTimer();
-              aiTurnRunningRef.current = false;
+              const loss = scoreDeltaForMode('ai', false);
               setPendingOpponentTileClues(null);
-              updateBackendPoints(-5, -10);
 
               setGs((prev: GameState) => ({
                 ...prev,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: -5,
+                ratingDelta: loss.rating,
                 opponentGuesses: [...prev.opponentGuesses, entry],
                 opponentGuessCount: prev.opponentGuessCount + 1,
                 opponentCurrentInput: [],
                 opponentCode: prev.playerCode,
                 isPlayerTurn: false,
               }));
-              void syncResultStats(-5);
 
               fetch('/api/games/reveal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
-              }).catch((err) => console.error('AI reveal sync failed', err));
+              })
+                .then(() => syncResultStats(loss.rating))
+                .catch((err) => console.error('AI reveal sync failed', err))
+                .finally(() => {
+                  aiTurnRunningRef.current = false;
+                  clearOppTimer();
+                });
               return;
             }
 
@@ -626,17 +625,14 @@ export default function Home() {
       setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: [] }));
       typeDigit();
     }, waitForPlayerReview);
-  }, [currentGameId, address, updateBackendPoints, syncResultStats]);
+  }, [currentGameId, address, syncResultStats, AI_DIGIT_MS, AI_REVEAL_MS]);
 
   // AI Turn Trigger
   useEffect(() => {
     if (gs.phase === 'playing' && !gs.isPlayerTurn && gs.gameMode === 'ai') {
       scheduleOpponentTurn();
     }
-    if (gs.isPlayerTurn || gs.phase !== 'playing') {
-      aiTurnRunningRef.current = false;
-    }
-  }, [gs.phase, gs.isPlayerTurn, gs.gameMode, scheduleOpponentTurn]);
+  }, [gs.phase, gs.isPlayerTurn, gs.gameMode, gs.playerGuesses.length, scheduleOpponentTurn]);
 
   // ─── Phase: Lobby → Matchmaking ───────────────────────────────────────────
 
@@ -1003,20 +999,15 @@ export default function Home() {
             // Win check
             if (isWinningClues(clues)) {
               clearOppTimer();
-              const delta = gs.gameMode === 'ai' ? 10 : 25;
-              if (gs.gameMode === 'ai') {
-                updateBackendPoints(delta, delta * 2);
-                void syncResultStats(delta);
-              } else {
-                void syncResultStats(delta, data.playerStats ?? null);
-              }
+              const win = scoreDeltaForMode(gs.gameMode === 'ai' ? 'ai' : gs.gameMode, true);
+              void syncResultStats(win.rating, data.playerStats ?? null);
 
               return {
                 ...prev,
                 playerGuesses: newGuesses,
                 phase: 'result',
                 result: 'win',
-                ratingDelta: delta,
+                ratingDelta: win.rating,
                 currentInput: [],
                 opponentCode: data.opponentCode // Revealed by server
               };
@@ -1024,30 +1015,25 @@ export default function Home() {
 
             // Max guesses exhausted?
             if (newGuesses.length >= MAX_GUESSES) {
-              const delta = gs.gameMode === 'ai' ? -5 : -15;
-              if (gs.gameMode === 'ai') {
-                updateBackendPoints(delta, delta * 2);
-                void syncResultStats(delta);
-              }
+              const loss = scoreDeltaForMode(gs.gameMode === 'ai' ? 'ai' : gs.gameMode, false);
 
-              // Reveal the code even on loss
               fetch('/api/games/reveal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' })
               })
                 .then(res => res.json())
-                .then(data => {
+                .then(revealData => {
                   setGs((prev: GameState) => ({
                     ...prev,
                     playerGuesses: newGuesses,
                     phase: 'result',
                     result: 'lose',
-                    ratingDelta: delta,
+                    ratingDelta: loss.rating,
                     currentInput: [],
-                    opponentCode: data.opponentCode || []
+                    opponentCode: revealData.opponentCode || []
                   }));
-                  if (prev.gameMode !== 'ai') void syncResultStats(delta);
+                  void syncResultStats(loss.rating);
                 });
               return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false };
             }
@@ -1066,7 +1052,7 @@ export default function Home() {
         setIsSubmitting(false);
       }
     }
-  }, [gs, currentGameId, address, isSubmitting, updateBackendPoints, syncResultStats]);
+  }, [gs, currentGameId, address, isSubmitting, syncResultStats]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
@@ -1098,7 +1084,8 @@ export default function Home() {
     setResultStats(null);
     setCurrentGameId(null);
     setShareableJoinCode(null);
-  }, [gs.playerRating, gs.playerPoints, resultStats]);
+    if (address) void refreshUserStats();
+  }, [gs.playerRating, gs.playerPoints, resultStats, address, refreshUserStats]);
 
   const handlePlayAgain = useCallback(() => {
     if (gs.gameMode !== 'ai') return;

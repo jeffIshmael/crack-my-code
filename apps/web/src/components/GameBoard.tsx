@@ -75,17 +75,19 @@ export default function GameBoard({
     }
   }, [isAI, phase, isPlayerTurn, opponentCurrentInput.length, pendingOpponentTileClues]);
 
-  // Return to player view when it's the player's turn again
+  // Return to player view when it's the player's turn again (after AI finishes animating)
   useEffect(() => {
-    if (isPlayerTurn) {
-      if (isAI) {
-        setView('player');
-        return;
-      }
-      const timer = setTimeout(() => setView('player'), 2000);
+    if (!isPlayerTurn) return;
+
+    if (isAI) {
+      if (opponentCurrentInput.length > 0 || pendingOpponentTileClues !== null) return;
+      const timer = setTimeout(() => setView('player'), 900);
       return () => clearTimeout(timer);
     }
-  }, [isPlayerTurn, isAI]);
+
+    const timer = setTimeout(() => setView('player'), 2000);
+    return () => clearTimeout(timer);
+  }, [isPlayerTurn, isAI, opponentCurrentInput.length, pendingOpponentTileClues]);
 
   // Handle turn notification transitions
   useEffect(() => {
@@ -350,6 +352,39 @@ export default function GameBoard({
       {/* ── Divider ── */}
       <div className="mb-3 h-px w-full" style={{ background: 'var(--border-mid)' }} />
 
+      {/* ── Submit (always visible above input) ── */}
+      {isPlayerTurn && (
+        <motion.button
+          onClick={onSubmit}
+          disabled={!canSubmit || isSubmitting}
+          className="mb-3 w-full rounded-2xl py-3.5 font-ui text-sm font-black tracking-[0.18em] relative overflow-hidden"
+          style={{
+            background: canSubmit ? 'var(--accent)' : 'rgba(255,255,255,0.75)',
+            color: canSubmit ? '#fff' : 'var(--text-dim)',
+            border: `2px solid ${canSubmit ? 'var(--accent)' : 'var(--border-mid)'}`,
+            boxShadow: canSubmit ? '0 8px 20px rgba(47, 111, 214, 0.22)' : 'none',
+            cursor: canSubmit && !isSubmitting ? 'pointer' : 'not-allowed',
+          }}
+          whileTap={canSubmit && !isSubmitting ? { scale: 0.98 } : {}}
+          type="button"
+        >
+          {isSubmitting ? (
+            <span className="flex items-center justify-center gap-2">
+              <motion.div
+                className="h-4 w-4 rounded-full border-2 border-white/40 border-t-white"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
+              />
+              ANALYZING…
+            </span>
+          ) : canSubmit ? (
+            'SUBMIT GUESS →'
+          ) : (
+            `ENTER ${CODE_LENGTH - currentInput.length} MORE DIGIT${CODE_LENGTH - currentInput.length !== 1 ? 'S' : ''}`
+          )}
+        </motion.button>
+      )}
+
       {/* ── Current input display ── */}
       <div className="mb-3">
         <div className="mb-2 flex items-center justify-between">
@@ -417,81 +452,40 @@ export default function GameBoard({
       </div>
 
       {/* ── Number pad ── */}
-      <div className="mb-3 flex-1">
+      <div className="mb-4 flex-1">
         <NumberPad
           inputLength={currentInput.length}
           maxLength={CODE_LENGTH}
           disabled={!isPlayerTurn}
+          canSubmit={canSubmit}
+          isSubmitting={isSubmitting}
           onDigit={onDigitPress}
           onDelete={onDelete}
+          onSubmit={onSubmit}
         />
       </div>
 
-      {/* ── Submit button ── */}
-      <motion.button
-        onClick={onSubmit}
-        disabled={!canSubmit || isSubmitting}
-        className="mb-4 w-full rounded-[2rem] py-5 font-orbitron text-base font-black tracking-[0.25em] relative overflow-hidden"
-        style={{
-          background: canSubmit
-            ? 'var(--accent)'
-            : 'var(--clue-gray)',
-          color: canSubmit ? 'var(--bg-base)' : 'var(--text-dim)',
-          boxShadow: canSubmit ? '0 12px 32px rgba(37,99,235,0.2)' : 'none',
-          cursor: canSubmit && !isSubmitting ? 'pointer' : 'not-allowed',
-          transition: 'all 0.3s cubic-bezier(0.22, 1, 0.36, 1)',
-        }}
-        animate={canSubmit && !isSubmitting ? { boxShadow: ['0 10px 24px rgba(37,99,235,0.2)', '0 12px 40px rgba(37,99,235,0.4)', '0 10px 24px rgba(37,99,235,0.2)'] } : {}}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-        whileTap={canSubmit && !isSubmitting ? { scale: 0.97 } : {}}
-      >
-        {isSubmitting ? (
-          <div className="flex items-center justify-center gap-3">
-             <motion.div 
-               className="h-5 w-5 rounded-full border-2 border-[var(--bg-base)]/40 border-t-[var(--bg-base)]"
-               animate={{ rotate: 360 }}
-               transition={{ duration: 0.8, repeat: Infinity, ease: 'linear' }}
-             />
-             <span className="animate-pulse tracking-widest">ANALYZING...</span>
-          </div>
-        ) : aiReviewingPlayerGuess ? (
-          <span className="text-xs opacity-60 tracking-[0.15em]">CIPHER WAITING…</span>
-        ) : !isPlayerTurn && phase === 'playing' ? (
-          <span className="flex items-center justify-center gap-2 opacity-60">
-            {aiCrackedCode ? (
-              <span className="tracking-widest text-[var(--orange)]">CODE BREACHED</span>
-            ) : (
-              <>
-                <motion.span
-                  animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 1, repeat: Infinity }}
-                >
-                  ···
-                </motion.span>
-                {isAI && opponentCurrentInput.length >= CODE_LENGTH
-                  ? 'REVEALING GUESS'
-                  : isAI
-                  ? `${opponentName.toUpperCase()} GUESSING`
-                  : 'OPPONENT THINKING'}
-              </>
-            )}
-          </span>
-        ) : canSubmit ? (
-          'SUBMIT GUESS →'
-        ) : (
-          <span className="text-xs opacity-50 tracking-[0.2em]">ENTER {CODE_LENGTH - currentInput.length} MORE DIGIT{CODE_LENGTH - currentInput.length !== 1 ? 'S' : ''}</span>
-        )}
-
-        {/* Loading overlay effect */}
-        {isSubmitting && (
-           <motion.div 
-             className="absolute inset-0 bg-white/10"
-             initial={{ x: '-100%' }}
-             animate={{ x: '100%' }}
-             transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-           />
-        )}
-      </motion.button>
+      {/* ── Turn status (when not submitting) ── */}
+      {!isPlayerTurn && phase === 'playing' && (
+        <div
+          className="mb-4 w-full rounded-2xl py-3 text-center font-ui text-xs font-bold tracking-[0.14em]"
+          style={{
+            background: 'rgba(255, 255, 255, 0.75)',
+            border: '2px solid var(--border-mid)',
+            color: aiCrackedCode ? 'var(--orange)' : 'var(--text-dim)',
+          }}
+        >
+          {aiReviewingPlayerGuess
+            ? 'Review your hints above'
+            : aiCrackedCode
+            ? `${opponentName} cracked your code!`
+            : isAI && opponentCurrentInput.length > 0
+            ? `Watch ${opponentName}'s guess…`
+            : isAI
+            ? `${opponentName} is guessing…`
+            : 'Waiting for opponent…'}
+        </div>
+      )}
     </div>
   );
 }
