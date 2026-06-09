@@ -15,6 +15,7 @@ import ResultModal from '@/components/ResultModal';
 import { BottomNav, type NavTab } from '@/components/BottomNav';
 import { AboutHowToPlay } from '@/components/AboutHowToPlay';
 import { SettingsPanel } from '@/components/SettingsPanel';
+import { StatsPanel } from '@/components/StatsPanel';
 import {
   CODE_LENGTH,
   GAME_DURATION,
@@ -35,7 +36,7 @@ import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, Send, ArrowLeft, Activity, Users, Zap, BarChart2, ChevronRight } from 'lucide-react';
+import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, Send, ArrowLeft, ChevronRight } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -1551,36 +1552,7 @@ export default function Home() {
 
   const renderStats = () => (
     <motion.div key="stats" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
-      <div className="flex items-center gap-4 mb-4">
-        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
-          <ArrowLeft size={16} />
-        </button>
-        <div className="flex flex-col">
-          <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Stats</h2>
-          <div className="flex items-center gap-2">
-            <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse" />
-            <span className="text-[8px] font-black uppercase tracking-widest text-green-500">Live Data</span>
-          </div>
-        </div>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        {[
-          { label: "Daily Active Users", value: "1,245", icon: Users },
-          { label: "Monthly Active Users", value: "14,580", icon: Activity },
-          { label: "Total Transactions", value: "32,891", icon: Zap },
-          { label: "Total Volume", value: "$125,430", icon: Wallet },
-          { label: "D7 Retention", value: "48%", icon: BarChart2 },
-          { label: "Network Fees", value: "$4.20", icon: Zap },
-        ].map((stat, i) => (
-          <div key={i} className="flex flex-col gap-3 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-5 shadow-sm">
-            <div className="flex items-center gap-2">
-              <stat.icon size={12} className="text-[var(--accent)]" />
-              <span className="text-[8px] font-black uppercase tracking-widest text-black/40">{stat.label}</span>
-            </div>
-            <span className="font-orbitron text-lg font-black">{stat.value}</span>
-          </div>
-        ))}
-      </div>
+      <StatsPanel address={address} onBack={() => setActiveTab('wallet')} />
     </motion.div>
   );
 

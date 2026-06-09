@@ -23,6 +23,13 @@ const menuItems: {
   accent: string;
 }[] = [
   {
+    tab: 'stats',
+    emoji: '📊',
+    label: 'Stats',
+    subtitle: 'Your games and platform totals',
+    accent: 'bg-[#F3EEFF] text-[#9B7FD4]',
+  },
+  {
     tab: 'terms',
     emoji: '📜',
     label: 'Terms of Service',
