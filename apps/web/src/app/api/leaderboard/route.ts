@@ -1,17 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isGuestAddress, registeredPlayerWhere } from '@/lib/guest';
 
 async function getUserRank(address: string) {
+  if (isGuestAddress(address)) return null;
+
   const user = await prisma.user.findUnique({
     where: { address: address.toLowerCase() },
     select: { address: true, points: true, name: true, rating: true },
   });
 
-  if (!user?.address) return null;
+  if (!user?.address || isGuestAddress(user.address)) return null;
 
   const ahead = await prisma.user.count({
     where: {
-      address: { not: null },
+      ...registeredPlayerWhere,
       OR: [
         { points: { gt: user.points } },
         {
@@ -36,7 +39,7 @@ export async function GET(req: NextRequest) {
     const address = req.nextUrl.searchParams.get('address')?.toLowerCase();
 
     const users = await prisma.user.findMany({
-      where: { address: { not: null } },
+      where: registeredPlayerWhere,
       orderBy: [{ points: 'desc' }, { rating: 'desc' }],
       take: 50,
       select: {
@@ -50,7 +53,7 @@ export async function GET(req: NextRequest) {
     const seen = new Set<string>();
     const leaderboard = users
       .filter((user) => {
-        if (!user.address) return false;
+        if (!user.address || isGuestAddress(user.address)) return false;
         const key = user.address.toLowerCase();
         if (seen.has(key)) return false;
         seen.add(key);
@@ -65,7 +68,7 @@ export async function GET(req: NextRequest) {
       }));
 
     let viewer = null;
-    if (address) {
+    if (address && !isGuestAddress(address)) {
       const inList = leaderboard.find((e) => e.address.toLowerCase() === address);
       viewer = inList ?? (await getUserRank(address));
     }

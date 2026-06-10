@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
+import { isGuestAddress } from '@/lib/guest';
 
 export async function POST(req: NextRequest) {
   try {
@@ -7,6 +8,10 @@ export async function POST(req: NextRequest) {
 
     if (!address) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 });
+    }
+
+    if (isGuestAddress(address)) {
+      return NextResponse.json({ error: 'Guest accounts cannot earn CMC points' }, { status: 403 });
     }
 
     const normalizedAddress = address.toLowerCase();

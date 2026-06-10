@@ -7,18 +7,19 @@ import { evaluateGuess, toTileClues, MAX_GUESSES } from '@/lib/game';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
+import { isGuestAddress, isRegisteredPlayer } from '@/lib/guest';
 
 async function applyScoreDelta(
   address: string,
   deltas: { rating: number; points: number },
 ) {
-  if (!address || address === 'GUEST') return;
+  if (!isRegisteredPlayer(address)) return;
   if (deltas.rating === 0 && deltas.points === 0) return;
 
   const user = await prisma.user.findFirst({
     where: { address: { equals: address, mode: 'insensitive' } },
   });
-  if (!user) return;
+  if (!user || isGuestAddress(user.address)) return;
 
   await prisma.user.update({
     where: { id: user.id },
@@ -88,18 +89,13 @@ export async function POST(req: NextRequest) {
       const isAI = game.mode === 'ai';
       const deltas = scoreDeltaForMode(isAI ? 'ai' : (game.mode as 'fun' | 'cash'), true);
 
-      if (normalizedPlayerAddress !== 'GUEST') {
+      if (isRegisteredPlayer(normalizedPlayerAddress)) {
         await applyScoreDelta(normalizedPlayerAddress, deltas);
       }
 
       if (!isAI) {
         const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;
-        if (
-          opponentAddress &&
-          opponentAddress !== 'GUEST' &&
-          opponentAddress !== 'AI_BOT' &&
-          opponentAddress !== 'AI'
-        ) {
+        if (opponentAddress && isRegisteredPlayer(opponentAddress)) {
           const loss = scoreDeltaForMode(game.mode as 'fun' | 'cash', false);
           await applyScoreDelta(opponentAddress.toLowerCase(), loss);
         }
@@ -188,7 +184,7 @@ export async function POST(req: NextRequest) {
           winner = 'AI';
         } else {
           const opponentAddress = (isPlayer1 ? game.player2Address : game.player1Address)?.toLowerCase();
-          if (opponentAddress && opponentAddress !== 'GUEST') {
+          if (opponentAddress && isRegisteredPlayer(opponentAddress)) {
             const mode = game.mode as 'fun' | 'cash';
             await prisma.game.update({
               where: { id: gameId },
@@ -214,7 +210,7 @@ export async function POST(req: NextRequest) {
     }
 
     let playerStats: { points: number; rating: number } | null = null;
-    if (normalizedPlayerAddress !== 'GUEST' && (isWin || winner === 'AI' || (winner && winner !== normalizedPlayerAddress))) {
+    if (isRegisteredPlayer(normalizedPlayerAddress) && (isWin || winner === 'AI' || (winner && winner !== normalizedPlayerAddress))) {
       const updatedUser = await prisma.user.findFirst({
         where: {
           address: { equals: normalizedPlayerAddress, mode: 'insensitive' },

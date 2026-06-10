@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { startOfUtcDay } from '@/lib/stats';
+import { isGuestAddress, registeredPlayerWhere } from '@/lib/guest';
 
 export const dynamic = 'force-dynamic';
 
@@ -102,10 +103,7 @@ async function getGlobalStats() {
     playedToday,
   ] = await Promise.all([
     prisma.user.count({
-      where: {
-        address: { not: null },
-        NOT: { address: 'GUEST' },
-      },
+      where: registeredPlayerWhere,
     }),
     prisma.game.count({ where: { status: 'COMPLETED' } }),
     prisma.game.count({ where: { status: 'COMPLETED', mode: 'ai' } }),
@@ -144,6 +142,10 @@ export async function GET(req: NextRequest) {
     if (scope === 'me') {
       if (!address) {
         return NextResponse.json({ error: 'Address is required for my stats' }, { status: 400 });
+      }
+
+      if (isGuestAddress(address)) {
+        return NextResponse.json({ error: 'Sign in to track personal stats' }, { status: 400 });
       }
 
       const my = await getMyStats(address);

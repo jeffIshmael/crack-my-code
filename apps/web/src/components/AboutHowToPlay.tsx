@@ -131,9 +131,9 @@ export function AboutHowToPlay() {
         </h3>
         <div className="flex flex-col gap-3 font-body text-sm leading-relaxed text-[var(--text-2)]">
           <p>
-            <strong className="text-[var(--text)]">🤖 Cipher AI</strong> — Beat Cipher to earn{' '}
-            <strong className="text-[var(--text)]">+10 CMC</strong>. Losing to Cipher does not
-            reduce your points.
+            <strong className="text-[var(--text)]">🤖 Cipher AI</strong> — Play without signing in. Sign in to
+            earn <strong className="text-[var(--text)]">+10 CMC</strong> when you win; losses do not reduce your
+            points.
           </p>
           <p>
             <strong className="text-[var(--text)]">👥 Player vs Player</strong> — The winner gains{' '}

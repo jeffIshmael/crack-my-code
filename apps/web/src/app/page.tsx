@@ -50,6 +50,7 @@ const screenVariants = {
 
 import { pusherClient } from '@/lib/pusher-client';
 import { scoreDeltaForMode } from '@/lib/scoring';
+import { isRegisteredPlayer } from '@/lib/guest';
 
 export default function Home() {
   const searchParams = useSearchParams();
@@ -401,8 +402,19 @@ export default function Home() {
   }, [activeTab, address, gs.phase, refreshUserStats]);
 
   const syncResultStats = useCallback(
-    async (ratingDelta: number, serverStats?: { points: number; rating: number } | null) => {
+    async (pointsDelta: number, serverStats?: { points: number; rating: number } | null) => {
       const before = matchStartStatsRef.current;
+
+      if (!address) {
+        setResultStats({
+          pointsBefore: before.points,
+          pointsAfter: before.points,
+          rating: before.rating,
+          loading: false,
+        });
+        return;
+      }
+
       setResultStats({
         pointsBefore: before.points,
         pointsAfter: before.points,
@@ -411,8 +423,8 @@ export default function Home() {
       });
 
       const stats = serverStats ?? (await refreshUserStats());
-      const afterPoints = stats?.points ?? before.points + ratingDelta;
-      const afterRating = stats?.rating ?? before.rating + ratingDelta;
+      const afterPoints = stats?.points ?? before.points + pointsDelta;
+      const afterRating = stats?.rating ?? before.rating + pointsDelta;
 
       setResultStats({
         pointsBefore: before.points,
@@ -429,7 +441,7 @@ export default function Home() {
         }));
       }
     },
-    [refreshUserStats]
+    [refreshUserStats, address]
   );
 
   // ─── Real-time Gameplay Logic ───────────────────────────────────────────
@@ -469,11 +481,13 @@ export default function Home() {
                 opponentGuesses: newGuesses,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: loss.points,
+                ratingDelta: isRegisteredPlayer(address) ? loss.points : 0,
                 opponentCurrentInput: [],
                 opponentCode: revealData.opponentCode || []
               }));
-              void syncResultStats(loss.points);
+              if (isRegisteredPlayer(address)) {
+                void syncResultStats(loss.points);
+              }
             });
 
           return {
@@ -584,7 +598,7 @@ export default function Home() {
                 ...prev,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: loss.points,
+                ratingDelta: isRegisteredPlayer(address) ? loss.points : 0,
                 opponentGuesses: [...prev.opponentGuesses, entry],
                 opponentGuessCount: prev.opponentGuessCount + 1,
                 opponentCurrentInput: [],
@@ -597,7 +611,11 @@ export default function Home() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
               })
-                .then(() => syncResultStats(loss.points))
+                .then(() => {
+                  if (isRegisteredPlayer(address)) {
+                    void syncResultStats(loss.points);
+                  }
+                })
                 .catch((err) => console.error('AI reveal sync failed', err))
                 .finally(() => {
                   aiTurnRunningRef.current = false;
@@ -1000,14 +1018,16 @@ export default function Home() {
             if (isWinningClues(clues)) {
               clearOppTimer();
               const win = scoreDeltaForMode(gs.gameMode === 'ai' ? 'ai' : gs.gameMode, true);
-              void syncResultStats(win.points, data.playerStats ?? null);
+              if (isRegisteredPlayer(address)) {
+                void syncResultStats(win.points, data.playerStats ?? null);
+              }
 
               return {
                 ...prev,
                 playerGuesses: newGuesses,
                 phase: 'result',
                 result: 'win',
-                ratingDelta: win.points,
+                ratingDelta: isRegisteredPlayer(address) ? win.points : 0,
                 currentInput: [],
                 opponentCode: data.opponentCode // Revealed by server
               };
@@ -1029,11 +1049,11 @@ export default function Home() {
                     playerGuesses: newGuesses,
                     phase: 'result',
                     result: 'lose',
-                    ratingDelta: loss.points,
+                    ratingDelta: isRegisteredPlayer(address) ? loss.points : 0,
                     currentInput: [],
                     opponentCode: revealData.opponentCode || []
                   }));
-                  void syncResultStats(loss.points);
+                  void syncResultStats(isRegisteredPlayer(address) ? loss.points : 0);
                 });
               return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false };
             }
