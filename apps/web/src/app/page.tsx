@@ -71,6 +71,7 @@ export default function Home() {
     token: USDT_ADDRESS as `0x${string}`,
   });
   const [gs, setGs] = useState(() => initialGameState());
+  const [playerStatsLoaded, setPlayerStatsLoaded] = useState(false);
   const gsRef = useRef(gs);
   useEffect(() => { gsRef.current = gs; }, [gs]);
 
@@ -267,32 +268,6 @@ export default function Home() {
     if (activeTab === 'games' && address) fetchMyActive();
   }, [activeTab, address, fetchMyActive]);
 
-  // 1.5 User Registration / Fetch Rating
-  useEffect(() => {
-    if (authenticated && address) {
-      const register = async () => {
-        try {
-          const res = await fetch('/api/users/register', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ address })
-          });
-          const data = await res.json();
-          if (data.rating !== undefined && data.points !== undefined) {
-            setGs(prev => ({
-              ...prev,
-              playerRating: data.rating,
-              playerPoints: data.points
-            }));
-          }
-        } catch (err) {
-          console.error('Registration failed', err);
-        }
-      };
-      register();
-    }
-  }, [authenticated, address]);
-
   useEffect(() => {
     let interval: NodeJS.Timeout;
     if (gs.phase === 'matchmaking') {
@@ -336,7 +311,7 @@ export default function Home() {
   const snappedMatchStatsRef = useRef(false);
   // Snapshot CMC points once when a match starts (for accurate result modal)
   useEffect(() => {
-    if (gs.phase === 'playing' && !snappedMatchStatsRef.current) {
+    if (gs.phase === 'playing' && !snappedMatchStatsRef.current && playerStatsLoaded) {
       matchStartStatsRef.current = {
         points: gs.playerPoints,
         rating: gs.playerRating,
@@ -346,7 +321,7 @@ export default function Home() {
     if (gs.phase !== 'playing' && gs.phase !== 'result') {
       snappedMatchStatsRef.current = false;
     }
-  }, [gs.phase, gs.playerPoints, gs.playerRating]);
+  }, [gs.phase, gs.playerPoints, gs.playerRating, playerStatsLoaded]);
 
   // 1.8 Countdown Timer
   useEffect(() => {
@@ -394,6 +369,24 @@ export default function Home() {
     }
     return null;
   }, [address]);
+
+  useEffect(() => {
+    if (!address) {
+      setPlayerStatsLoaded(false);
+      return;
+    }
+
+    let cancelled = false;
+    setPlayerStatsLoaded(false);
+
+    refreshUserStats().finally(() => {
+      if (!cancelled) setPlayerStatsLoaded(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [address, refreshUserStats]);
 
   useEffect(() => {
     if ((activeTab === 'home' || activeTab === 'wallet') && address && gs.phase === 'lobby') {
@@ -1305,12 +1298,15 @@ export default function Home() {
     }
   }, [address, cancelChallenge, fetchMyActive]);
 
+  const pointsLoading = !!address && !playerStatsLoaded;
+
   const renderHomeContent = () => {
     return gs.phase === 'lobby' || gs.phase === 'matchmaking' ? (
       <motion.div key="lobby" className="w-full relative flex flex-col gap-4" {...screenVariants}>
         <Lobby
           rating={gs.playerRating}
           points={gs.playerPoints}
+          pointsLoading={pointsLoading}
           isMatchmaking={gs.phase === 'matchmaking'}
           opponentName={gs.opponentName}
           onFindMatch={handleFindMatch}
@@ -1399,6 +1395,7 @@ export default function Home() {
           opponentName={gs.opponentName}
           playerRating={gs.playerRating}
           playerPoints={gs.playerPoints}
+          pointsLoading={pointsLoading}
           isSubmitting={isSubmitting}
           onDigitPress={handleDigitPress}
           onDelete={handleDeleteDigit}
@@ -1532,6 +1529,7 @@ export default function Home() {
       <SettingsPanel
         address={address}
         points={gs.playerPoints}
+        pointsLoading={pointsLoading}
         usdtFormatted={usdtData?.formatted}
         copied={copied}
         onLogin={() => login()}

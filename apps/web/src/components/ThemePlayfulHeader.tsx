@@ -4,10 +4,11 @@ import Image from 'next/image';
 
 interface ThemePlayfulHeaderProps {
   points: number;
+  pointsLoading?: boolean;
   usdtFormatted?: string;
 }
 
-export function ThemePlayfulHeader({ points, usdtFormatted }: ThemePlayfulHeaderProps) {
+export function ThemePlayfulHeader({ points, pointsLoading = false, usdtFormatted }: ThemePlayfulHeaderProps) {
   const usdtValue =
     usdtFormatted && parseFloat(usdtFormatted) > 0
       ? parseFloat(usdtFormatted).toFixed(2)
@@ -20,7 +21,7 @@ export function ThemePlayfulHeader({ points, usdtFormatted }: ThemePlayfulHeader
           CMC
         </span>
         <span className="font-ui theme-playful-header__points">
-          {points.toLocaleString()}
+          {pointsLoading ? '---' : points.toLocaleString()}
         </span>
       </div>
       <div className="theme-playful-header__usdt font-body">

@@ -8,6 +8,7 @@ import type { NavTab } from '@/components/BottomNav';
 interface SettingsPanelProps {
   address?: string;
   points: number;
+  pointsLoading?: boolean;
   usdtFormatted?: string;
   copied: boolean;
   onLogin: () => void;
@@ -55,6 +56,7 @@ const menuItems: {
 export function SettingsPanel({
   address,
   points,
+  pointsLoading = false,
   usdtFormatted,
   copied,
   onLogin,
@@ -106,7 +108,9 @@ export function SettingsPanel({
             <span className="theme-playful-coin font-ui" aria-hidden>CMC</span>
             <span className="font-body text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Points</span>
           </div>
-          <span className="font-ui text-2xl font-bold text-[var(--text)]">{points.toLocaleString()}</span>
+          <span className="font-ui text-2xl font-bold text-[var(--text)]">
+            {pointsLoading ? '---' : points.toLocaleString()}
+          </span>
         </div>
       </div>
 

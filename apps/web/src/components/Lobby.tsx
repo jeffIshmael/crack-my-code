@@ -19,6 +19,7 @@ import JoinChallenge from '@/components/JoinChallenge';
 interface LobbyProps {
   rating: number;
   points: number;
+  pointsLoading?: boolean;
   isMatchmaking: boolean;
   opponentName: string;
   onFindMatch: (mode: GameMode, stake: number, isPublic?: boolean, userBalance?: number) => Promise<void>;
@@ -44,6 +45,7 @@ const fadeUp = {
 export default function Lobby({
   rating,
   points,
+  pointsLoading = false,
   isMatchmaking,
   opponentName,
   onFindMatch,
@@ -179,6 +181,7 @@ export default function Lobby({
         {isConnected ? (
           <ThemePlayfulHeader
             points={points}
+            pointsLoading={pointsLoading}
             usdtFormatted={usdtData?.formatted}
           />
         ) : (
