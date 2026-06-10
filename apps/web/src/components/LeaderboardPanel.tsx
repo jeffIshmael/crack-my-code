@@ -22,7 +22,7 @@ const PODIUM_EMOJI: Record<1 | 2 | 3, string> = {
 };
 
 function formatAddress(address: string) {
-  return `${address.slice(0, 8)}…${address.slice(-6)}`;
+  return `${address.slice(0, 4)} ... ${address.slice(-6)}`;
 }
 
 function displayName(entry: LeaderboardEntry, isYou = false) {
@@ -197,7 +197,7 @@ export function LeaderboardPanel({ currentAddress }: LeaderboardPanelProps) {
         <div className="leaderboard-header__top">
           <div className="leaderboard-header__titles">
             <h2 className="leaderboard-header__title">Leaderboard</h2>
-            <p className="leaderboard-header__subtitle">Top players by CMC points</p>
+            <p className="leaderboard-header__subtitle">Top 10 players by CMC points</p>
           </div>
         </div>
       </div>
