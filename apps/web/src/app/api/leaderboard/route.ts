@@ -47,13 +47,22 @@ export async function GET(req: NextRequest) {
       },
     });
 
-    const leaderboard = users.map((user, index) => ({
-      rank: index + 1,
-      address: user.address!,
-      name: user.name,
-      points: user.points,
-      rating: user.rating,
-    }));
+    const seen = new Set<string>();
+    const leaderboard = users
+      .filter((user) => {
+        if (!user.address) return false;
+        const key = user.address.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      })
+      .map((user, index) => ({
+        rank: index + 1,
+        address: user.address!.toLowerCase(),
+        name: user.name,
+        points: user.points,
+        rating: user.rating,
+      }));
 
     let viewer = null;
     if (address) {

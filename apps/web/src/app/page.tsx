@@ -1368,7 +1368,7 @@ export default function Home() {
         </AnimatePresence>
       </motion.div>
     ) : (gs.phase === 'playing' || gs.phase === 'result' || gs.phase === 'countdown') ? (
-      <motion.div key="game" className="w-full h-full pb-10" {...screenVariants}>
+      <motion.div key="game" className="h-dvh w-full overflow-hidden" {...screenVariants}>
         <GameBoard
           playerGuesses={gs.playerGuesses}
           opponentGuesses={gs.opponentGuesses}
@@ -1438,7 +1438,7 @@ export default function Home() {
   };
 
   const renderOpenGames = () => (
-    <motion.div key="games" className="flex w-full flex-col gap-6 px-5 pt-12 pb-48 text-left" {...screenVariants}>
+    <motion.div key="games" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       {!address ? (
         <div className="theme-card flex flex-col items-center justify-center gap-4 py-16 text-center">
           <span className="text-4xl" aria-hidden>🛡️</span>
@@ -1496,19 +1496,19 @@ export default function Home() {
   );
 
   const renderLeaderboard = () => (
-    <motion.div key="leaderboard" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32" {...screenVariants}>
+    <motion.div key="leaderboard" className="page-tab flex w-full flex-col gap-4 px-5" {...screenVariants}>
       <LeaderboardPanel currentAddress={address} />
     </motion.div>
   );
 
   const renderAbout = () => (
-    <motion.div key="about" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32" {...screenVariants}>
+    <motion.div key="about" className="page-tab flex w-full flex-col gap-6 px-5" {...screenVariants}>
       <AboutHowToPlay />
     </motion.div>
   );
 
   const renderWalletContent = () => (
-    <motion.div key="wallet" className="flex w-full flex-col gap-5 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+    <motion.div key="wallet" className="page-tab flex w-full flex-col gap-5 px-5 text-left" {...screenVariants}>
       <SettingsPanel
         address={address}
         points={gs.playerPoints}
@@ -1538,13 +1538,13 @@ export default function Home() {
   );
 
   const renderStats = () => (
-    <motion.div key="stats" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+    <motion.div key="stats" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       <StatsPanel address={address} onBack={() => setActiveTab('wallet')} />
     </motion.div>
   );
 
   const renderTerms = () => (
-    <motion.div key="terms" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+    <motion.div key="terms" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
         <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
           <ArrowLeft size={16} />
@@ -1574,7 +1574,7 @@ export default function Home() {
   );
 
   const renderPrivacy = () => (
-    <motion.div key="privacy" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+    <motion.div key="privacy" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
         <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
           <ArrowLeft size={16} />
@@ -1600,7 +1600,7 @@ export default function Home() {
   );
 
   const renderContact = () => (
-    <motion.div key="contact" className="flex w-full flex-col gap-6 px-5 pt-12 pb-32 text-left" {...screenVariants}>
+    <motion.div key="contact" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
         <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
           <ArrowLeft size={16} />

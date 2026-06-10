@@ -32,13 +32,12 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-1/2 -translate-x-1/2 w-full max-w-[440px] z-[100] flex justify-center px-4 pb-8 pointer-events-none">
+    <div className="fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[440px] -translate-x-1/2 justify-center px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pointer-events-none">
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        className="theme-bottom-nav pointer-events-auto flex items-center justify-between px-2 py-3 backdrop-blur-xl"
-        style={{ width: '100%', maxWidth: '380px' }}
+        className="theme-bottom-nav pointer-events-auto flex w-full max-w-[400px] items-center justify-between px-2 py-2.5 backdrop-blur-xl"
       >
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;

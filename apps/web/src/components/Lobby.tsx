@@ -166,13 +166,13 @@ export default function Lobby({
   };
 
   return (
-    <div className="relative flex h-dvh flex-col items-center justify-between px-5 pt-8 pb-32 text-[var(--text)] overflow-hidden">
+    <div className="relative flex h-dvh flex-col items-center justify-between px-4 pt-6 pb-[calc(var(--nav-clearance)+env(safe-area-inset-bottom,0px))] text-[var(--text)] overflow-hidden">
 
       {/* ── Top row with Sign Up ── */}
       {/* ── Top Header Row ── */}
       {/* ── Top Header Section ── */}
-      <div className="flex w-full flex-col px-2">
-        <div className="mb-6 flex w-full justify-center">
+      <div className="flex w-full flex-col">
+        <div className="mb-5 flex w-full justify-center">
           <ThemeLogo />
         </div>
 
@@ -182,20 +182,21 @@ export default function Lobby({
             usdtFormatted={usdtData?.formatted}
           />
         ) : (
-          <div className="mt-2 flex w-full justify-center">
+          <div className="mt-1 flex w-full justify-center">
             <button
               onClick={() => login()}
               className="theme-card flex items-center gap-2 px-6 py-2 transition-transform hover:scale-105"
+              type="button"
             >
-              <span className="font-ui text-[10px] uppercase tracking-widest text-[var(--text)]">Connect Wallet</span>
+              <span className="font-ui text-[10px] uppercase tracking-widest text-[var(--text)]">Sign In</span>
             </button>
           </div>
         )}
       </div>
 
       {/* ── Center: Play actions ── */}
-      <div className="flex flex-1 w-full flex-col items-center justify-center py-2 relative">
-        <div className="z-10 flex w-full flex-col px-5">
+      <div className="relative flex w-full flex-1 flex-col items-center justify-center py-2">
+        <div className="z-10 flex w-full flex-col">
           {isMatchmaking ? (
             <div className="w-full">
               {opponentName === 'WAITING' ? (

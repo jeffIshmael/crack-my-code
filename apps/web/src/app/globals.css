@@ -33,7 +33,7 @@
   --clue-yellow-dim: rgba(255, 159, 67, 0.4);
   --clue-green-text: #FFFFFF;
   --clue-yellow-text: #FFFFFF;
-  --shell-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  --nav-clearance: 6.75rem;
   --shell-outer-bg: #2D3748;
   --font-display: 'Fredoka', sans-serif;
   --font-ui: 'Fredoka', sans-serif;
@@ -259,6 +259,12 @@ html, body {
   flex-direction: column;
   gap: 1.25rem;
   width: 100%;
+  max-width: none;
+}
+
+.page-tab {
+  padding-top: 1.25rem;
+  padding-bottom: calc(var(--nav-clearance) + env(safe-area-inset-bottom, 0px));
 }
 
 .theme-game-btn__inner {

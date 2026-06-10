@@ -49,7 +49,7 @@ export default function NumberPad({
         <motion.button
           onClick={onDelete}
           disabled={disabled || inputLength === 0}
-          className="flex h-14 flex-1 items-center justify-center rounded-xl transition-opacity"
+          className="flex h-12 flex-1 items-center justify-center rounded-xl transition-opacity"
           style={{
             background: 'var(--bg-elevated)',
             border: '1px solid var(--border-mid)',
@@ -72,7 +72,7 @@ export default function NumberPad({
         <motion.button
           onClick={() => canSubmit && !isSubmitting && onSubmit?.()}
           disabled={!canSubmit || isSubmitting || disabled}
-          className="flex h-14 flex-1 items-center justify-center rounded-xl font-ui text-sm font-black tracking-wider transition-opacity"
+          className="flex h-12 flex-1 items-center justify-center rounded-xl font-ui text-sm font-black tracking-wider transition-opacity"
           style={{
             background: canSubmit && !isSubmitting ? 'var(--accent)' : 'var(--bg-elevated)',
             border: `2px solid ${canSubmit && !isSubmitting ? 'var(--accent)' : 'var(--border-mid)'}`,
@@ -113,7 +113,7 @@ function DigitButton({ digit, disabled, onPress }: DigitButtonProps) {
     <motion.button
       onClick={() => !disabled && onPress(digit)}
       disabled={disabled}
-      className="relative flex h-14 flex-1 items-center justify-center rounded-xl font-code text-xl font-bold select-none"
+      className="relative flex h-12 flex-1 items-center justify-center rounded-xl font-code text-lg font-bold select-none"
       style={{
         background: 'var(--bg-elevated)',
         border: '1px solid var(--border-mid)',

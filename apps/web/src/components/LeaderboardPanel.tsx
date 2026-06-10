@@ -22,12 +22,12 @@ const PODIUM_EMOJI: Record<1 | 2 | 3, string> = {
 };
 
 function formatAddress(address: string) {
-  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+  return `${address.slice(0, 8)}…${address.slice(-6)}`;
 }
 
 function displayName(entry: LeaderboardEntry, isYou = false) {
   if (isYou) return 'You';
-  return entry.name || formatAddress(entry.address);
+  return formatAddress(entry.address);
 }
 
 function PodiumCard({
@@ -97,7 +97,7 @@ function YourRankBanner({
   if (!currentAddress) {
     return (
       <div className="leaderboard-your-rank leaderboard-your-rank--muted">
-        <span className="leaderboard-your-rank__hint">Connect your wallet to see your rank</span>
+        <span className="leaderboard-your-rank__hint">Sign in to see your rank</span>
       </div>
     );
   }
@@ -176,11 +176,16 @@ export function LeaderboardPanel({ currentAddress }: LeaderboardPanelProps) {
   const isYou = (address: string) =>
     !!currentAddress && address.toLowerCase() === currentAddress.toLowerCase();
 
-  const first = entries.find((e) => e.rank === 1);
-  const second = entries.find((e) => e.rank === 2);
-  const third = entries.find((e) => e.rank === 3);
+  const dedupedEntries = entries.filter(
+    (entry, index, arr) =>
+      arr.findIndex((e) => e.address.toLowerCase() === entry.address.toLowerCase()) === index,
+  );
 
-  const ranksFourToTen = entries.filter((e) => e.rank >= 4 && e.rank <= 10);
+  const first = dedupedEntries.find((e) => e.rank === 1);
+  const second = dedupedEntries.find((e) => e.rank === 2);
+  const third = dedupedEntries.find((e) => e.rank === 3);
+
+  const ranksFourToTen = dedupedEntries.filter((e) => e.rank >= 4 && e.rank <= 10);
   const viewerInTopTen = viewer != null && viewer.rank <= 10;
   const showViewerPinned = viewer != null && !viewerInTopTen;
 
@@ -236,7 +241,7 @@ export function LeaderboardPanel({ currentAddress }: LeaderboardPanelProps) {
           {showListPanel && (
             <div className="leaderboard-panel-card">
               {ranksFourToTen.map((entry, index) => (
-                <div key={entry.address}>
+                <div key={`${entry.rank}-${entry.address}`}>
                   {index > 0 && <div className="leaderboard-row-divider" aria-hidden />}
                   <ListRow entry={entry} isYou={isYou(entry.address)} />
                 </div>
