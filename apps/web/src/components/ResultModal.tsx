@@ -232,7 +232,7 @@ export default function ResultModal({
                 {statsLoading ? '…' : pointsBefore}
               </span>
             </div>
-            {gameMode !== 'ai' && ratingDelta !== 0 && (
+            {ratingDelta !== 0 && (
               <motion.div
                 className="flex items-center gap-1 rounded-lg px-3 py-1.5 font-orbitron text-lg font-bold"
                 style={{

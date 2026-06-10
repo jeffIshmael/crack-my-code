@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
-import { SCORE } from '@/lib/scoring';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,34 +25,11 @@ export async function POST(req: NextRequest) {
     // Allow revealing if game is COMPLETED OR if it's an ACTIVE AI game
     if (game.status !== 'COMPLETED') {
       if (game.mode === 'ai' && game.status === 'ACTIVE') {
-        // AI won, mark game as COMPLETED
+        // AI won — mark complete; no CMC penalty for the player
         await prisma.game.update({
           where: { id: gameId },
-          data: { status: 'COMPLETED', winnerAddress: 'AI' }
+          data: { status: 'COMPLETED', winnerAddress: 'AI' },
         });
-
-        // Update player points (-5 for AI loss)
-        if (normalizedAddress !== 'GUEST') {
-          const user = await prisma.user.findFirst({
-            where: {
-              address: {
-                equals: normalizedAddress,
-                mode: 'insensitive'
-              }
-            }
-          });
-          if (user) {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: {
-                rating: { decrement: Math.abs(SCORE.ai.loss.rating) },
-                points: { decrement: Math.abs(SCORE.ai.loss.points) },
-              },
-            });
-          } else {
-            console.warn(`[Reveal] User not found for rating update: ${normalizedAddress}`);
-          }
-        }
 
         // --- ON-CHAIN: Track Game On-Chain (background) ---
         void trackGameOnChain(0, true).catch((trackErr) => {

@@ -469,11 +469,11 @@ export default function Home() {
                 opponentGuesses: newGuesses,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: loss.rating,
+                ratingDelta: loss.points,
                 opponentCurrentInput: [],
                 opponentCode: revealData.opponentCode || []
               }));
-              void syncResultStats(loss.rating);
+              void syncResultStats(loss.points);
             });
 
           return {
@@ -584,7 +584,7 @@ export default function Home() {
                 ...prev,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: loss.rating,
+                ratingDelta: loss.points,
                 opponentGuesses: [...prev.opponentGuesses, entry],
                 opponentGuessCount: prev.opponentGuessCount + 1,
                 opponentCurrentInput: [],
@@ -597,7 +597,7 @@ export default function Home() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
               })
-                .then(() => syncResultStats(loss.rating))
+                .then(() => syncResultStats(loss.points))
                 .catch((err) => console.error('AI reveal sync failed', err))
                 .finally(() => {
                   aiTurnRunningRef.current = false;
@@ -1000,14 +1000,14 @@ export default function Home() {
             if (isWinningClues(clues)) {
               clearOppTimer();
               const win = scoreDeltaForMode(gs.gameMode === 'ai' ? 'ai' : gs.gameMode, true);
-              void syncResultStats(win.rating, data.playerStats ?? null);
+              void syncResultStats(win.points, data.playerStats ?? null);
 
               return {
                 ...prev,
                 playerGuesses: newGuesses,
                 phase: 'result',
                 result: 'win',
-                ratingDelta: win.rating,
+                ratingDelta: win.points,
                 currentInput: [],
                 opponentCode: data.opponentCode // Revealed by server
               };
@@ -1029,11 +1029,11 @@ export default function Home() {
                     playerGuesses: newGuesses,
                     phase: 'result',
                     result: 'lose',
-                    ratingDelta: loss.rating,
+                    ratingDelta: loss.points,
                     currentInput: [],
                     opponentCode: revealData.opponentCode || []
                   }));
-                  void syncResultStats(loss.rating);
+                  void syncResultStats(loss.points);
                 });
               return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false };
             }

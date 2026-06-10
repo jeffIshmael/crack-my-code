@@ -125,10 +125,27 @@ export function AboutHowToPlay() {
         </div>
       </div>
 
+      <div className="flex flex-col gap-4">
+        <h3 className="font-ui text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-dim)]">
+          Earning CMC Points
+        </h3>
+        <div className="flex flex-col gap-3 font-body text-sm leading-relaxed text-[var(--text-2)]">
+          <p>
+            <strong className="text-[var(--text)]">🤖 Cipher AI</strong> — Beat Cipher to earn{' '}
+            <strong className="text-[var(--text)]">+10 CMC</strong>. Losing to Cipher does not
+            reduce your points.
+          </p>
+          <p>
+            <strong className="text-[var(--text)]">👥 Player vs Player</strong> — The winner gains{' '}
+            <strong className="text-[var(--text)]">+15 CMC</strong> and the loser loses{' '}
+            <strong className="text-[var(--text)]">15 CMC</strong> (points move from loser to winner).
+          </p>
+        </div>
+      </div>
+
       <div className="rounded-2xl bg-[#D6EEF9]/80 px-4 py-4">
         <p className="font-body text-sm leading-relaxed text-[var(--text-2)]">
-          🏆 Win matches to earn <strong className="text-[var(--text)]">CMC points</strong> and
-          climb the leaderboard!
+          🏆 Stack CMC points to climb the leaderboard!
         </p>
       </div>
     </div>

@@ -3,10 +3,31 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
-import { evaluateGuess, toTileClues } from '@/lib/game';
+import { evaluateGuess, toTileClues, MAX_GUESSES } from '@/lib/game';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
+
+async function applyScoreDelta(
+  address: string,
+  deltas: { rating: number; points: number },
+) {
+  if (!address || address === 'GUEST') return;
+  if (deltas.rating === 0 && deltas.points === 0) return;
+
+  const user = await prisma.user.findFirst({
+    where: { address: { equals: address, mode: 'insensitive' } },
+  });
+  if (!user) return;
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      rating: Math.max(0, (user.rating || 1000) + deltas.rating),
+      points: Math.max(0, (user.points || 1000) + deltas.points),
+    },
+  });
+}
 
 export async function POST(req: NextRequest) {
   try {
@@ -68,22 +89,7 @@ export async function POST(req: NextRequest) {
       const deltas = scoreDeltaForMode(isAI ? 'ai' : (game.mode as 'fun' | 'cash'), true);
 
       if (normalizedPlayerAddress !== 'GUEST') {
-        const winnerUser = await prisma.user.findFirst({
-          where: {
-            address: { equals: normalizedPlayerAddress, mode: 'insensitive' },
-          },
-        });
-        if (winnerUser) {
-          await prisma.user.update({
-            where: { id: winnerUser.id },
-            data: {
-              rating: { increment: deltas.rating },
-              points: { increment: deltas.points },
-            },
-          });
-        } else {
-          console.warn(`[Submit Guess] Player user not found for address: ${normalizedPlayerAddress}`);
-        }
+        await applyScoreDelta(normalizedPlayerAddress, deltas);
       }
 
       if (!isAI) {
@@ -94,22 +100,8 @@ export async function POST(req: NextRequest) {
           opponentAddress !== 'AI_BOT' &&
           opponentAddress !== 'AI'
         ) {
-          const opponentUser = await prisma.user.findFirst({
-            where: {
-              address: { equals: opponentAddress, mode: 'insensitive' },
-            },
-          });
-          if (opponentUser) {
-            const loss = scoreDeltaForMode(game.mode as 'fun' | 'cash', false);
-            const newRating = Math.max(0, (opponentUser.rating || 1000) + loss.rating);
-            const newPoints = Math.max(0, (opponentUser.points || 1000) + loss.points);
-            await prisma.user.update({
-              where: { id: opponentUser.id },
-              data: { rating: newRating, points: newPoints },
-            });
-          } else {
-            console.warn(`[Submit Guess] Opponent user not found for address: ${opponentAddress}`);
-          }
+          const loss = scoreDeltaForMode(game.mode as 'fun' | 'cash', false);
+          await applyScoreDelta(opponentAddress.toLowerCase(), loss);
         }
       }
 
@@ -179,6 +171,35 @@ export async function POST(req: NextRequest) {
           console.error('[Pusher] opponent-guess failed:', pusherErr);
         }
       })();
+    } else {
+      const playerGuessCount = await prisma.guess.count({
+        where: { gameId, isPlayer: isPlayer1 },
+      });
+
+      if (playerGuessCount >= MAX_GUESSES && game.status === 'ACTIVE') {
+        const isAI = game.mode === 'ai';
+        revealCode = opponentCode;
+
+        if (isAI) {
+          await prisma.game.update({
+            where: { id: gameId },
+            data: { status: 'COMPLETED', winnerAddress: 'AI' },
+          });
+          winner = 'AI';
+        } else {
+          const opponentAddress = (isPlayer1 ? game.player2Address : game.player1Address)?.toLowerCase();
+          if (opponentAddress && opponentAddress !== 'GUEST') {
+            const mode = game.mode as 'fun' | 'cash';
+            await prisma.game.update({
+              where: { id: gameId },
+              data: { status: 'COMPLETED', winnerAddress: opponentAddress },
+            });
+            winner = opponentAddress;
+            await applyScoreDelta(opponentAddress, scoreDeltaForMode(mode, true));
+            await applyScoreDelta(normalizedPlayerAddress, scoreDeltaForMode(mode, false));
+          }
+        }
+      }
     }
 
     if (!isWin) {
@@ -193,7 +214,7 @@ export async function POST(req: NextRequest) {
     }
 
     let playerStats: { points: number; rating: number } | null = null;
-    if (isWin && normalizedPlayerAddress !== 'GUEST') {
+    if (normalizedPlayerAddress !== 'GUEST' && (isWin || winner === 'AI' || (winner && winner !== normalizedPlayerAddress))) {
       const updatedUser = await prisma.user.findFirst({
         where: {
           address: { equals: normalizedPlayerAddress, mode: 'insensitive' },
