@@ -49,8 +49,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
         clientId={clientId}
         config={{
           appearance: {
-            theme: 'dark',
-            accentColor: '#00CFFF',
+            theme: 'light',
+            accentColor: '#2F6FD6',
             showWalletLoginFirst: false,
           },
           embeddedWallets: {

@@ -42,11 +42,6 @@ export default function OpenChallengesList({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex items-center gap-2 mb-1">
-        <span className="text-xl" aria-hidden>📋</span>
-        <h3 className="font-ui text-sm font-bold text-[var(--text)]">My Open Challenges</h3>
-      </div>
-
       {myActiveGames.map((game) => (
         <motion.div
           key={game.id}

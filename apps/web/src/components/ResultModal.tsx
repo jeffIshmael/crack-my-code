@@ -20,6 +20,11 @@ interface ResultModalProps {
   statsLoading?: boolean;
   onPlayAgain: () => void;
   onHome: () => void;
+  /** PvP rematch (non-AI modes only) */
+  rematchStatus?: 'idle' | 'waiting' | 'opponent_wants';
+  onRematch?: () => void;
+  onDeclineRematch?: () => void;
+  rematchLoading?: boolean;
 }
 
 const CONFETTI_COLORS = ['#00CFFF', '#10B981', '#F59E0B', '#FF6B2B', '#A78BFA'];
@@ -38,6 +43,10 @@ export default function ResultModal({
   statsLoading = false,
   onPlayAgain,
   onHome,
+  rematchStatus = 'idle',
+  onRematch,
+  onDeclineRematch,
+  rematchLoading = false,
 }: ResultModalProps) {
   const isWin = result === 'win';
   const prizePool = stakeAmount * 2;
@@ -300,6 +309,76 @@ export default function ResultModal({
               <div className="absolute inset-0 bg-white/10 opacity-0 transition-opacity group-hover:opacity-100" />
               <span className="relative z-10">PLAY AGAIN</span>
             </motion.button>
+          )}
+
+          {gameMode !== 'ai' && onRematch && (
+            <motion.div
+              className="flex w-full flex-col gap-3"
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.75 }}
+            >
+              {rematchStatus === 'opponent_wants' ? (
+                <>
+                  <p className="text-center font-body text-sm text-[var(--text-2)]">
+                    <span className="font-bold text-[var(--accent)]">{opponentName}</span> wants a rematch!
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onRematch}
+                    disabled={rematchLoading}
+                    className="theme-game-btn theme-game-btn--pvp w-full min-h-0 py-4 disabled:opacity-50"
+                  >
+                    <span className="theme-game-btn__title text-sm">
+                      {rematchLoading ? 'Starting rematch…' : 'Accept rematch'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDeclineRematch ?? onHome}
+                    disabled={rematchLoading}
+                    className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-red-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                  >
+                    Decline
+                  </button>
+                </>
+              ) : rematchStatus === 'waiting' ? (
+                <div className="theme-card flex flex-col items-center gap-3 px-4 py-5 !shadow-none">
+                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-mid)] border-t-[var(--accent)]" />
+                  <p className="text-center font-body text-sm text-[var(--text-2)]">
+                    Waiting for <span className="font-bold text-[var(--accent)]">{opponentName}</span> to accept…
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onDeclineRematch ?? onHome}
+                    disabled={rematchLoading}
+                    className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]"
+                  >
+                    Cancel & go home
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    onClick={onRematch}
+                    disabled={rematchLoading}
+                    className="theme-game-btn theme-game-btn--pvp w-full min-h-0 py-4 disabled:opacity-50"
+                  >
+                    <span className="theme-game-btn__title text-sm">
+                      {rematchLoading ? 'Requesting…' : 'Rematch'}
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onHome}
+                    className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  >
+                    Go home
+                  </button>
+                </>
+              )}
+            </motion.div>
           )}
 
           <motion.p

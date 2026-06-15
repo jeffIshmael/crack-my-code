@@ -7,6 +7,7 @@ import Lobby from '@/components/Lobby';
 import { normalizeJoinCodeInput } from '@/lib/join-code';
 import JoinStakeModal from '@/components/JoinStakeModal';
 import OpenChallengesList from '@/components/OpenChallengesList';
+import MatchHistoryList from '@/components/MatchHistoryList';
 import { LeaderboardPanel } from '@/components/LeaderboardPanel';
 import Image from 'next/image';
 import SetCode from '@/components/SetCode';
@@ -129,6 +130,10 @@ export default function Home() {
     rating: number;
     loading: boolean;
   } | null>(null);
+  const [rematchStatus, setRematchStatus] = useState<'idle' | 'waiting' | 'opponent_wants'>('idle');
+  const [rematchLoading, setRematchLoading] = useState(false);
+  const [openGamesTab, setOpenGamesTab] = useState<'active' | 'history'>('active');
+  const opponentAddressRef = useRef<string | null>(null);
 
   const [isSendSectionOpen, setIsSendSectionOpen] = useState(false);
   const [sendTab, setSendTab] = useState<'celo' | 'usdt'>('usdt');
@@ -654,7 +659,12 @@ export default function Home() {
   ) => {
     setCurrentGameId(gameId);
     setResultStats(null);
+    setRematchStatus('idle');
+    setRematchLoading(false);
     const isAIMatch = opponentAddress === 'AI_BOT' || opponentAddress === 'AI';
+    if (!isAIMatch) {
+      opponentAddressRef.current = opponentAddress.toLowerCase();
+    }
     const mode = isAIMatch ? 'ai' : (meta?.mode ?? 'fun');
     
     setGs((prev: GameState) => ({
@@ -687,8 +697,34 @@ export default function Home() {
       toast.success('Opponent joined!', { description: 'Set your secret code to begin.' });
     });
 
+    channel.bind('rematch-request', () => {
+      setRematchStatus('opponent_wants');
+    });
+
+    channel.bind('rematch-declined', () => {
+      setRematchStatus('idle');
+      setRematchLoading(false);
+      toast.error('Rematch declined', {
+        description: `${gsRef.current.opponentName} declined the rematch.`,
+      });
+    });
+
+    channel.bind('rematch-started', (data: { gameId: string; opponentAddress: string; mode?: string; stake?: number }) => {
+      const mode = data.mode === 'cash' ? 'cash' : data.mode === 'ai' ? 'ai' : 'fun';
+      handleMatchFound(data.gameId, data.opponentAddress, {
+        mode,
+        stake: parseFloat(String(data.stake)) || 0,
+      });
+      setRematchStatus('idle');
+      setRematchLoading(false);
+      toast.success('Rematch starting!', { description: 'Set your secret code to begin.' });
+    });
+
     return () => {
       channel.unbind('match-found');
+      channel.unbind('rematch-request');
+      channel.unbind('rematch-declined');
+      channel.unbind('rematch-started');
       pusherClient.unsubscribe(channelName);
     };
   }, [address, handleMatchFound]);
@@ -1095,8 +1131,11 @@ export default function Home() {
     const points = resultStats?.pointsAfter ?? gs.playerPoints;
     setGs(initialGameState(rating, points));
     setResultStats(null);
+    setRematchStatus('idle');
+    setRematchLoading(false);
     setCurrentGameId(null);
     setShareableJoinCode(null);
+    opponentAddressRef.current = null;
     if (address) void refreshUserStats();
   }, [gs.playerRating, gs.playerPoints, resultStats, address, refreshUserStats]);
 
@@ -1107,6 +1146,52 @@ export default function Home() {
       handleFindMatch('ai', 0, true);
     }, 100);
   }, [gs.gameMode, exitResultScreen, handleFindMatch]);
+
+  const handleRematch = useCallback(async () => {
+    if (!currentGameId || !address || gs.gameMode === 'ai') return;
+
+    setRematchLoading(true);
+    try {
+      const res = await fetch('/api/games/rematch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId: currentGameId, address, action: 'accept' }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Rematch failed');
+
+      if (data.status === 'started') {
+        handleMatchFound(data.gameId, data.opponentAddress, {
+          mode: gs.gameMode,
+          stake: gs.stakeAmount,
+        });
+        setRematchStatus('idle');
+        toast.success('Rematch starting!', { description: 'Set your secret code to begin.' });
+      } else {
+        setRematchStatus('waiting');
+      }
+    } catch (err) {
+      setRematchStatus('idle');
+      toast.error('Rematch failed', { description: getErrorMessage(err) });
+    } finally {
+      setRematchLoading(false);
+    }
+  }, [currentGameId, address, gs.gameMode, gs.stakeAmount, handleMatchFound]);
+
+  const handleDeclineRematch = useCallback(async () => {
+    if (currentGameId && address && gs.gameMode !== 'ai') {
+      try {
+        await fetch('/api/games/rematch', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gameId: currentGameId, address, action: 'decline' }),
+        });
+      } catch (err) {
+        console.error('Decline rematch failed', err);
+      }
+    }
+    exitResultScreen();
+  }, [currentGameId, address, gs.gameMode, exitResultScreen]);
 
   const handleHome = useCallback(() => {
     exitResultScreen();
@@ -1447,6 +1532,10 @@ export default function Home() {
               guessCount={gs.playerGuesses.length}
               onPlayAgain={handlePlayAgain}
               onHome={handleHome}
+              rematchStatus={rematchStatus}
+              onRematch={handleRematch}
+              onDeclineRematch={handleDeclineRematch}
+              rematchLoading={rematchLoading}
             />
           )}
         </AnimatePresence>
@@ -1470,42 +1559,40 @@ export default function Home() {
         </div>
       ) : (
         <>
-          <OpenChallengesList
-            isConnected={!!isConnected}
-            myActiveGames={myActiveGames}
-            onCancelOpenChallenge={handleCancelOpenChallenge}
-            isCancellingId={isCancelling}
-          />
+          <div className="flex rounded-2xl border-2 border-[var(--border-mid)] bg-white p-1">
+            <button
+              type="button"
+              onClick={() => setOpenGamesTab('active')}
+              className={`flex-1 rounded-xl py-2.5 font-ui text-xs font-bold transition-all ${
+                openGamesTab === 'active'
+                  ? 'bg-[var(--accent-dim)] text-[var(--accent)] shadow-[var(--pop-shadow)]'
+                  : 'text-[var(--text-dim)] hover:text-[var(--text)]'
+              }`}
+            >
+              My Active
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpenGamesTab('history')}
+              className={`flex-1 rounded-xl py-2.5 font-ui text-xs font-bold transition-all ${
+                openGamesTab === 'history'
+                  ? 'bg-[var(--accent-dim)] text-[var(--accent)] shadow-[var(--pop-shadow)]'
+                  : 'text-[var(--text-dim)] hover:text-[var(--text)]'
+              }`}
+            >
+              History
+            </button>
+          </div>
 
-          {gameHistory.length > 0 && (
-            <div className="flex flex-col gap-4 mt-4">
-              <div className="flex items-center gap-2">
-                <span className="text-lg" aria-hidden>📜</span>
-                <h3 className="font-ui text-sm font-bold text-[var(--text)]">Match History</h3>
-              </div>
-              <div className="flex flex-col gap-3">
-                {gameHistory.map((game) => {
-                  const isWinner = game.winnerAddress?.toLowerCase() === (address?.toLowerCase() || '');
-                  const isDraw = !game.winnerAddress;
-                  const opponentAddr = game.player1Address.toLowerCase() === (address?.toLowerCase() || '') ? game.player2Address : game.player1Address;
-                  return (
-                    <div key={game.id} className="theme-card flex items-center justify-between p-4">
-                      <div className="flex flex-col gap-1">
-                        <span className={`font-ui text-[10px] font-bold uppercase tracking-wider ${isWinner ? 'text-[var(--clue-green)]' : isDraw ? 'text-[var(--accent)]' : 'text-red-500'}`}>
-                          {isWinner ? 'Victory' : isDraw ? 'Draw' : 'Defeat'}
-                        </span>
-                        <span className="font-body text-xs text-[var(--text-dim)]">
-                          vs {opponentAddr ? `${opponentAddr.slice(0, 6)}…${opponentAddr.slice(-4)}` : 'AI'}
-                        </span>
-                      </div>
-                      <div className="font-ui text-xs font-bold text-[var(--text)]">
-                        {game.mode === 'cash' ? (isWinner ? `+${(game.stake * 2 * 0.99).toFixed(2)}` : `-${game.stake}`) : 'FREE'}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+          {openGamesTab === 'active' ? (
+            <OpenChallengesList
+              isConnected={!!isConnected}
+              myActiveGames={myActiveGames}
+              onCancelOpenChallenge={handleCancelOpenChallenge}
+              isCancellingId={isCancelling}
+            />
+          ) : (
+            <MatchHistoryList games={gameHistory} address={address} />
           )}
         </>
       )}

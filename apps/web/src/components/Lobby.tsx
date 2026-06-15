@@ -11,7 +11,7 @@ import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, X } from 'lucide-react';
 import { ThemeLogo } from '@/components/ThemeLogo';
 import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
 import JoinChallenge from '@/components/JoinChallenge';
@@ -211,9 +211,21 @@ export default function Lobby({
                     isCreating={isCreating}
                   />
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-8 gap-3">
-                    <div className="h-10 w-10 animate-spin rounded-full border-t-2 border-[var(--accent)]" />
-                    <span className="text-[10px] font-black tracking-widest text-[var(--accent)]">GENERATING...</span>
+                  <div className="theme-card mx-auto flex max-w-[320px] flex-col items-center gap-5 px-6 py-8">
+                    <div className="h-10 w-10 animate-spin rounded-full border-2 border-[var(--border-mid)] border-t-[var(--accent)]" />
+                    <div className="flex flex-col items-center gap-1 text-center">
+                      <span className="font-ui text-xs font-bold uppercase tracking-widest text-[var(--accent)]">Setting up challenge</span>
+                      <span className="font-body text-[10px] text-[var(--text-dim)]">Confirming on-chain transaction…</span>
+                    </div>
+                    {onCancelMatchmaking && (
+                      <button
+                        type="button"
+                        onClick={onCancelMatchmaking}
+                        className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-red-300 hover:bg-red-50 hover:text-red-500 active:scale-[0.98]"
+                      >
+                        Cancel
+                      </button>
+                    )}
                   </div>
                 )
               ) : (
@@ -289,26 +301,40 @@ export default function Lobby({
       <AnimatePresence>
         {showPvPModal && (
           <div className="fixed inset-x-0 inset-y-0 z-[120] flex items-end justify-center pointer-events-none">
-            {/* Backdrop (Full screen) */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/60 backdrop-blur-md pointer-events-auto"
-              onClick={() => setShowPvPModal(false)}
+              className="fixed inset-0 bg-[var(--text)]/20 backdrop-blur-sm pointer-events-auto"
+              onClick={() => !isCreating && setShowPvPModal(false)}
             />
 
-            {/* Sheet (Caged) */}
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 30, stiffness: 350 }}
-              className="relative w-full max-w-[440px] rounded-t-[2.5rem] border-t border-x border-black/10 bg-[#FDFCFB] p-8 shadow-[0_-12px_40px_rgba(0,0,0,0.25)] pb-12 pointer-events-auto"
+              className="relative w-full max-w-[440px] overflow-hidden rounded-t-[2.5rem] pointer-events-auto"
+              style={{
+                background: 'var(--bg-surface)',
+                border: '1px solid var(--border-mid)',
+                borderBottom: 'none',
+                boxShadow: '0 -12px 40px rgba(47, 111, 214, 0.12)',
+              }}
             >
-              {/* Handle */}
-              <div className="absolute top-3 left-1/2 h-1.5 w-12 -translate-x-1/2 rounded-full bg-white/10" />
+              <div className="h-1 w-full bg-gradient-to-r from-transparent via-[var(--accent)] to-transparent opacity-60" />
 
+              <button
+                type="button"
+                onClick={() => !isCreating && setShowPvPModal(false)}
+                disabled={isCreating}
+                className="absolute right-4 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--border-mid)] bg-white text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] hover:scale-105 active:scale-95 disabled:opacity-40"
+                aria-label="Close"
+              >
+                <X size={20} />
+              </button>
+
+              <div className="px-6 pb-10 pt-6">
               <AnimatePresence mode="wait">
                 {isCreating ? (
                   <motion.div
@@ -316,17 +342,17 @@ export default function Lobby({
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="flex flex-col items-center justify-center py-12 gap-6"
+                    className="flex flex-col items-center justify-center gap-6 py-10"
                   >
                     <div className="relative h-20 w-20">
-                      <div className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/20" />
+                      <div className="absolute inset-0 rounded-full border-2 border-[var(--accent)]/15" />
                       <div className="absolute inset-0 rounded-full border-t-2 border-[var(--accent)] animate-spin" />
-                      <div className="absolute inset-4 rounded-full border-2 border-[var(--orange)]/20" />
+                      <div className="absolute inset-4 rounded-full border-2 border-[var(--orange)]/15" />
                       <div className="absolute inset-4 rounded-full border-b-2 border-[var(--orange)] animate-spin-slow" />
                     </div>
-                    <div className="flex flex-col items-center gap-2">
-                      <span className="font-orbitron text-xs font-black tracking-[0.3em] text-white">INITIALIZING ON-CHAIN</span>
-                      <span className="text-[8px] font-bold text-[var(--text-dim)] uppercase tracking-widest animate-pulse">Waiting for network confirmation...</span>
+                    <div className="flex flex-col items-center gap-2 text-center">
+                      <span className="font-ui text-xs font-bold uppercase tracking-[0.2em] text-[var(--text)]">Initializing challenge</span>
+                      <span className="font-body text-[10px] text-[var(--text-dim)]">Waiting for network confirmation…</span>
                     </div>
                   </motion.div>
                 ) : pvpStep === 'selection' ? (
@@ -337,37 +363,36 @@ export default function Lobby({
                     exit={{ opacity: 0, x: 10 }}
                     className="flex flex-col gap-6"
                   >
-                    <div className="text-center">
-                      <h2 className="font-orbitron text-lg font-black tracking-[0.2em]">INITIATE CHALLENGE</h2>
-                      <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest pt-1">Select your engagement parameters</p>
+                    <div className="text-center pt-2">
+                      <h2 className="font-ui text-lg font-bold text-[var(--text)]">Start a challenge</h2>
+                      <p className="font-body pt-1 text-xs text-[var(--text-dim)]">Pick how you want to play</p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
-                      {/* Friendly Option */}
+                    <div className="grid grid-cols-1 gap-3">
                       <button
+                        type="button"
                         onClick={() => handleStartPvP('fun')}
-                        className="group flex flex-col gap-2 rounded-2xl border border-black/5 bg-black/5 p-5 text-left transition-all hover:bg-black/[0.08] hover:translate-y-[-2px] active:translate-y-[1px] shadow-sm hover:shadow-md"
+                        className="theme-card group flex flex-col gap-2 p-5 text-left transition-all hover:translate-y-[-2px] active:translate-y-[1px]"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-orbitron text-sm font-black tracking-wider text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">FRIENDLY</span>
-                          <span className="text-xl transition-transform group-hover:scale-125">⚔️</span>
+                          <span className="font-ui text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">Friendly match</span>
+                          <span className="text-xl transition-transform group-hover:scale-110" aria-hidden>⚔️</span>
                         </div>
-                        <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">Free Match • Play for Global Ranking</p>
+                        <p className="font-body text-[11px] text-[var(--text-dim)]">Free match · climb the global ranking</p>
                       </button>
 
-                      {/* Professional (coming soon) */}
-                      <div className="relative flex flex-col gap-2 rounded-2xl border border-black/10 bg-black/[0.03] p-5 opacity-70">
-                        <div className="absolute top-3 right-3 rounded-full bg-[var(--orange)]/15 px-2.5 py-1">
-                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--orange)]">
-                            Coming Soon
+                      <div className="theme-card relative flex flex-col gap-2 p-5 opacity-60">
+                        <div className="absolute top-3 right-3 rounded-full bg-[var(--orange-dim)] px-2.5 py-1">
+                          <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--orange)]">
+                            Coming soon
                           </span>
                         </div>
                         <div className="flex items-center justify-between">
-                          <span className="font-orbitron text-sm font-black tracking-wider text-black/50">PROFESSIONAL</span>
-                          <span className="text-xl grayscale">💰</span>
+                          <span className="font-ui text-sm font-bold text-[var(--text-dim)]">Professional</span>
+                          <span className="text-xl grayscale" aria-hidden>💰</span>
                         </div>
-                        <p className="text-[10px] font-bold text-black/35 uppercase tracking-widest pr-16">
-                          USDT stakes • Winner takes 99%
+                        <p className="font-body pr-16 text-[11px] text-[var(--text-dim)]">
+                          USDT stakes · winner takes 99%
                         </p>
                       </div>
                     </div>
@@ -378,67 +403,69 @@ export default function Lobby({
                     initial={{ opacity: 0, x: 10 }}
                     animate={{ opacity: 1, x: 0 }}
                     exit={{ opacity: 0, x: -10 }}
-                    className="flex flex-col gap-8"
+                    className="flex flex-col gap-6"
                   >
-                    <div className="text-center">
-                      <h2 className="font-orbitron text-lg font-black tracking-[0.2em] text-[var(--orange)]">STAKE CONFIGURATION</h2>
-                      <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest pt-1">Define the reward parameters</p>
+                    <div className="text-center pt-2">
+                      <h2 className="font-ui text-lg font-bold text-[var(--orange)]">Set your stake</h2>
+                      <p className="font-body pt-1 text-xs text-[var(--text-dim)]">Define the reward for this duel</p>
                     </div>
 
-                    <div className="flex flex-col gap-6">
-                      <div className="flex flex-col gap-3">
-                        <label className="text-[10px] font-black uppercase tracking-[0.2em] text-[var(--text-dim)]">Enter USDT Stake</label>
-                        <div className="relative flex flex-col gap-2">
-                          <div className="relative flex items-center">
-                            <input
-                              type="number"
-                              value={stake}
-                              onChange={(e) => setStake(e.target.value)}
-                              className="w-full flex-1 rounded-2xl border border-black/10 bg-black/5 p-5 text-2xl font-black text-[var(--orange)] outline-none ring-[var(--orange)] focus:ring-1"
-                              autoFocus
-                              placeholder="0.00"
-                            />
-                            <span className="absolute right-5 text-lg font-black text-[var(--text-dim)] mr-6">USDT</span>
-                          </div>
-                          <div className="flex items-center justify-between px-2">
-                            <span className={`text-[9px] font-bold uppercase tracking-wider ${(parseFloat(stake) || 0) < 0.1 ? 'text-red-500 animate-pulse' : 'text-[var(--text-dim)]'}`}>
-                              Min: 0.1 USDT
-                            </span>
-                            <span className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
-                              Available: <span className="text-[var(--text)]">{usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)} USDT` : '...'}</span>
-                            </span>
-                          </div>
+                    <div className="flex flex-col gap-5">
+                      <div className="flex flex-col gap-2">
+                        <label className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)]">USDT amount</label>
+                        <div className="relative flex items-center">
+                          <input
+                            type="number"
+                            value={stake}
+                            onChange={(e) => setStake(e.target.value)}
+                            className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white p-4 pr-16 font-ui text-2xl font-bold text-[var(--orange)] outline-none focus:border-[var(--orange)]"
+                            autoFocus
+                            placeholder="0.00"
+                          />
+                          <span className="absolute right-4 font-ui text-sm font-bold text-[var(--text-dim)]">USDT</span>
+                        </div>
+                        <div className="flex items-center justify-between px-1">
+                          <span className={`font-body text-[10px] ${(parseFloat(stake) || 0) < 0.1 ? 'font-bold text-red-500' : 'text-[var(--text-dim)]'}`}>
+                            Minimum 0.1 USDT
+                          </span>
+                          <span className="font-body text-[10px] text-[var(--text-dim)]">
+                            Available: <span className="font-bold text-[var(--text)]">{usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)} USDT` : '…'}</span>
+                          </span>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-1 rounded-2xl bg-[var(--clue-green)]/5 p-4 border border-[var(--clue-green)]/10">
-                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Winner&apos;s Reward</span>
-                          <span className="text-xl font-black text-[var(--clue-green)] tracking-tight">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="flex flex-col gap-1 rounded-2xl border-2 border-[var(--clue-green)]/20 bg-[var(--clue-green-bg)] p-4">
+                          <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--text-dim)]">Winner reward</span>
+                          <span className="font-ui text-xl font-bold text-[var(--clue-green)]">
                             {((parseFloat(stake) || 0) * 2 * 0.99).toFixed(3)} <span className="text-[10px]">USDT</span>
                           </span>
                         </div>
-                        <div className="flex flex-col gap-1 rounded-2xl bg-white/5 p-4 border border-white/10">
-                          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Platform Fee</span>
-                          <span className="text-xl font-black text-[var(--text)] tracking-tight">
+                        <div className="theme-card flex flex-col gap-1 p-4 !shadow-none">
+                          <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--text-dim)]">Platform fee</span>
+                          <span className="font-ui text-xl font-bold text-[var(--text)]">
                             1.0 <span className="text-[10px]">%</span>
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-3">
+                      <div className="flex flex-col gap-2">
                         <button
+                          type="button"
                           onClick={() => allowance < stakeBigInt ? handleApprove(stakeBigInt) : setPvpStep('visibility')}
                           disabled={isApproving || isCreating || (parseFloat(stake) || 0) < 0.1}
-                          className="w-full rounded-2xl bg-[var(--orange)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--bg-base)] shadow-[0_0_20px_rgba(220,38,38,0.2)] disabled:opacity-50"
+                          className="theme-game-btn theme-game-btn--pvp w-full min-h-0 py-4 disabled:opacity-50"
                         >
-                          {isApproving ? 'APPROVING...' : (allowance < stakeBigInt ? 'APPROVE USDT' : 'SET VISIBILITY')}
+                          <span className="theme-game-btn__title text-sm">
+                            {isApproving ? 'Approving…' : allowance < stakeBigInt ? 'Approve USDT' : 'Choose visibility'}
+                          </span>
                         </button>
                         <button
+                          type="button"
                           onClick={() => setPvpStep('selection')}
-                          className="w-full rounded-2xl border border-white/10 bg-white/5 py-4 text-[10px] font-black uppercase tracking-widest text-white/60 hover:bg-white/10"
+                          className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
                         >
-                          GO BACK
+                          Go back
                         </button>
                       </div>
                     </div>
@@ -449,51 +476,52 @@ export default function Lobby({
                     initial={{ opacity: 0, scale: 0.95 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.95 }}
-                    className="flex flex-col gap-8"
+                    className="flex flex-col gap-6"
                   >
-                    <div className="text-center">
-                      <h2 className="font-orbitron text-lg font-black tracking-[0.2em] text-[var(--accent)]">CHALLENGE VISIBILITY</h2>
-                      <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest pt-1">Who can accept this duel?</p>
+                    <div className="text-center pt-2">
+                      <h2 className="font-ui text-lg font-bold text-[var(--accent)]">Who can join?</h2>
+                      <p className="font-body pt-1 text-xs text-[var(--text-dim)]">Choose how others find your challenge</p>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4">
+                    <div className="grid grid-cols-1 gap-3">
                       <button
+                        type="button"
                         onClick={() => handleFinalizeChallenge(true)}
                         disabled={isCreating}
-                        className="group flex flex-col gap-2 rounded-2xl border border-black/10 bg-black/5 p-5 text-left transition-all hover:bg-black/[0.08] disabled:opacity-50"
+                        className="theme-card group flex flex-col gap-2 p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-orbitron text-sm font-black tracking-wider text-black">ANYONE CAN JOIN</span>
-                          <span className="text-xl">🌍</span>
+                          <span className="font-ui text-sm font-bold text-[var(--text)]">Anyone can join</span>
+                          <span className="text-xl" aria-hidden>🌍</span>
                         </div>
-                        <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Live matchmaking • Pairs when another player is searching</p>
+                        <p className="font-body text-[11px] text-[var(--text-dim)]">Live matchmaking · pairs when another player is searching</p>
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => handleFinalizeChallenge(false)}
                         disabled={isCreating}
-                        className="group flex flex-col gap-2 rounded-2xl border border-[var(--accent)]/30 bg-[var(--accent)]/5 p-5 text-left transition-all hover:bg-[var(--accent)]/10 disabled:opacity-50"
+                        className="theme-card flex flex-col gap-2 border-[var(--accent)]/30 bg-[var(--accent-dim)] p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-orbitron text-sm font-black tracking-wider text-[var(--accent)]">INVITE ONLY</span>
-                          <span className="text-xl">🔐</span>
+                          <span className="font-ui text-sm font-bold text-[var(--accent)]">Invite only</span>
+                          <span className="text-xl" aria-hidden>🔐</span>
                         </div>
-                        <p className="text-[10px] font-bold text-black/40 uppercase tracking-widest">Private challenge • Share Game ID</p>
+                        <p className="font-body text-[11px] text-[var(--text-dim)]">Private challenge · share a Game ID with a friend</p>
                       </button>
 
                       <button
+                        type="button"
                         onClick={() => selectedMode === 'cash' ? setPvpStep('config') : setPvpStep('selection')}
-                        className="mt-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] hover:text-white transition-colors"
+                        className="mt-1 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]"
                       >
-                        GO BACK
+                        Go back
                       </button>
                     </div>
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {/* Close Spacer */}
-              <div className="h-12" />
+              </div>
             </motion.div>
           </div>
         )}
@@ -565,8 +593,8 @@ function MatchmakingPulse({
         {/* Live Timer */}
         {!isAI && (
           <div className="mt-4 flex flex-col items-center gap-4">
-            <div className="rounded-full border border-white/10 bg-white/5 px-4 py-1">
-              <span className="font-code text-sm font-black text-[var(--accent)]">
+            <div className="rounded-full border-2 border-[var(--border-mid)] bg-white px-4 py-1 shadow-[var(--pop-shadow)]">
+              <span className="font-code text-sm font-bold text-[var(--accent)]">
                 {Math.floor(searchTime / 60)}:{(searchTime % 60).toString().padStart(2, '0')}
               </span>
             </div>
