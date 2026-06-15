@@ -28,7 +28,7 @@ import {
   MAX_GUESSES,
   PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
-import type { GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
+import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useSendTransaction } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
 import { parseUnits, parseEventLogs, encodeFunctionData, parseEther } from 'viem';
@@ -113,6 +113,7 @@ export default function Home() {
   } | null>(null);
   const [isWaiting, setIsWaiting] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const [myActiveGames, setMyActiveGames] = useState<any[]>([]);
   const [gameHistory, setGameHistory] = useState<any[]>([]);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
@@ -134,6 +135,10 @@ export default function Home() {
   const [rematchLoading, setRematchLoading] = useState(false);
   const [openGamesTab, setOpenGamesTab] = useState<'active' | 'history'>('active');
   const opponentAddressRef = useRef<string | null>(null);
+  const addressRef = useRef<string | undefined>(address);
+  useEffect(() => {
+    addressRef.current = address;
+  }, [address]);
 
   const [isSendSectionOpen, setIsSendSectionOpen] = useState(false);
   const [sendTab, setSendTab] = useState<'celo' | 'usdt'>('usdt');
@@ -444,25 +449,117 @@ export default function Home() {
 
   // ─── Real-time Gameplay Logic ───────────────────────────────────────────
 
+  const applySyncPayload = useCallback(
+    (data: {
+      status: string;
+      isYourTurn: boolean;
+      playerGuesses: GuessEntry[];
+      opponentGuesses: GuessEntry[];
+      opponentGuessCount: number;
+      result?: 'win' | 'lose' | null;
+      opponentCode?: number[] | null;
+    }) => {
+      setGs((prev: GameState) => {
+        if (prev.phase !== 'playing' && prev.phase !== 'result') return prev;
+
+        if (data.status === 'COMPLETED' && data.result) {
+          const loss = scoreDeltaForMode(prev.gameMode === 'ai' ? 'ai' : prev.gameMode, false);
+          const win = scoreDeltaForMode(prev.gameMode === 'ai' ? 'ai' : prev.gameMode, true);
+          const delta = data.result === 'win' ? win : loss;
+
+          if (isRegisteredPlayer(addressRef.current) && prev.phase === 'playing') {
+            void syncResultStats(delta.points);
+          }
+
+          return {
+            ...prev,
+            phase: 'result',
+            result: data.result,
+            ratingDelta: isRegisteredPlayer(addressRef.current) ? delta.points : 0,
+            playerGuesses: data.playerGuesses,
+            opponentGuesses: data.opponentGuesses,
+            opponentGuessCount: data.opponentGuessCount,
+            isPlayerTurn: false,
+            opponentCurrentInput: [],
+            currentInput: [],
+            opponentCode: data.opponentCode ?? prev.opponentCode,
+          };
+        }
+
+        const guessesChanged =
+          data.playerGuesses.length !== prev.playerGuesses.length ||
+          data.opponentGuesses.length !== prev.opponentGuesses.length ||
+          data.playerGuesses.at(-1)?.digits.join('') !== prev.playerGuesses.at(-1)?.digits.join('') ||
+          data.opponentGuesses.at(-1)?.digits.join('') !== prev.opponentGuesses.at(-1)?.digits.join('');
+        const turnChanged = data.isYourTurn !== prev.isPlayerTurn;
+
+        if (data.playerGuesses.length < prev.playerGuesses.length) return prev;
+
+        if (!guessesChanged && !turnChanged) return prev;
+
+        return {
+          ...prev,
+          isPlayerTurn: data.isYourTurn,
+          playerGuesses: data.playerGuesses,
+          opponentGuesses: data.opponentGuesses,
+          opponentGuessCount: data.opponentGuessCount,
+          opponentCurrentInput: [],
+        };
+      });
+    },
+    [syncResultStats],
+  );
+
+  const syncGameState = useCallback(async () => {
+    if (!currentGameId || !addressRef.current || gsRef.current.gameMode === 'ai') return;
+    if (gsRef.current.phase !== 'playing') return;
+    if (isSubmittingRef.current) return;
+
+    try {
+      const res = await fetch(
+        `/api/games/sync?id=${currentGameId}&address=${encodeURIComponent(addressRef.current)}`,
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      if (!data.success) return;
+      applySyncPayload(data);
+    } catch (err) {
+      console.error('Game sync poll failed', err);
+    }
+  }, [currentGameId, applySyncPayload]);
+
   useEffect(() => {
     if (!currentGameId || gs.gameMode === 'ai') return;
 
-    const channel = pusherClient.subscribe(`private-game-${currentGameId}`);
+    const channelName = `private-game-${currentGameId}`;
+    const channel = pusherClient.subscribe(channelName);
 
-    channel.bind('client-typing', (data: { input: number[] }) => {
+    const onTyping = (data: { input: number[] }) => {
       setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: data.input }));
-    });
+    };
 
-    channel.bind('opponent-guess', (data: { digits: number[], clues: any[], tileClues?: TileClue[], sender: string }) => {
-      if (data.sender === address) return;
+    const onOpponentGuess = (data: {
+      digits: number[];
+      clues: Clue[];
+      tileClues?: TileClue[];
+      sender: string;
+      nextTurnAddress?: string;
+      revealCode?: number[];
+    }) => {
+      const myAddress = addressRef.current?.toLowerCase();
+      if (!myAddress || data.sender?.toLowerCase() === myAddress) return;
+
       setGs((prev: GameState) => {
         const entry: GuessEntry = {
           digits: data.digits,
-          clues: data.clues as any[],
+          clues: data.clues,
           tileClues: data.tileClues,
           id: `opp-${Date.now()}`,
         };
         const newGuesses = [...prev.opponentGuesses, entry];
+        const isMyTurn = data.nextTurnAddress
+          ? data.nextTurnAddress.toLowerCase() === myAddress
+          : true;
 
         if (isWinningClues(data.clues)) {
           const loss = scoreDeltaForMode(prev.gameMode === 'ai' ? 'ai' : prev.gameMode, false);
@@ -470,20 +567,21 @@ export default function Home() {
           fetch('/api/games/reveal', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' })
+            body: JSON.stringify({ gameId: currentGameId, address: addressRef.current || 'GUEST' }),
           })
-            .then(res => res.json())
-            .then(revealData => {
-              setGs(curr => ({
+            .then((res) => res.json())
+            .then((revealData) => {
+              setGs((curr) => ({
                 ...curr,
                 opponentGuesses: newGuesses,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: isRegisteredPlayer(address) ? loss.points : 0,
+                ratingDelta: isRegisteredPlayer(addressRef.current) ? loss.points : 0,
                 opponentCurrentInput: [],
-                opponentCode: revealData.opponentCode || []
+                opponentCode: revealData.opponentCode || data.revealCode || [],
+                isPlayerTurn: false,
               }));
-              if (isRegisteredPlayer(address)) {
+              if (isRegisteredPlayer(addressRef.current)) {
                 void syncResultStats(loss.points);
               }
             });
@@ -491,7 +589,8 @@ export default function Home() {
           return {
             ...prev,
             opponentGuesses: newGuesses,
-            opponentCurrentInput: []
+            opponentCurrentInput: [],
+            isPlayerTurn: false,
           };
         }
 
@@ -499,21 +598,43 @@ export default function Home() {
           ...prev,
           opponentGuesses: newGuesses,
           opponentGuessCount: prev.opponentGuessCount + 1,
-          isPlayerTurn: true,
-          opponentCurrentInput: []
+          isPlayerTurn: isMyTurn,
+          opponentCurrentInput: [],
         };
       });
-    });
+    };
 
-    channel.bind('game-started', () => {
+    const onGameStarted = () => {
       setIsWaiting(false);
       setGs((prev: GameState): GameState => ({ ...prev, phase: 'countdown' }));
-    });
+    };
+
+    channel.bind('client-typing', onTyping);
+    channel.bind('opponent-guess', onOpponentGuess);
+    channel.bind('game-started', onGameStarted);
 
     return () => {
-      pusherClient.unsubscribe(`private-game-${currentGameId}`);
+      channel.unbind('client-typing', onTyping);
+      channel.unbind('opponent-guess', onOpponentGuess);
+      channel.unbind('game-started', onGameStarted);
+      pusherClient.unsubscribe(channelName);
     };
-  }, [currentGameId, gs.gameMode, address, syncResultStats]);
+  }, [currentGameId, gs.gameMode, syncResultStats]);
+
+  // Poll server turn state during PvP — backup when Pusher events are missed
+  useEffect(() => {
+    if (gs.phase !== 'playing' || !currentGameId || gs.gameMode === 'ai' || !address) return;
+
+    syncGameState();
+    const interval = setInterval(syncGameState, 2000);
+    return () => clearInterval(interval);
+  }, [gs.phase, currentGameId, gs.gameMode, address, syncGameState]);
+
+  // Set correct opening turn when the match begins
+  useEffect(() => {
+    if (gs.phase !== 'playing' || !currentGameId || gs.gameMode === 'ai' || !address) return;
+    syncGameState();
+  }, [gs.phase, currentGameId, gs.gameMode, address, syncGameState]);
 
   // Turn notification effect
   useEffect(() => {
@@ -1021,6 +1142,7 @@ export default function Home() {
     if (digits.length !== CODE_LENGTH) return;
 
     setIsSubmitting(true);
+    isSubmittingRef.current = true;
 
     // 1. Send guess to server
     if (currentGameId) {
@@ -1099,6 +1221,7 @@ export default function Home() {
         toast.error('Submission Failed', { description: getErrorMessage(err) });
       } finally {
         setIsSubmitting(false);
+        isSubmittingRef.current = false;
       }
     }
   }, [gs, currentGameId, address, isSubmitting, syncResultStats]);

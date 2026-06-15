@@ -8,6 +8,7 @@ import { scoreDeltaForMode } from '@/lib/scoring';
 import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
 import { isGuestAddress, isRegisteredPlayer } from '@/lib/guest';
+import { getNextTurnAddress } from '@/lib/turn';
 
 async function applyScoreDelta(
   address: string,
@@ -77,6 +78,19 @@ export async function POST(req: NextRequest) {
     const isWin = clues.filter(c => c === 'green').length === 4;
     let revealCode = null;
     let winner = null;
+
+    const p1GuessCount = await prisma.guess.count({
+      where: { gameId, isPlayer: true },
+    });
+    const p2GuessCount = await prisma.guess.count({
+      where: { gameId, isPlayer: false },
+    });
+    const nextTurnAddress = getNextTurnAddress(
+      game.player1Address,
+      game.player2Address,
+      p1GuessCount,
+      p2GuessCount,
+    );
 
     if (isWin) {
       revealCode = opponentCode;
@@ -160,7 +174,8 @@ export async function POST(req: NextRequest) {
             digits,
             clues,
             tileClues,
-            sender: playerAddress,
+            sender: normalizedPlayerAddress,
+            nextTurnAddress,
             revealCode: isWin ? opponentCode : undefined,
           });
         } catch (pusherErr) {
@@ -168,9 +183,7 @@ export async function POST(req: NextRequest) {
         }
       })();
     } else {
-      const playerGuessCount = await prisma.guess.count({
-        where: { gameId, isPlayer: isPlayer1 },
-      });
+      const playerGuessCount = isPlayer1 ? p1GuessCount : p2GuessCount;
 
       if (playerGuessCount >= MAX_GUESSES && game.status === 'ACTIVE') {
         const isAI = game.mode === 'ai';
@@ -199,14 +212,17 @@ export async function POST(req: NextRequest) {
     }
 
     if (!isWin) {
-      void pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
-        digits,
-        clues,
-        tileClues,
-        sender: playerAddress,
-      }).catch((pusherErr) => {
+      try {
+        await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
+          digits,
+          clues,
+          tileClues,
+          sender: normalizedPlayerAddress,
+          nextTurnAddress,
+        });
+      } catch (pusherErr) {
         console.error('[Pusher] opponent-guess failed:', pusherErr);
-      });
+      }
     }
 
     let playerStats: { points: number; rating: number } | null = null;
@@ -231,6 +247,8 @@ export async function POST(req: NextRequest) {
       opponentCode: revealCode,
       winnerAddress: winner,
       playerStats,
+      isYourTurn: false,
+      nextTurnAddress,
     });
   } catch (error) {
     console.error('Submit guess error:', error);
