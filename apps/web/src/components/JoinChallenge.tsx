@@ -11,6 +11,7 @@ interface JoinChallengeProps {
   isJoining: boolean;
   disabled?: boolean;
   collapsible?: boolean;
+  onSignInRequired?: () => void;
 }
 
 export default function JoinChallenge({
@@ -18,36 +19,64 @@ export default function JoinChallenge({
   onChange,
   onJoin,
   isJoining,
-  disabled,
+  disabled = false,
   collapsible = false,
+  onSignInRequired,
 }: JoinChallengeProps) {
   const [focused, setFocused] = useState(false);
   const [open, setOpen] = useState(false);
+  const signInRequired = disabled;
+
+  const handleToggle = () => {
+    if (signInRequired) {
+      onSignInRequired?.();
+      return;
+    }
+    setOpen((prev) => !prev);
+  };
 
   const inputBlock = (
     <div
       className={`flex items-center gap-2 rounded-xl border-2 bg-white px-3 py-2 transition-colors ${
-        focused ? 'border-[var(--accent)]' : 'border-[var(--border-mid)]'
+        signInRequired
+          ? 'border-[var(--border-mid)] opacity-60'
+          : focused
+            ? 'border-[var(--accent)]'
+            : 'border-[var(--border-mid)]'
       }`}
     >
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        onFocus={() => setFocused(true)}
+        onFocus={() => {
+          if (signInRequired) {
+            onSignInRequired?.();
+            return;
+          }
+          setFocused(true);
+        }}
         onBlur={() => setFocused(false)}
-        onKeyDown={(e) => e.key === 'Enter' && !disabled && !isJoining && value.trim() && onJoin()}
-        placeholder="e.g. K7M3NP2X"
-        disabled={disabled || isJoining}
-        className="min-w-0 flex-1 bg-transparent font-ui text-sm font-bold uppercase tracking-widest text-[var(--text)] placeholder:text-[var(--text-dim)]/50 focus:outline-none disabled:opacity-50"
+        onKeyDown={(e) => e.key === 'Enter' && !signInRequired && !isJoining && value.trim() && onJoin()}
+        placeholder={signInRequired ? 'Sign in to join' : 'e.g. K7M3NP2X'}
+        disabled={signInRequired || isJoining}
+        readOnly={signInRequired}
+        className="min-w-0 flex-1 bg-transparent font-ui text-sm font-bold uppercase tracking-widest text-[var(--text)] placeholder:normal-case placeholder:font-body placeholder:font-semibold placeholder:tracking-normal placeholder:text-[var(--text-dim)] focus:outline-none disabled:cursor-not-allowed"
         autoCapitalize="characters"
         autoCorrect="off"
         spellCheck={false}
       />
       <button
         type="button"
-        onClick={onJoin}
-        disabled={disabled || isJoining || !value.trim()}
+        onClick={() => {
+          if (signInRequired) {
+            onSignInRequired?.();
+            return;
+          }
+          onJoin();
+        }}
+        disabled={!signInRequired && (isJoining || !value.trim())}
+        aria-disabled={signInRequired}
         className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[var(--accent)] text-white transition-transform active:scale-95 disabled:opacity-40"
       >
         {isJoining ? (
@@ -64,20 +93,27 @@ export default function JoinChallenge({
       <div className="flex flex-col gap-3">
         <button
           type="button"
-          onClick={() => setOpen((prev) => !prev)}
-          className="theme-game-btn theme-game-btn--ai group w-full"
-          aria-expanded={open}
+          onClick={handleToggle}
+          className={`theme-game-btn theme-game-btn--ai group w-full ${signInRequired ? 'opacity-60' : ''}`}
+          aria-expanded={signInRequired ? false : open}
+          aria-disabled={signInRequired}
         >
           <div className="theme-game-btn__inner">
             <span className="theme-game-btn__emoji" aria-hidden>🔗</span>
             <div className="theme-game-btn__content flex-1">
               <span className="theme-game-btn__title">Join Challenge</span>
-              <span className="theme-game-btn__subtitle">Paste a friend&apos;s Game ID</span>
+              <span
+                className={`theme-game-btn__subtitle ${
+                  signInRequired ? 'text-[var(--orange)] font-bold' : ''
+                }`}
+              >
+                {signInRequired ? 'Sign in required' : "Paste a friend's Game ID"}
+              </span>
             </div>
             <ChevronDown
               size={20}
               className={`flex-shrink-0 text-[var(--text-dim)] transition-transform duration-200 ${
-                open ? 'rotate-180' : ''
+                open && !signInRequired ? 'rotate-180' : ''
               }`}
               aria-hidden
             />
@@ -85,7 +121,7 @@ export default function JoinChallenge({
         </button>
 
         <AnimatePresence initial={false}>
-          {open && (
+          {open && !signInRequired && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
@@ -108,7 +144,7 @@ export default function JoinChallenge({
 
   return (
     <motion.div
-      className="theme-card flex flex-col gap-3 p-4"
+      className={`theme-card flex flex-col gap-3 p-4 ${signInRequired ? 'opacity-60' : ''}`}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
     >
@@ -117,7 +153,9 @@ export default function JoinChallenge({
         <h3 className="font-ui text-sm font-bold text-[var(--text)]">Join Challenge</h3>
       </div>
       <p className="font-body text-xs leading-relaxed text-[var(--text-dim)]">
-        Paste the Game ID your friend shared after creating an invite-only match.
+        {signInRequired
+          ? 'Sign in to paste a Game ID and join an invite-only match.'
+          : 'Paste the Game ID your friend shared after creating an invite-only match.'}
       </p>
       {inputBlock}
     </motion.div>

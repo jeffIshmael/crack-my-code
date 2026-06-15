@@ -260,15 +260,22 @@ export default function Lobby({
                 </button>
 
                 <button
+                  type="button"
                   onClick={isConnected ? openPvPModal : () => login()}
-                  disabled={!isConnected}
-                  className="theme-game-btn theme-game-btn--pvp group"
+                  className={`theme-game-btn theme-game-btn--pvp group ${!isConnected ? 'opacity-60' : ''}`}
+                  aria-disabled={!isConnected}
                 >
                   <div className="theme-game-btn__inner">
                     <span className="theme-game-btn__emoji" aria-hidden>👥</span>
                     <div className="theme-game-btn__content flex-1">
                       <span className="theme-game-btn__title">Play Against Opponent</span>
-                      <span className="theme-game-btn__subtitle">Human Opponent</span>
+                      <span
+                        className={`theme-game-btn__subtitle ${
+                          !isConnected ? '!text-[var(--orange)] font-bold' : ''
+                        }`}
+                      >
+                        {!isConnected ? 'Sign in required' : 'Human Opponent'}
+                      </span>
                     </div>
                     <ChevronRight
                       size={20}
@@ -288,6 +295,7 @@ export default function Lobby({
                     onJoin={onJoinByGameId}
                     isJoining={isJoining}
                     disabled={!isConnected}
+                    onSignInRequired={() => login()}
                     collapsible
                   />
                 </>
