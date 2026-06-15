@@ -1722,8 +1722,10 @@ export default function Home() {
     </motion.div>
   );
 
+  const showBottomNav = gs.phase === 'lobby' || gs.phase === 'matchmaking';
+
   return (
-    <main className="relative flex flex-col items-center justify-start min-h-full">
+    <main className="relative flex h-full min-h-0 flex-col overflow-hidden">
       <JoinStakeModal
         open={!!pendingJoinStake}
         stake={pendingJoinStake?.stake ?? 0}
@@ -1734,21 +1736,21 @@ export default function Home() {
           if (!isJoining) setPendingJoinStake(null);
         }}
       />
-      <div className="w-full max-w-xl px-4 relative">
-        {activeTab === 'home' ? renderHomeContent() :
-          activeTab === 'games' ? renderOpenGames() :
-            activeTab === 'leaderboard' ? renderLeaderboard() :
-            activeTab === 'wallet' ? renderWalletContent() :
-              activeTab === 'stats' ? renderStats() :
-                activeTab === 'terms' ? renderTerms() :
-                  activeTab === 'privacy' ? renderPrivacy() :
-                    activeTab === 'contact' ? renderContact() :
-                      renderAbout()}
-
-
+      <div
+        className={`app-page-scroll w-full ${showBottomNav ? 'app-page-scroll--with-nav' : ''}`}
+      >
+        <div className="relative mx-auto w-full max-w-xl px-4">
+          {activeTab === 'home' ? renderHomeContent() :
+            activeTab === 'games' ? renderOpenGames() :
+              activeTab === 'leaderboard' ? renderLeaderboard() :
+              activeTab === 'wallet' ? renderWalletContent() :
+                activeTab === 'stats' ? renderStats() :
+                  activeTab === 'terms' ? renderTerms() :
+                    activeTab === 'privacy' ? renderPrivacy() :
+                      activeTab === 'contact' ? renderContact() :
+                        renderAbout()}
+        </div>
       </div>
-
-
 
       <BottomNav
         activeTab={activeTab}
@@ -1756,7 +1758,7 @@ export default function Home() {
           setActiveTab(t);
           if (gs.phase === 'result') handleHome();
         }}
-        visible={gs.phase === 'lobby' || gs.phase === 'matchmaking'}
+        visible={showBottomNav}
       />
     </main>
   );

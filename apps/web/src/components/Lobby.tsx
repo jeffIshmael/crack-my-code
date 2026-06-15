@@ -168,7 +168,7 @@ export default function Lobby({
   };
 
   return (
-    <div className="relative flex h-dvh flex-col items-center justify-between px-4 pt-6 pb-[calc(var(--nav-clearance)+env(safe-area-inset-bottom,0px))] text-[var(--text)] overflow-hidden">
+    <div className="relative flex min-h-[calc(100dvh-var(--nav-clearance-with-safe))] flex-col items-center justify-between px-4 pt-6 text-[var(--text)] overflow-hidden">
 
       {/* ── Top row with Sign Up ── */}
       {/* ── Top Header Row ── */}

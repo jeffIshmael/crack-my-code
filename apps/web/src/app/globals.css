@@ -33,7 +33,8 @@
   --clue-yellow-dim: rgba(255, 159, 67, 0.4);
   --clue-green-text: #FFFFFF;
   --clue-yellow-text: #FFFFFF;
-  --nav-clearance: 6.75rem;
+  --nav-clearance: 6.5rem;
+  --nav-clearance-with-safe: calc(var(--nav-clearance) + env(safe-area-inset-bottom, 0px));
   --shell-outer-bg: #2D3748;
   --font-display: 'Fredoka', sans-serif;
   --font-ui: 'Fredoka', sans-serif;
@@ -60,7 +61,8 @@ html, body {
   -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
   min-height: 100vh;
-  overflow-x: hidden;
+  min-height: 100dvh;
+  overflow: hidden;
 }
 
 .font-display { font-family: var(--font-display); }
@@ -72,6 +74,11 @@ html, body {
   background: linear-gradient(180deg, #E8F6FD 0%, #E3F2FA 50%, #D6EEF9 100%);
   color: var(--text);
   position: relative;
+  height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .theme-shell__effects {
@@ -85,6 +92,24 @@ html, body {
 .theme-shell__content {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.app-page-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+}
+
+.app-page-scroll--with-nav {
+  padding-bottom: var(--nav-clearance-with-safe);
 }
 
 .theme-bg-pop-cloud {
@@ -264,7 +289,6 @@ html, body {
 
 .page-tab {
   padding-top: 1.25rem;
-  padding-bottom: calc(var(--nav-clearance) + env(safe-area-inset-bottom, 0px));
 }
 
 .theme-game-btn__inner {
