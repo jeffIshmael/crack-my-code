@@ -8,6 +8,13 @@ import type { TileClue, GuessEntry } from '@/lib/game';
 import { CODE_LENGTH, MAX_GUESSES } from '@/lib/game';
 import type { GamePhase } from '@/lib/game';
 
+/**
+ * PvP: how long to linger on the player's board after they guess (turn passes
+ * to the opponent) so the just-revealed green/yellow/gray feedback is readable
+ * before the opponent's board slides in.
+ */
+const PVP_GUESS_REVIEW_MS = 1800;
+
 interface GameBoardProps {
   playerGuesses: GuessEntry[];
   opponentGuesses: GuessEntry[];
@@ -83,27 +90,26 @@ export default function GameBoard({
   }, [isAI, phase, isPlayerTurn, opponentCurrentInput.length, pendingOpponentTileClues]);
 
   useEffect(() => {
-    if (!isPlayerTurn) return;
-
-    if (isAI) {
-      if (opponentCurrentInput.length > 0 || pendingOpponentTileClues !== null) return;
-      const timer = setTimeout(() => setView('player'), 900);
-      return () => clearTimeout(timer);
-    }
-
-    const timer = setTimeout(() => setView('player'), 2000);
+    if (!isAI || !isPlayerTurn) return;
+    if (opponentCurrentInput.length > 0 || pendingOpponentTileClues !== null) return;
+    const timer = setTimeout(() => setView('player'), 900);
     return () => clearTimeout(timer);
-  }, [isPlayerTurn, isAI, opponentCurrentInput.length, pendingOpponentTileClues]);
+  }, [isAI, isPlayerTurn, opponentCurrentInput.length, pendingOpponentTileClues]);
 
+  // PvP board switching, keyed only on whose turn it is (not opponent typing)
+  // so the post-guess review window stays stable. When it's the player's turn
+  // we show their board immediately; once they guess and the turn passes, we
+  // linger on their board so the clue feedback is visible before revealing the
+  // opponent's board.
   useEffect(() => {
-    if (turnNotification === 'opponent') {
-      const timer = setTimeout(() => setView('opponent'), 800);
-      return () => clearTimeout(timer);
-    }
-    if (turnNotification === 'player') {
+    if (isAI || phase !== 'playing') return;
+    if (isPlayerTurn) {
       setView('player');
+      return;
     }
-  }, [turnNotification]);
+    const timer = setTimeout(() => setView('opponent'), PVP_GUESS_REVIEW_MS);
+    return () => clearTimeout(timer);
+  }, [isAI, phase, isPlayerTurn]);
 
   useEffect(() => {
     if (historyRef.current) {

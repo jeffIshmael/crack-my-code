@@ -21,7 +21,7 @@ interface ResultModalProps {
   onPlayAgain: () => void;
   onHome: () => void;
   /** PvP rematch (non-AI modes only) */
-  rematchStatus?: 'idle' | 'waiting' | 'opponent_wants';
+  rematchStatus?: 'idle' | 'waiting' | 'opponent_wants' | 'declined';
   onRematch?: () => void;
   onDeclineRematch?: () => void;
   rematchLoading?: boolean;
@@ -307,7 +307,9 @@ export default function ResultModal({
               transition={{ delay: 0.75 }}
             >
               <div className="absolute inset-0 bg-white/10 opacity-0 transition-opacity group-hover:opacity-100" />
-              <span className="relative z-10">PLAY AGAIN</span>
+              <span className="relative z-10 inline-flex items-center justify-center gap-2">
+                <span aria-hidden>🔄</span> PLAY AGAIN
+              </span>
             </motion.button>
           )}
 
@@ -357,26 +359,39 @@ export default function ResultModal({
                     Cancel & go home
                   </button>
                 </div>
-              ) : (
+              ) : rematchStatus === 'declined' ? (
                 <>
+                  <p className="text-center font-body text-sm text-[var(--text-2)]">
+                    <span className="font-bold text-[var(--accent)]">{opponentName}</span> declined the rematch.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={onHome}
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3.5 font-ui text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                  >
+                    <span aria-hidden>🏠</span> Go home
+                  </button>
+                </>
+              ) : (
+                <div className="flex w-full items-stretch gap-3">
                   <button
                     type="button"
                     onClick={onRematch}
                     disabled={rematchLoading}
-                    className="theme-game-btn theme-game-btn--pvp w-full min-h-0 py-4 disabled:opacity-50"
+                    className="theme-game-btn theme-game-btn--pvp flex-1 min-h-0 py-4 disabled:opacity-50"
                   >
-                    <span className="theme-game-btn__title text-sm">
-                      {rematchLoading ? 'Requesting…' : 'Rematch'}
+                    <span className="theme-game-btn__title flex items-center justify-center gap-1.5 text-sm">
+                      <span aria-hidden>🔄</span> {rematchLoading ? 'Requesting…' : 'Rematch'}
                     </span>
                   </button>
                   <button
                     type="button"
                     onClick={onHome}
-                    className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
                   >
-                    Go home
+                    <span aria-hidden>🏠</span> Go home
                   </button>
-                </>
+                </div>
               )}
             </motion.div>
           )}

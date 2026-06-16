@@ -131,7 +131,7 @@ export default function Home() {
     rating: number;
     loading: boolean;
   } | null>(null);
-  const [rematchStatus, setRematchStatus] = useState<'idle' | 'waiting' | 'opponent_wants'>('idle');
+  const [rematchStatus, setRematchStatus] = useState<'idle' | 'waiting' | 'opponent_wants' | 'declined'>('idle');
   const [rematchLoading, setRematchLoading] = useState(false);
   const [openGamesTab, setOpenGamesTab] = useState<'active' | 'history'>('active');
   const opponentAddressRef = useRef<string | null>(null);
@@ -430,7 +430,9 @@ export default function Home() {
       const afterRating = stats?.rating ?? before.rating + pointsDelta;
 
       setResultStats({
-        pointsBefore: before.points,
+        // Derive "before" from the authoritative post-game total so the
+        // displayed delta always reconciles (before + delta === after).
+        pointsBefore: afterPoints - pointsDelta,
         pointsAfter: afterPoints,
         rating: afterRating,
         loading: false,
@@ -823,7 +825,7 @@ export default function Home() {
     });
 
     channel.bind('rematch-declined', () => {
-      setRematchStatus('idle');
+      setRematchStatus('declined');
       setRematchLoading(false);
       toast.error('Rematch declined', {
         description: `${gsRef.current.opponentName} declined the rematch.`,
