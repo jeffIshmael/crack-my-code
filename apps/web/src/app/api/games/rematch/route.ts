@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { pusherServer } from '@/lib/pusher-server';
 import { createGameRecord } from '@/lib/prisma-game';
+import { findUserByAddress } from '@/lib/user-address';
 
 export const dynamic = 'force-dynamic';
 
@@ -87,9 +88,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 'waiting' });
     }
 
-    const creatorUser = await prisma.user.findFirst({
-      where: { address: { equals: game.player1Address, mode: 'insensitive' } },
-    });
+    const creatorUser = await findUserByAddress(game.player1Address);
 
     if (!creatorUser) {
       return NextResponse.json({ error: 'Could not resolve game creator' }, { status: 500 });

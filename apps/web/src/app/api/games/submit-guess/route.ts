@@ -9,6 +9,7 @@ import { applyScoreDelta } from '@/lib/user-points';
 import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
 import { isRegisteredPlayer } from '@/lib/guest';
+import { findUserByAddress } from '@/lib/user-address';
 import { getNextTurnAddress } from '@/lib/turn';
 
 export async function POST(req: NextRequest) {
@@ -208,11 +209,7 @@ export async function POST(req: NextRequest) {
     let playerStats: { points: number } | null = null;
     const gameEnded = isWin || winner !== null;
     if (isRegisteredPlayer(normalizedPlayerAddress) && gameEnded) {
-      const updatedUser = await prisma.user.findFirst({
-        where: {
-          address: { equals: normalizedPlayerAddress, mode: 'insensitive' },
-        },
-      });
+      const updatedUser = await findUserByAddress(normalizedPlayerAddress);
       if (updatedUser) {
         playerStats = { points: updatedUser.points ?? 1000 };
       }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { isGuestAddress } from '@/lib/guest';
+import { ensureRegisteredUser, normalizeWalletAddress } from '@/lib/user-address';
 
 export async function POST(req: NextRequest) {
   try {
@@ -14,17 +14,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest accounts are not registered' }, { status: 403 });
     }
 
-    const normalizedAddress = address.toLowerCase();
-
-    const user = await prisma.user.upsert({
-      where: { address: normalizedAddress },
-      update: {},
-      create: {
-        address: normalizedAddress,
-        name: `Player_${normalizedAddress.slice(2, 6)}`,
-        points: 1000,
-      },
-    });
+    const user = await ensureRegisteredUser(normalizeWalletAddress(address));
 
     return NextResponse.json({ ...user, points: user.points ?? 1000 });
   } catch (error) {

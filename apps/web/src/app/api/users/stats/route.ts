@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { isGuestAddress } from '@/lib/guest';
+import { ensureRegisteredUser, normalizeWalletAddress } from '@/lib/user-address';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,21 +16,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Guest accounts are not registered' }, { status: 403 });
     }
 
-    const normalizedAddress = address.toLowerCase();
-
-    let user = await prisma.user.findFirst({
-      where: { address: { equals: normalizedAddress, mode: 'insensitive' } },
-    });
-
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          address: normalizedAddress,
-          name: `Player_${normalizedAddress.slice(2, 6)}`,
-          points: 1000,
-        },
-      });
-    }
+    const user = await ensureRegisteredUser(normalizeWalletAddress(address));
 
     return NextResponse.json({ points: user.points ?? 1000 });
   } catch (error) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
 import { isGuestAddress } from '@/lib/guest';
 import { applyScoreDelta } from '@/lib/user-points';
+import { findUserByAddress, normalizeWalletAddress } from '@/lib/user-address';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,19 +15,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Guest accounts cannot earn CMC points' }, { status: 403 });
     }
 
-    const normalizedAddress = address.toLowerCase();
+    const normalizedAddress = normalizeWalletAddress(address);
     const delta = pointsDelta ?? ratingDelta ?? 0;
 
     await applyScoreDelta(normalizedAddress, delta);
 
-    const user = await prisma.user.findFirst({
-      where: {
-        address: {
-          equals: normalizedAddress,
-          mode: 'insensitive',
-        },
-      },
-    });
+    const user = await findUserByAddress(normalizedAddress);
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });

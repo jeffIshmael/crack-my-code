@@ -6,6 +6,7 @@ import { pusherServer } from '@/lib/pusher-server';
 import { generateSecretCode } from '@/lib/game';
 import { generateJoinCode } from '@/lib/join-code';
 import { createGameRecord } from '@/lib/prisma-game';
+import { ensureGuestUser, ensureRegisteredUser } from '@/lib/user-address';
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,15 +22,10 @@ export async function POST(req: NextRequest) {
     const effectiveAddress = rawAddress === 'GUEST' ? 'GUEST' : rawAddress.toLowerCase();
 
     // 1. Ensure the user exists (Guests use a shared GUEST account)
-    const user = await prisma.user.upsert({
-      where: { address: effectiveAddress },
-      update: {},
-      create: { 
-        address: effectiveAddress, 
-        name: effectiveAddress === 'GUEST' ? 'Anonymous Guest' : `Player_${effectiveAddress.slice(2, 6)}`,
-        points: 1000,
-      }
-    });
+    const user =
+      effectiveAddress === 'GUEST'
+        ? await ensureGuestUser()
+        : await ensureRegisteredUser(effectiveAddress);
 
     if (effectiveAddress === 'GUEST' && !isAI) {
         return NextResponse.json({ error: 'Guests can only play against AI' }, { status: 403 });
