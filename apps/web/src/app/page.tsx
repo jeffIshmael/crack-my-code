@@ -82,6 +82,17 @@ export default function Home() {
   const AI_DIGIT_MS = 300;
   const AI_REVEAL_MS = 2200;
 
+  // PvP: after a guess is played, keep the result visible on the current board
+  // for this long before announcing the turn change and switching boards.
+  const TURN_HANDOVER_DELAY_MS = 1500;
+  const turnHandoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const turnTransitionUntilRef = useRef(0);
+  // Blocks input while a player's just-played guess is still being reviewed
+  // (their turn flag is held briefly so they can read the clue feedback).
+  const [turnLocked, setTurnLocked] = useState(false);
+  const turnLockedRef = useRef(false);
+  useEffect(() => { turnLockedRef.current = turnLocked; }, [turnLocked]);
+
   const [activeTab, setActiveTab] = useState<NavTab>(() => {
     if (typeof window !== 'undefined') {
       const path = window.location.pathname.replace('/', '');
@@ -252,6 +263,35 @@ export default function Home() {
   const { cancelChallenge } = useGuessMyCode();
 
   const clearOppTimer = () => { if (oppTimerRef.current) clearTimeout(oppTimerRef.current); };
+
+  const clearTurnHandover = useCallback(() => {
+    if (turnHandoverTimerRef.current) {
+      clearTimeout(turnHandoverTimerRef.current);
+      turnHandoverTimerRef.current = null;
+    }
+    turnTransitionUntilRef.current = 0;
+    setTurnLocked(false);
+  }, []);
+
+  // PvP: hold the current board (with the just-played guess + clues visible)
+  // for TURN_HANDOVER_DELAY_MS, then flip the turn — which triggers the turn
+  // banner and the board switch together. `nextIsPlayerTurn` is the turn owner
+  // once the handover completes.
+  const scheduleTurnHandover = useCallback((nextIsPlayerTurn: boolean) => {
+    if (turnHandoverTimerRef.current) clearTimeout(turnHandoverTimerRef.current);
+    turnTransitionUntilRef.current = Date.now() + TURN_HANDOVER_DELAY_MS;
+    setTurnLocked(true);
+    turnHandoverTimerRef.current = setTimeout(() => {
+      turnHandoverTimerRef.current = null;
+      turnTransitionUntilRef.current = 0;
+      setTurnLocked(false);
+      setGs((prev) =>
+        prev.phase === 'playing' && prev.gameMode !== 'ai'
+          ? { ...prev, isPlayerTurn: nextIsPlayerTurn, opponentCurrentInput: [] }
+          : prev,
+      );
+    }, TURN_HANDOVER_DELAY_MS);
+  }, []);
 
   // 1.2 Fetch my private invite challenges
   const fetchMyActive = useCallback(async () => {
@@ -488,6 +528,10 @@ export default function Home() {
           };
         }
 
+        // Don't let background sync flip the turn (or switch boards) while we're
+        // deliberately holding the current board to show the just-played result.
+        if (Date.now() < turnTransitionUntilRef.current) return prev;
+
         const guessesChanged =
           data.playerGuesses.length !== prev.playerGuesses.length ||
           data.opponentGuesses.length !== prev.opponentGuesses.length ||
@@ -551,6 +595,11 @@ export default function Home() {
       const myAddress = addressRef.current?.toLowerCase();
       if (!myAddress || data.sender?.toLowerCase() === myAddress) return;
 
+      const isMyTurn = data.nextTurnAddress
+        ? data.nextTurnAddress.toLowerCase() === myAddress
+        : true;
+      const opponentWon = isWinningClues(data.clues);
+
       setGs((prev: GameState) => {
         const entry: GuessEntry = {
           digits: data.digits,
@@ -559,11 +608,8 @@ export default function Home() {
           id: `opp-${Date.now()}`,
         };
         const newGuesses = [...prev.opponentGuesses, entry];
-        const isMyTurn = data.nextTurnAddress
-          ? data.nextTurnAddress.toLowerCase() === myAddress
-          : true;
 
-        if (isWinningClues(data.clues)) {
+        if (opponentWon) {
           const loss = scoreDeltaForMode(prev.gameMode === 'ai' ? 'ai' : prev.gameMode, false);
 
           fetch('/api/games/reveal', {
@@ -596,14 +642,21 @@ export default function Home() {
           };
         }
 
+        // Reveal the opponent's guess + clues on their board now, but keep the
+        // turn flag where it is. scheduleTurnHandover (below) flips it after a
+        // beat so the result is readable before switching to my board.
         return {
           ...prev,
           opponentGuesses: newGuesses,
           opponentGuessCount: prev.opponentGuessCount + 1,
-          isPlayerTurn: isMyTurn,
           opponentCurrentInput: [],
+          isPlayerTurn: false,
         };
       });
+
+      if (!opponentWon) {
+        scheduleTurnHandover(isMyTurn);
+      }
     };
 
     const onGameStarted = () => {
@@ -621,7 +674,7 @@ export default function Home() {
       channel.unbind('game-started', onGameStarted);
       pusherClient.unsubscribe(channelName);
     };
-  }, [currentGameId, gs.gameMode, syncResultStats]);
+  }, [currentGameId, gs.gameMode, syncResultStats, scheduleTurnHandover]);
 
   // Poll server turn state during PvP — backup when Pusher events are missed
   useEffect(() => {
@@ -784,6 +837,7 @@ export default function Home() {
     setResultStats(null);
     setRematchStatus('idle');
     setRematchLoading(false);
+    clearTurnHandover();
     const isAIMatch = opponentAddress === 'AI_BOT' || opponentAddress === 'AI';
     if (!isAIMatch) {
       opponentAddressRef.current = opponentAddress.toLowerCase();
@@ -806,7 +860,7 @@ export default function Home() {
       result: null,
       ratingDelta: null,
     }));
-  }, []);
+  }, [clearTurnHandover]);
 
   // User channel: match-found
   useEffect(() => {
@@ -1093,11 +1147,12 @@ export default function Home() {
   const handleQuitGame = useCallback(() => {
     if (window.confirm("Are you sure you want to quit the game?")) {
       clearOppTimer();
+      clearTurnHandover();
       setGs(initialGameState(gs.playerRating, gs.playerPoints));
       setCurrentGameId(null);
       setCurrentOnChainMatchId(null);
     }
-  }, [gs.playerRating, gs.playerPoints]);
+  }, [gs.playerRating, gs.playerPoints, clearTurnHandover]);
 
   // ─── Phase: SetCode → Playing ─────────────────────────────────────────────
 
@@ -1140,7 +1195,7 @@ export default function Home() {
   // ─── Phase: Playing — submit guess ────────────────────────────────────────
 
   const handleSubmitGuess = useCallback(async (digits: number[]) => {
-    if (!gs.isPlayerTurn || gs.phase !== 'playing' || isSubmitting) return;
+    if (!gs.isPlayerTurn || gs.phase !== 'playing' || isSubmitting || turnLockedRef.current) return;
     if (digits.length !== CODE_LENGTH) return;
 
     setIsSubmitting(true);
@@ -1165,10 +1220,12 @@ export default function Home() {
             id: `${Date.now()}`,
           };
           const newGuesses = [...gs.playerGuesses, entry];
+          const won = isWinningClues(clues);
+          const reachedMax = newGuesses.length >= MAX_GUESSES;
 
           setGs((prev: GameState) => {
             // Win check
-            if (isWinningClues(clues)) {
+            if (won) {
               clearOppTimer();
               const win = scoreDeltaForMode(gs.gameMode === 'ai' ? 'ai' : gs.gameMode, true);
               if (isRegisteredPlayer(address)) {
@@ -1187,7 +1244,7 @@ export default function Home() {
             }
 
             // Max guesses exhausted?
-            if (newGuesses.length >= MAX_GUESSES) {
+            if (reachedMax) {
               const loss = scoreDeltaForMode(gs.gameMode === 'ai' ? 'ai' : gs.gameMode, false);
 
               fetch('/api/games/reveal', {
@@ -1214,9 +1271,18 @@ export default function Home() {
             // Hold on your board so you can read green/yellow/gray feedback before Cipher moves
             if (prev.gameMode === 'ai') {
               playerReviewUntilRef.current = Date.now() + PLAYER_GUESS_REVIEW_MS;
+              return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
             }
-            return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
+
+            // PvP: keep the turn flag on me so my board (with the clue result)
+            // stays visible. scheduleTurnHandover (below) passes the turn after a
+            // beat, which then triggers the "opponent's turn" banner + board switch.
+            return { ...prev, playerGuesses: newGuesses, currentInput: [] };
           });
+
+          if (!won && !reachedMax && gs.gameMode !== 'ai') {
+            scheduleTurnHandover(false);
+          }
         }
       } catch (err) {
         console.error('Failed to submit guess', err);
@@ -1226,11 +1292,12 @@ export default function Home() {
         isSubmittingRef.current = false;
       }
     }
-  }, [gs, currentGameId, address, isSubmitting, syncResultStats]);
+  }, [gs, currentGameId, address, isSubmitting, syncResultStats, scheduleTurnHandover]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
   const handleDigitPress = useCallback((digit: number) => {
+    if (turnLockedRef.current) return;
     setGs((prev: GameState) => {
       if (!prev.isPlayerTurn || prev.phase !== 'playing') return prev;
       if (prev.currentInput.length >= CODE_LENGTH) return prev;
@@ -1252,6 +1319,7 @@ export default function Home() {
 
   const exitResultScreen = useCallback(() => {
     clearOppTimer();
+    clearTurnHandover();
     const rating = resultStats?.rating ?? gs.playerRating;
     const points = resultStats?.pointsAfter ?? gs.playerPoints;
     setGs(initialGameState(rating, points));
@@ -1262,7 +1330,7 @@ export default function Home() {
     setShareableJoinCode(null);
     opponentAddressRef.current = null;
     if (address) void refreshUserStats();
-  }, [gs.playerRating, gs.playerPoints, resultStats, address, refreshUserStats]);
+  }, [gs.playerRating, gs.playerPoints, resultStats, address, refreshUserStats, clearTurnHandover]);
 
   const handlePlayAgain = useCallback(() => {
     if (gs.gameMode !== 'ai') return;
@@ -1324,7 +1392,7 @@ export default function Home() {
 
   // ─── Cleanup on unmount ───────────────────────────────────────────────────
 
-  useEffect(() => () => { clearOppTimer(); }, []); // eslint-disable-line
+  useEffect(() => () => { clearOppTimer(); clearTurnHandover(); }, []); // eslint-disable-line
 
   // ─── Keyboard support (desktop / testing) ────────────────────────────────
 
@@ -1541,6 +1609,7 @@ export default function Home() {
           onLockCode={handleLockCode}
           onBack={() => {
             clearOppTimer();
+            clearTurnHandover();
             setGs(initialGameState(gs.playerRating, gs.playerPoints));
             setCurrentGameId(null);
             setShareableJoinCode(null);
@@ -1607,6 +1676,7 @@ export default function Home() {
           playerPoints={gs.playerPoints}
           pointsLoading={pointsLoading}
           isSubmitting={isSubmitting}
+          inputLocked={turnLocked}
           onDigitPress={handleDigitPress}
           onDelete={handleDeleteDigit}
           onSubmit={() => handleSubmitGuess(gs.currentInput)}

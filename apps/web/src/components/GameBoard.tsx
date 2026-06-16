@@ -8,13 +8,6 @@ import type { TileClue, GuessEntry } from '@/lib/game';
 import { CODE_LENGTH, MAX_GUESSES } from '@/lib/game';
 import type { GamePhase } from '@/lib/game';
 
-/**
- * PvP: how long to linger on the player's board after they guess (turn passes
- * to the opponent) so the just-revealed green/yellow/gray feedback is readable
- * before the opponent's board slides in.
- */
-const PVP_GUESS_REVIEW_MS = 1800;
-
 interface GameBoardProps {
   playerGuesses: GuessEntry[];
   opponentGuesses: GuessEntry[];
@@ -28,6 +21,8 @@ interface GameBoardProps {
   pointsLoading?: boolean;
   isSubmitting?: boolean;
   isAI?: boolean;
+  /** PvP: locks input while the player reviews their just-played guess. */
+  inputLocked?: boolean;
   onDigitPress: (d: number) => void;
   onDelete: () => void;
   onSubmit: () => void;
@@ -50,6 +45,7 @@ export default function GameBoard({
   pointsLoading = false,
   isSubmitting = false,
   isAI = false,
+  inputLocked = false,
   onDigitPress,
   onDelete,
   onSubmit,
@@ -60,7 +56,7 @@ export default function GameBoard({
 }: GameBoardProps) {
   const historyRef = useRef<HTMLDivElement>(null);
   const [view, setView] = useState<'player' | 'opponent'>('player');
-  const canSubmit = isPlayerTurn && currentInput.length === CODE_LENGTH;
+  const canSubmit = isPlayerTurn && !inputLocked && currentInput.length === CODE_LENGTH;
   const aiReviewingPlayerGuess =
     isAI &&
     !isPlayerTurn &&
@@ -96,19 +92,13 @@ export default function GameBoard({
     return () => clearTimeout(timer);
   }, [isAI, isPlayerTurn, opponentCurrentInput.length, pendingOpponentTileClues]);
 
-  // PvP board switching, keyed only on whose turn it is (not opponent typing)
-  // so the post-guess review window stays stable. When it's the player's turn
-  // we show their board immediately; once they guess and the turn passes, we
-  // linger on their board so the clue feedback is visible before revealing the
-  // opponent's board.
+  // PvP board switching follows whose turn it is. The deliberate "review the
+  // result first" delay is handled upstream (the turn flag is held briefly
+  // after a guess), so here we switch boards immediately on the turn flip:
+  // it's my turn -> my board, opponent's turn -> their board.
   useEffect(() => {
     if (isAI || phase !== 'playing') return;
-    if (isPlayerTurn) {
-      setView('player');
-      return;
-    }
-    const timer = setTimeout(() => setView('opponent'), PVP_GUESS_REVIEW_MS);
-    return () => clearTimeout(timer);
+    setView(isPlayerTurn ? 'player' : 'opponent');
   }, [isAI, phase, isPlayerTurn]);
 
   useEffect(() => {
@@ -303,7 +293,7 @@ export default function GameBoard({
 
       {/* Fixed bottom controls */}
       <div className="flex-shrink-0 border-t border-[var(--border-mid)] pt-2 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
-        {isPlayerTurn && (
+        {isPlayerTurn && !inputLocked && (
           <motion.button
             onClick={onSubmit}
             disabled={!canSubmit || isSubmitting}
@@ -321,9 +311,11 @@ export default function GameBoard({
           </motion.button>
         )}
 
-        {!isPlayerTurn && phase === 'playing' && (
+        {phase === 'playing' && (inputLocked || !isPlayerTurn) && (
           <p className="mb-2 text-center font-ui text-[10px] font-bold tracking-wide text-[var(--text-dim)]">
-            {aiReviewingPlayerGuess
+            {inputLocked && isPlayerTurn
+              ? 'Review your hints above…'
+              : aiReviewingPlayerGuess
               ? 'Review your hints above'
               : aiCrackedCode
               ? `${opponentName} cracked your code!`
@@ -361,7 +353,7 @@ export default function GameBoard({
         <NumberPad
           inputLength={currentInput.length}
           maxLength={CODE_LENGTH}
-          disabled={!isPlayerTurn}
+          disabled={!isPlayerTurn || inputLocked}
           canSubmit={canSubmit}
           isSubmitting={isSubmitting}
           onDigit={onDigitPress}
