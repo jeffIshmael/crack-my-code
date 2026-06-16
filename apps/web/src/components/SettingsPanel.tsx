@@ -155,6 +155,25 @@ export function SettingsPanel({
             <ChevronRight size={18} className="flex-shrink-0 text-[var(--text-dim)]" />
           </motion.button>
         ))}
+
+        <motion.a
+          href="https://x.com/crack_my_code"
+          target="_blank"
+          rel="noopener noreferrer"
+          whileTap={{ scale: 0.98 }}
+          className="theme-card flex w-full items-center justify-between p-4 text-left transition-colors hover:brightness-[0.99]"
+        >
+          <div className="flex items-center gap-3 min-w-0">
+            <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#15202B] text-lg text-white">
+              𝕏
+            </span>
+            <div className="min-w-0">
+              <span className="block font-ui text-sm font-bold text-[var(--text)]">Follow us on X</span>
+              <span className="block font-body text-xs text-[var(--text-dim)]">@crack_my_code</span>
+            </div>
+          </div>
+          <ChevronRight size={18} className="flex-shrink-0 text-[var(--text-dim)]" />
+        </motion.a>
       </div>
     </div>
   );
