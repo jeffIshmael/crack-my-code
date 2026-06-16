@@ -24,11 +24,9 @@ export function ConnectButton({ onWalletClick }: ConnectButtonProps) {
   const fetchPoints = useCallback(async () => {
     if (!address) return;
     try {
-      const res = await fetch('/api/users/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address })
-      });
+      const res = await fetch(
+        `/api/users/stats?address=${encodeURIComponent(address)}`,
+      );
       const data = await res.json();
       if (data.points !== undefined) {
         setPoints(data.points);

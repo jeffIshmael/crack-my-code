@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isGuestAddress } from '@/lib/guest';
+import { applyScoreDelta } from '@/lib/user-points';
 
 export async function POST(req: NextRequest) {
   try {
@@ -16,30 +17,23 @@ export async function POST(req: NextRequest) {
 
     const normalizedAddress = address.toLowerCase();
 
-    // Ensure we don't go below 0 for points or rating
-    const currentUser = await prisma.user.findFirst({
+    await applyScoreDelta(normalizedAddress, {
+      rating: ratingDelta || 0,
+      points: pointsDelta ?? ratingDelta ?? 0,
+    });
+
+    const user = await prisma.user.findFirst({
       where: {
         address: {
           equals: normalizedAddress,
-          mode: 'insensitive'
-        }
-      }
+          mode: 'insensitive',
+        },
+      },
     });
 
-    if (!currentUser) {
+    if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-
-    const newRating = Math.max(0, (currentUser.rating || 1000) + (ratingDelta || 0));
-    const newPoints = Math.max(0, (currentUser.points || 1000) + (pointsDelta || 0));
-
-    const user = await prisma.user.update({
-      where: { id: currentUser.id },
-      data: {
-        rating: newRating,
-        points: newPoints
-      }
-    });
 
     return NextResponse.json(user);
   } catch (error) {

@@ -400,13 +400,11 @@ export default function Home() {
   } | null> => {
     if (!address) return null;
     try {
-      const res = await fetch('/api/users/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address }),
-      });
+      const res = await fetch(
+        `/api/users/stats?address=${encodeURIComponent(address)}`,
+      );
       const data = await res.json();
-      if (data.rating !== undefined && data.points !== undefined) {
+      if (data.points !== undefined && data.rating !== undefined) {
         setGs((prev) => ({
           ...prev,
           playerRating: data.rating,
@@ -445,7 +443,7 @@ export default function Home() {
   }, [activeTab, address, gs.phase, refreshUserStats]);
 
   const syncResultStats = useCallback(
-    async (pointsDelta: number, serverStats?: { points: number; rating: number } | null) => {
+    async (pointsDelta: number) => {
       const before = matchStartStatsRef.current;
 
       if (!address) {
@@ -465,9 +463,11 @@ export default function Home() {
         loading: true,
       });
 
-      const stats = serverStats ?? (await refreshUserStats());
+      // Always re-fetch User.points from the DB after settlement so the homepage
+      // CMC header matches what submit-guess wrote (not a stale local snapshot).
+      const stats = await refreshUserStats();
       const afterPoints = stats?.points ?? before.points + pointsDelta;
-      const afterRating = stats?.rating ?? before.rating + pointsDelta;
+      const afterRating = stats?.rating ?? afterPoints;
 
       setResultStats({
         // Derive "before" from the authoritative post-game total so the
@@ -501,16 +501,19 @@ export default function Home() {
       result?: 'win' | 'lose' | null;
       opponentCode?: number[] | null;
     }) => {
+      let pendingStatsSync: number | null = null;
+
       setGs((prev: GameState) => {
         if (prev.phase !== 'playing' && prev.phase !== 'result') return prev;
 
         if (data.status === 'COMPLETED' && data.result) {
-          const loss = scoreDeltaForMode(prev.gameMode === 'ai' ? 'ai' : prev.gameMode, false);
-          const win = scoreDeltaForMode(prev.gameMode === 'ai' ? 'ai' : prev.gameMode, true);
+          const mode = prev.gameMode === 'ai' ? 'ai' : prev.gameMode;
+          const loss = scoreDeltaForMode(mode, false);
+          const win = scoreDeltaForMode(mode, true);
           const delta = data.result === 'win' ? win : loss;
 
           if (isRegisteredPlayer(addressRef.current) && prev.phase === 'playing') {
-            void syncResultStats(delta.points);
+            pendingStatsSync = delta.points;
           }
 
           return {
@@ -552,6 +555,10 @@ export default function Home() {
           opponentCurrentInput: [],
         };
       });
+
+      if (pendingStatsSync !== null) {
+        void syncResultStats(pendingStatsSync);
+      }
     },
     [syncResultStats],
   );
@@ -612,13 +619,14 @@ export default function Home() {
         if (opponentWon) {
           const loss = scoreDeltaForMode(prev.gameMode === 'ai' ? 'ai' : prev.gameMode, false);
 
-          fetch('/api/games/reveal', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ gameId: currentGameId, address: addressRef.current || 'GUEST' }),
-          })
-            .then((res) => res.json())
-            .then((revealData) => {
+          void (async () => {
+            try {
+              const res = await fetch('/api/games/reveal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gameId: currentGameId, address: addressRef.current || 'GUEST' }),
+              });
+              const revealData = await res.json();
               setGs((curr) => ({
                 ...curr,
                 opponentGuesses: newGuesses,
@@ -630,9 +638,12 @@ export default function Home() {
                 isPlayerTurn: false,
               }));
               if (isRegisteredPlayer(addressRef.current)) {
-                void syncResultStats(loss.points);
+                await syncResultStats(loss.points);
               }
-            });
+            } catch (err) {
+              console.error('Opponent win reveal failed', err);
+            }
+          })();
 
           return {
             ...prev,
@@ -691,18 +702,37 @@ export default function Home() {
     syncGameState();
   }, [gs.phase, currentGameId, gs.gameMode, address, syncGameState]);
 
-  // Turn notification effect
+  // Turn notification — PvP flips on handover; AI delays Cipher's banner until hint review ends
   useEffect(() => {
-    if (gs.phase === 'playing') {
-      if (gs.gameMode === 'ai') {
-        setTurnNotification(null);
-        return;
-      }
-      setTurnNotification(gs.isPlayerTurn ? 'player' : 'opponent');
-      const timer = setTimeout(() => setTurnNotification(null), 2000);
-      return () => clearTimeout(timer);
+    if (gs.phase !== 'playing') {
+      setTurnNotification(null);
+      return;
     }
-  }, [gs.isPlayerTurn, gs.phase, gs.gameMode]);
+
+    if (gs.gameMode === 'ai') {
+      if (gs.isPlayerTurn) {
+        setTurnNotification('player');
+        const timer = setTimeout(() => setTurnNotification(null), 2000);
+        return () => clearTimeout(timer);
+      }
+
+      const waitMs = Math.max(0, playerReviewUntilRef.current - Date.now());
+      let hideTimer: ReturnType<typeof setTimeout> | undefined;
+      const showCipherTimer = setTimeout(() => {
+        setTurnNotification('opponent');
+        hideTimer = setTimeout(() => setTurnNotification(null), 2000);
+      }, waitMs);
+
+      return () => {
+        clearTimeout(showCipherTimer);
+        if (hideTimer) clearTimeout(hideTimer);
+      };
+    }
+
+    setTurnNotification(gs.isPlayerTurn ? 'player' : 'opponent');
+    const timer = setTimeout(() => setTurnNotification(null), 2000);
+    return () => clearTimeout(timer);
+  }, [gs.isPlayerTurn, gs.phase, gs.gameMode, gs.playerGuesses.length, gs.opponentGuesses.length]);
 
   const emitTyping = (input: number[]) => {
     if (!currentGameId || gs.gameMode === 'ai') return;
@@ -780,21 +810,23 @@ export default function Home() {
                 isPlayerTurn: false,
               }));
 
-              fetch('/api/games/reveal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
-              })
-                .then(() => {
+              void (async () => {
+                try {
+                  await fetch('/api/games/reveal', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
+                  });
                   if (isRegisteredPlayer(address)) {
-                    void syncResultStats(loss.points);
+                    await syncResultStats(loss.points);
                   }
-                })
-                .catch((err) => console.error('AI reveal sync failed', err))
-                .finally(() => {
+                } catch (err) {
+                  console.error('AI reveal sync failed', err);
+                } finally {
                   aiTurnRunningRef.current = false;
                   clearOppTimer();
-                });
+                }
+              })();
               return;
             }
 
@@ -1222,66 +1254,63 @@ export default function Home() {
           const newGuesses = [...gs.playerGuesses, entry];
           const won = isWinningClues(clues);
           const reachedMax = newGuesses.length >= MAX_GUESSES;
+          const mode = gs.gameMode === 'ai' ? 'ai' : gs.gameMode;
 
-          setGs((prev: GameState) => {
-            // Win check
-            if (won) {
-              clearOppTimer();
-              const win = scoreDeltaForMode(gs.gameMode === 'ai' ? 'ai' : gs.gameMode, true);
-              if (isRegisteredPlayer(address)) {
-                void syncResultStats(win.points, data.playerStats ?? null);
-              }
-
-              return {
+          if (won) {
+            clearOppTimer();
+            setGs((prev: GameState) => ({
+              ...prev,
+              playerGuesses: newGuesses,
+              phase: 'result',
+              result: 'win',
+              ratingDelta: isRegisteredPlayer(address) ? scoreDeltaForMode(mode, true).points : 0,
+              currentInput: [],
+              opponentCode: data.opponentCode,
+            }));
+            if (isRegisteredPlayer(address)) {
+              await syncResultStats(scoreDeltaForMode(mode, true).points);
+            }
+          } else if (reachedMax) {
+            const loss = scoreDeltaForMode(mode, false);
+            setGs((prev: GameState) => ({
+              ...prev,
+              playerGuesses: newGuesses,
+              isPlayerTurn: false,
+            }));
+            try {
+              const revealRes = await fetch('/api/games/reveal', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
+              });
+              const revealData = await revealRes.json();
+              setGs((prev: GameState) => ({
                 ...prev,
                 playerGuesses: newGuesses,
                 phase: 'result',
-                result: 'win',
-                ratingDelta: isRegisteredPlayer(address) ? win.points : 0,
+                result: 'lose',
+                ratingDelta: isRegisteredPlayer(address) ? loss.points : 0,
                 currentInput: [],
-                opponentCode: data.opponentCode // Revealed by server
-              };
+                opponentCode: revealData.opponentCode || [],
+              }));
+              if (isRegisteredPlayer(address)) {
+                await syncResultStats(loss.points);
+              }
+            } catch (revealErr) {
+              console.error('Reveal after max guesses failed', revealErr);
             }
+          } else {
+            setGs((prev: GameState) => {
+              if (prev.gameMode === 'ai') {
+                playerReviewUntilRef.current = Date.now() + PLAYER_GUESS_REVIEW_MS;
+                return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
+              }
+              return { ...prev, playerGuesses: newGuesses, currentInput: [] };
+            });
 
-            // Max guesses exhausted?
-            if (reachedMax) {
-              const loss = scoreDeltaForMode(gs.gameMode === 'ai' ? 'ai' : gs.gameMode, false);
-
-              fetch('/api/games/reveal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' })
-              })
-                .then(res => res.json())
-                .then(revealData => {
-                  setGs((prev: GameState) => ({
-                    ...prev,
-                    playerGuesses: newGuesses,
-                    phase: 'result',
-                    result: 'lose',
-                    ratingDelta: isRegisteredPlayer(address) ? loss.points : 0,
-                    currentInput: [],
-                    opponentCode: revealData.opponentCode || []
-                  }));
-                  void syncResultStats(isRegisteredPlayer(address) ? loss.points : 0);
-                });
-              return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false };
+            if (gs.gameMode !== 'ai') {
+              scheduleTurnHandover(false);
             }
-
-            // Hold on your board so you can read green/yellow/gray feedback before Cipher moves
-            if (prev.gameMode === 'ai') {
-              playerReviewUntilRef.current = Date.now() + PLAYER_GUESS_REVIEW_MS;
-              return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
-            }
-
-            // PvP: keep the turn flag on me so my board (with the clue result)
-            // stays visible. scheduleTurnHandover (below) passes the turn after a
-            // beat, which then triggers the "opponent's turn" banner + board switch.
-            return { ...prev, playerGuesses: newGuesses, currentInput: [] };
-          });
-
-          if (!won && !reachedMax && gs.gameMode !== 'ai') {
-            scheduleTurnHandover(false);
           }
         }
       } catch (err) {

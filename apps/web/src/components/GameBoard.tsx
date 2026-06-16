@@ -141,7 +141,11 @@ export default function GameBoard({
                 style={{ background: turnNotification === 'player' ? 'var(--accent)' : 'var(--orange)' }}
               />
               <span className="font-orbitron text-xl font-black tracking-[0.2em] uppercase text-center" style={{ color: turnNotification === 'player' ? 'var(--accent)' : 'var(--orange)' }}>
-                {turnNotification === 'player' ? 'Your Turn' : `${opponentName}'s Turn`}
+                {turnNotification === 'player'
+                  ? 'Your Turn'
+                  : isAI
+                    ? "Cipher's Turn"
+                    : `${opponentName}'s Turn`}
               </span>
             </div>
           </motion.div>

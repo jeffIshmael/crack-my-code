@@ -5,31 +5,11 @@ export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
 import { evaluateGuess, toTileClues, MAX_GUESSES } from '@/lib/game';
 import { scoreDeltaForMode } from '@/lib/scoring';
+import { applyScoreDelta, ensureUserPointsSynced } from '@/lib/user-points';
 import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
-import { isGuestAddress, isRegisteredPlayer } from '@/lib/guest';
+import { isRegisteredPlayer } from '@/lib/guest';
 import { getNextTurnAddress } from '@/lib/turn';
-
-async function applyScoreDelta(
-  address: string,
-  deltas: { rating: number; points: number },
-) {
-  if (!isRegisteredPlayer(address)) return;
-  if (deltas.rating === 0 && deltas.points === 0) return;
-
-  const user = await prisma.user.findFirst({
-    where: { address: { equals: address, mode: 'insensitive' } },
-  });
-  if (!user || isGuestAddress(user.address)) return;
-
-  await prisma.user.update({
-    where: { id: user.id },
-    data: {
-      rating: Math.max(0, (user.rating || 1000) + deltas.rating),
-      points: Math.max(0, (user.points || 1000) + deltas.points),
-    },
-  });
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -226,16 +206,18 @@ export async function POST(req: NextRequest) {
     }
 
     let playerStats: { points: number; rating: number } | null = null;
-    if (isRegisteredPlayer(normalizedPlayerAddress) && (isWin || winner === 'AI' || (winner && winner !== normalizedPlayerAddress))) {
+    const gameEnded = isWin || winner !== null;
+    if (isRegisteredPlayer(normalizedPlayerAddress) && gameEnded) {
       const updatedUser = await prisma.user.findFirst({
         where: {
           address: { equals: normalizedPlayerAddress, mode: 'insensitive' },
         },
       });
       if (updatedUser) {
+        const synced = await ensureUserPointsSynced(updatedUser.id);
         playerStats = {
-          points: updatedUser.points,
-          rating: updatedUser.rating,
+          points: synced?.points ?? updatedUser.points,
+          rating: synced?.rating ?? updatedUser.rating,
         };
       }
     }

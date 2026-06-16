@@ -27,7 +27,8 @@ export async function POST(req: NextRequest) {
       create: { 
         address: effectiveAddress, 
         name: effectiveAddress === 'GUEST' ? 'Anonymous Guest' : `Player_${effectiveAddress.slice(2, 6)}`,
-        rating: 1000
+        rating: 1000,
+        points: 1000,
       }
     });
 

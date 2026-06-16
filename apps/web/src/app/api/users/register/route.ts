@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isGuestAddress } from '@/lib/guest';
+import { ensureUserPointsSynced } from '@/lib/user-points';
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,7 +28,9 @@ export async function POST(req: NextRequest) {
       }
     });
 
-    return NextResponse.json(user);
+    const synced = await ensureUserPointsSynced(user.id);
+
+    return NextResponse.json(synced ?? user);
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
