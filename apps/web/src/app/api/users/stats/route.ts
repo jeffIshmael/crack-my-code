@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isGuestAddress } from '@/lib/guest';
-import { ensureUserPointsSynced } from '@/lib/user-points';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,18 +27,12 @@ export async function GET(req: NextRequest) {
         data: {
           address: normalizedAddress,
           name: `Player_${normalizedAddress.slice(2, 6)}`,
-          rating: 1000,
           points: 1000,
         },
       });
     }
 
-    const synced = await ensureUserPointsSynced(user.id);
-
-    return NextResponse.json({
-      points: synced?.points ?? user.points,
-      rating: synced?.rating ?? user.rating,
-    });
+    return NextResponse.json({ points: user.points ?? 1000 });
   } catch (error) {
     console.error('User stats error:', error);
     return NextResponse.json({ error: 'Failed to load user stats' }, { status: 500 });

@@ -8,7 +8,6 @@ interface LeaderboardEntry {
   address: string;
   name: string | null;
   points: number;
-  rating: number;
 }
 
 interface LeaderboardPanelProps {

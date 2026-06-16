@@ -215,7 +215,7 @@ export function getHintText(clues: Clue[]): string {
 
 
 
-export function initialGameState(rating = 1000, points = 1000, mode: GameMode = 'fun', stake = 0): GameState {
+export function initialGameState(points = 1000, mode: GameMode = 'fun', stake = 0): GameState {
   return {
     phase: 'lobby',
     gameMode: mode,
@@ -230,7 +230,7 @@ export function initialGameState(rating = 1000, points = 1000, mode: GameMode = 
     isPlayerTurn: true,
     timeLeft: GAME_DURATION,
     result: null,
-    playerRating: rating,
+    playerRating: points,
     playerPoints: points,
     ratingDelta: null,
     opponentName: 'Searching...',

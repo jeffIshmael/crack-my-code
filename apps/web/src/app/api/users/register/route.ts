@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { isGuestAddress } from '@/lib/guest';
-import { ensureUserPointsSynced } from '@/lib/user-points';
 
 export async function POST(req: NextRequest) {
   try {
@@ -23,22 +22,19 @@ export async function POST(req: NextRequest) {
       create: {
         address: normalizedAddress,
         name: `Player_${normalizedAddress.slice(2, 6)}`,
-        rating: 1000,
-        points: 1000
-      }
+        points: 1000,
+      },
     });
 
-    const synced = await ensureUserPointsSynced(user.id);
-
-    return NextResponse.json(synced ?? user);
+    return NextResponse.json({ ...user, points: user.points ?? 1000 });
   } catch (error) {
     console.error('Registration error:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to register user', 
-        details: error instanceof Error ? error.message : String(error)
-      }, 
-      { status: 500 }
+      {
+        error: 'Failed to register user',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
     );
   }
 }

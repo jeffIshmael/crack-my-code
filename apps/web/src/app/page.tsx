@@ -86,6 +86,8 @@ export default function Home() {
   // for this long before announcing the turn change and switching boards.
   const TURN_HANDOVER_DELAY_MS = 1500;
   const turnHandoverTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const prevPvpTurnRef = useRef<boolean | null>(null);
+  const prevAiTurnRef = useRef<boolean | null>(null);
   const turnTransitionUntilRef = useRef(0);
   // Blocks input while a player's just-played guess is still being reviewed
   // (their turn flag is held briefly so they can read the clue feedback).
@@ -135,11 +137,10 @@ export default function Home() {
   const [pendingOpponentTileClues, setPendingOpponentTileClues] = useState<TileClue[] | null>(null);
   const [copied, setCopied] = useState(false);
 
-  const matchStartStatsRef = useRef({ points: 1000, rating: 1000 });
+  const matchStartStatsRef = useRef({ points: 1000 });
   const [resultStats, setResultStats] = useState<{
     pointsBefore: number;
     pointsAfter: number;
-    rating: number;
     loading: boolean;
   } | null>(null);
   const [rematchStatus, setRematchStatus] = useState<'idle' | 'waiting' | 'opponent_wants' | 'declined'>('idle');
@@ -364,14 +365,13 @@ export default function Home() {
     if (gs.phase === 'playing' && !snappedMatchStatsRef.current && playerStatsLoaded) {
       matchStartStatsRef.current = {
         points: gs.playerPoints,
-        rating: gs.playerRating,
       };
       snappedMatchStatsRef.current = true;
     }
     if (gs.phase !== 'playing' && gs.phase !== 'result') {
       snappedMatchStatsRef.current = false;
     }
-  }, [gs.phase, gs.playerPoints, gs.playerRating, playerStatsLoaded]);
+  }, [gs.phase, gs.playerPoints, playerStatsLoaded]);
 
   // 1.8 Countdown Timer
   useEffect(() => {
@@ -394,23 +394,20 @@ export default function Home() {
     }
   }, [gs.phase]);
 
-  const refreshUserStats = useCallback(async (): Promise<{
-    points: number;
-    rating: number;
-  } | null> => {
+  const refreshUserStats = useCallback(async (): Promise<{ points: number } | null> => {
     if (!address) return null;
     try {
       const res = await fetch(
         `/api/users/stats?address=${encodeURIComponent(address)}`,
       );
       const data = await res.json();
-      if (data.points !== undefined && data.rating !== undefined) {
+      if (data.points !== undefined) {
         setGs((prev) => ({
           ...prev,
-          playerRating: data.rating,
+          playerRating: data.points,
           playerPoints: data.points,
         }));
-        return { points: data.points, rating: data.rating };
+        return { points: data.points };
       }
     } catch (err) {
       console.error('Failed to refresh user stats', err);
@@ -450,7 +447,6 @@ export default function Home() {
         setResultStats({
           pointsBefore: before.points,
           pointsAfter: before.points,
-          rating: before.rating,
           loading: false,
         });
         return;
@@ -459,22 +455,15 @@ export default function Home() {
       setResultStats({
         pointsBefore: before.points,
         pointsAfter: before.points,
-        rating: before.rating,
         loading: true,
       });
 
-      // Always re-fetch User.points from the DB after settlement so the homepage
-      // CMC header matches what submit-guess wrote (not a stale local snapshot).
       const stats = await refreshUserStats();
       const afterPoints = stats?.points ?? before.points + pointsDelta;
-      const afterRating = stats?.rating ?? afterPoints;
 
       setResultStats({
-        // Derive "before" from the authoritative post-game total so the
-        // displayed delta always reconciles (before + delta === after).
         pointsBefore: afterPoints - pointsDelta,
         pointsAfter: afterPoints,
-        rating: afterRating,
         loading: false,
       });
 
@@ -482,7 +471,7 @@ export default function Home() {
         setGs((prev) => ({
           ...prev,
           playerPoints: stats.points,
-          playerRating: stats.rating,
+          playerRating: stats.points,
         }));
       }
     },
@@ -508,19 +497,20 @@ export default function Home() {
 
         if (data.status === 'COMPLETED' && data.result) {
           const mode = prev.gameMode === 'ai' ? 'ai' : prev.gameMode;
-          const loss = scoreDeltaForMode(mode, false);
-          const win = scoreDeltaForMode(mode, true);
-          const delta = data.result === 'win' ? win : loss;
+          const delta =
+            data.result === 'win'
+              ? scoreDeltaForMode(mode, true)
+              : scoreDeltaForMode(mode, false);
 
           if (isRegisteredPlayer(addressRef.current) && prev.phase === 'playing') {
-            pendingStatsSync = delta.points;
+            pendingStatsSync = delta;
           }
 
           return {
             ...prev,
             phase: 'result',
             result: data.result,
-            ratingDelta: isRegisteredPlayer(addressRef.current) ? delta.points : 0,
+            ratingDelta: isRegisteredPlayer(addressRef.current) ? delta : 0,
             playerGuesses: data.playerGuesses,
             opponentGuesses: data.opponentGuesses,
             opponentGuessCount: data.opponentGuessCount,
@@ -632,13 +622,13 @@ export default function Home() {
                 opponentGuesses: newGuesses,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: isRegisteredPlayer(addressRef.current) ? loss.points : 0,
+                ratingDelta: isRegisteredPlayer(addressRef.current) ? loss : 0,
                 opponentCurrentInput: [],
                 opponentCode: revealData.opponentCode || data.revealCode || [],
                 isPlayerTurn: false,
               }));
               if (isRegisteredPlayer(addressRef.current)) {
-                await syncResultStats(loss.points);
+                await syncResultStats(loss);
               }
             } catch (err) {
               console.error('Opponent win reveal failed', err);
@@ -702,37 +692,56 @@ export default function Home() {
     syncGameState();
   }, [gs.phase, currentGameId, gs.gameMode, address, syncGameState]);
 
-  // Turn notification — PvP flips on handover; AI delays Cipher's banner until hint review ends
+  // PvP: show turn banner only when the turn actually flips (not after each guess)
   useEffect(() => {
-    if (gs.phase !== 'playing') {
-      setTurnNotification(null);
+    if (gs.phase !== 'playing' || gs.gameMode === 'ai') {
+      prevPvpTurnRef.current = null;
       return;
     }
 
-    if (gs.gameMode === 'ai') {
-      if (gs.isPlayerTurn) {
-        setTurnNotification('player');
-        const timer = setTimeout(() => setTurnNotification(null), 2000);
-        return () => clearTimeout(timer);
-      }
+    const turn = gs.isPlayerTurn;
+    if (prevPvpTurnRef.current === turn) return;
 
-      const waitMs = Math.max(0, playerReviewUntilRef.current - Date.now());
-      let hideTimer: ReturnType<typeof setTimeout> | undefined;
-      const showCipherTimer = setTimeout(() => {
-        setTurnNotification('opponent');
-        hideTimer = setTimeout(() => setTurnNotification(null), 2000);
-      }, waitMs);
-
-      return () => {
-        clearTimeout(showCipherTimer);
-        if (hideTimer) clearTimeout(hideTimer);
-      };
-    }
-
-    setTurnNotification(gs.isPlayerTurn ? 'player' : 'opponent');
+    prevPvpTurnRef.current = turn;
+    setTurnNotification(turn ? 'player' : 'opponent');
     const timer = setTimeout(() => setTurnNotification(null), 2000);
     return () => clearTimeout(timer);
-  }, [gs.isPlayerTurn, gs.phase, gs.gameMode, gs.playerGuesses.length, gs.opponentGuesses.length]);
+  }, [gs.isPlayerTurn, gs.phase, gs.gameMode]);
+
+  // AI: Your Turn on handover back to player; Cipher's Turn after hint review
+  useEffect(() => {
+    if (gs.phase !== 'playing' || gs.gameMode !== 'ai') {
+      prevAiTurnRef.current = null;
+      return;
+    }
+
+    if (gs.isPlayerTurn) {
+      if (prevAiTurnRef.current === true) return;
+      prevAiTurnRef.current = true;
+      setTurnNotification('player');
+      const timer = setTimeout(() => setTurnNotification(null), 2000);
+      return () => clearTimeout(timer);
+    }
+
+    prevAiTurnRef.current = false;
+    const waitMs = Math.max(0, playerReviewUntilRef.current - Date.now());
+    let hideTimer: ReturnType<typeof setTimeout> | undefined;
+    const showCipherTimer = setTimeout(() => {
+      setTurnNotification('opponent');
+      hideTimer = setTimeout(() => setTurnNotification(null), 2000);
+    }, waitMs);
+
+    return () => {
+      clearTimeout(showCipherTimer);
+      if (hideTimer) clearTimeout(hideTimer);
+    };
+  }, [gs.isPlayerTurn, gs.phase, gs.gameMode, gs.playerGuesses.length]);
+
+  useEffect(() => {
+    if (gs.phase !== 'playing') {
+      setTurnNotification(null);
+    }
+  }, [gs.phase]);
 
   const emitTyping = (input: number[]) => {
     if (!currentGameId || gs.gameMode === 'ai') return;
@@ -802,7 +811,7 @@ export default function Home() {
                 ...prev,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: isRegisteredPlayer(address) ? loss.points : 0,
+                ratingDelta: isRegisteredPlayer(address) ? loss : 0,
                 opponentGuesses: [...prev.opponentGuesses, entry],
                 opponentGuessCount: prev.opponentGuessCount + 1,
                 opponentCurrentInput: [],
@@ -818,7 +827,7 @@ export default function Home() {
                     body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
                   });
                   if (isRegisteredPlayer(address)) {
-                    await syncResultStats(loss.points);
+                    await syncResultStats(loss);
                   }
                 } catch (err) {
                   console.error('AI reveal sync failed', err);
@@ -1180,11 +1189,11 @@ export default function Home() {
     if (window.confirm("Are you sure you want to quit the game?")) {
       clearOppTimer();
       clearTurnHandover();
-      setGs(initialGameState(gs.playerRating, gs.playerPoints));
+      setGs(initialGameState(gs.playerPoints));
       setCurrentGameId(null);
       setCurrentOnChainMatchId(null);
     }
-  }, [gs.playerRating, gs.playerPoints, clearTurnHandover]);
+  }, [gs.playerPoints, clearTurnHandover]);
 
   // ─── Phase: SetCode → Playing ─────────────────────────────────────────────
 
@@ -1263,12 +1272,12 @@ export default function Home() {
               playerGuesses: newGuesses,
               phase: 'result',
               result: 'win',
-              ratingDelta: isRegisteredPlayer(address) ? scoreDeltaForMode(mode, true).points : 0,
+              ratingDelta: isRegisteredPlayer(address) ? scoreDeltaForMode(mode, true) : 0,
               currentInput: [],
               opponentCode: data.opponentCode,
             }));
             if (isRegisteredPlayer(address)) {
-              await syncResultStats(scoreDeltaForMode(mode, true).points);
+              await syncResultStats(scoreDeltaForMode(mode, true));
             }
           } else if (reachedMax) {
             const loss = scoreDeltaForMode(mode, false);
@@ -1289,12 +1298,12 @@ export default function Home() {
                 playerGuesses: newGuesses,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: isRegisteredPlayer(address) ? loss.points : 0,
+                ratingDelta: isRegisteredPlayer(address) ? loss : 0,
                 currentInput: [],
                 opponentCode: revealData.opponentCode || [],
               }));
               if (isRegisteredPlayer(address)) {
-                await syncResultStats(loss.points);
+                await syncResultStats(loss);
               }
             } catch (revealErr) {
               console.error('Reveal after max guesses failed', revealErr);
@@ -1349,9 +1358,8 @@ export default function Home() {
   const exitResultScreen = useCallback(() => {
     clearOppTimer();
     clearTurnHandover();
-    const rating = resultStats?.rating ?? gs.playerRating;
     const points = resultStats?.pointsAfter ?? gs.playerPoints;
-    setGs(initialGameState(rating, points));
+    setGs(initialGameState(points));
     setResultStats(null);
     setRematchStatus('idle');
     setRematchLoading(false);
@@ -1359,7 +1367,7 @@ export default function Home() {
     setShareableJoinCode(null);
     opponentAddressRef.current = null;
     if (address) void refreshUserStats();
-  }, [gs.playerRating, gs.playerPoints, resultStats, address, refreshUserStats, clearTurnHandover]);
+  }, [gs.playerPoints, resultStats, address, refreshUserStats, clearTurnHandover]);
 
   const handlePlayAgain = useCallback(() => {
     if (gs.gameMode !== 'ai') return;
@@ -1611,7 +1619,7 @@ export default function Home() {
     return gs.phase === 'lobby' || gs.phase === 'matchmaking' ? (
       <motion.div key="lobby" className="w-full relative flex flex-col gap-4" {...screenVariants}>
         <Lobby
-          rating={gs.playerRating}
+          rating={gs.playerPoints}
           points={gs.playerPoints}
           pointsLoading={pointsLoading}
           isMatchmaking={gs.phase === 'matchmaking'}
@@ -1639,7 +1647,7 @@ export default function Home() {
           onBack={() => {
             clearOppTimer();
             clearTurnHandover();
-            setGs(initialGameState(gs.playerRating, gs.playerPoints));
+            setGs(initialGameState(gs.playerPoints));
             setCurrentGameId(null);
             setShareableJoinCode(null);
             setCurrentOnChainMatchId(null);
@@ -1701,7 +1709,7 @@ export default function Home() {
           opponentCurrentInput={gs.opponentCurrentInput}
           isPlayerTurn={gs.isPlayerTurn}
           opponentName={gs.opponentName}
-          playerRating={gs.playerRating}
+          playerRating={gs.playerPoints}
           playerPoints={gs.playerPoints}
           pointsLoading={pointsLoading}
           isSubmitting={isSubmitting}
@@ -1751,7 +1759,7 @@ export default function Home() {
               ratingDelta={gs.ratingDelta ?? 0}
               pointsBefore={resultStats?.pointsBefore ?? matchStartStatsRef.current.points}
               pointsAfter={resultStats?.pointsAfter ?? gs.playerPoints}
-              playerRating={resultStats?.rating ?? gs.playerRating}
+              playerRating={resultStats?.pointsAfter ?? gs.playerPoints}
               statsLoading={resultStats?.loading ?? false}
               guessCount={gs.playerGuesses.length}
               onPlayAgain={handlePlayAgain}

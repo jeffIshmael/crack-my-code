@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
 import { evaluateGuess, toTileClues, MAX_GUESSES } from '@/lib/game';
 import { scoreDeltaForMode } from '@/lib/scoring';
-import { applyScoreDelta, ensureUserPointsSynced } from '@/lib/user-points';
+import { applyScoreDelta } from '@/lib/user-points';
 import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
 import { isRegisteredPlayer } from '@/lib/guest';
@@ -81,17 +81,17 @@ export async function POST(req: NextRequest) {
       });
 
       const isAI = game.mode === 'ai';
-      const deltas = scoreDeltaForMode(isAI ? 'ai' : (game.mode as 'fun' | 'cash'), true);
+      const winDelta = scoreDeltaForMode(isAI ? 'ai' : (game.mode as 'fun' | 'cash'), true);
 
       if (isRegisteredPlayer(normalizedPlayerAddress)) {
-        await applyScoreDelta(normalizedPlayerAddress, deltas);
+        await applyScoreDelta(normalizedPlayerAddress, winDelta);
       }
 
       if (!isAI) {
         const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;
         if (opponentAddress && isRegisteredPlayer(opponentAddress)) {
-          const loss = scoreDeltaForMode(game.mode as 'fun' | 'cash', false);
-          await applyScoreDelta(opponentAddress.toLowerCase(), loss);
+          const lossDelta = scoreDeltaForMode(game.mode as 'fun' | 'cash', false);
+          await applyScoreDelta(opponentAddress.toLowerCase(), lossDelta);
         }
       }
 
@@ -205,7 +205,7 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    let playerStats: { points: number; rating: number } | null = null;
+    let playerStats: { points: number } | null = null;
     const gameEnded = isWin || winner !== null;
     if (isRegisteredPlayer(normalizedPlayerAddress) && gameEnded) {
       const updatedUser = await prisma.user.findFirst({
@@ -214,11 +214,7 @@ export async function POST(req: NextRequest) {
         },
       });
       if (updatedUser) {
-        const synced = await ensureUserPointsSynced(updatedUser.id);
-        playerStats = {
-          points: synced?.points ?? updatedUser.points,
-          rating: synced?.rating ?? updatedUser.rating,
-        };
+        playerStats = { points: updatedUser.points ?? 1000 };
       }
     }
 

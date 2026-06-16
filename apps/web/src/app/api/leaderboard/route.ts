@@ -7,19 +7,21 @@ async function getUserRank(address: string) {
 
   const user = await prisma.user.findUnique({
     where: { address: address.toLowerCase() },
-    select: { address: true, points: true, name: true, rating: true },
+    select: { address: true, points: true, name: true, createdAt: true },
   });
 
   if (!user?.address || isGuestAddress(user.address)) return null;
+
+  const userPoints = user.points ?? 1000;
 
   const ahead = await prisma.user.count({
     where: {
       ...registeredPlayerWhere,
       OR: [
-        { points: { gt: user.points } },
+        { points: { gt: userPoints } },
         {
-          points: user.points,
-          rating: { gt: user.rating },
+          points: userPoints,
+          createdAt: { lt: user.createdAt },
         },
       ],
     },
@@ -29,8 +31,7 @@ async function getUserRank(address: string) {
     rank: ahead + 1,
     address: user.address,
     name: user.name,
-    points: user.points,
-    rating: user.rating,
+    points: userPoints,
   };
 }
 
@@ -40,13 +41,13 @@ export async function GET(req: NextRequest) {
 
     const users = await prisma.user.findMany({
       where: registeredPlayerWhere,
-      orderBy: [{ points: 'desc' }, { rating: 'desc' }],
+      orderBy: [{ points: 'desc' }, { createdAt: 'asc' }],
       take: 50,
       select: {
         address: true,
         points: true,
         name: true,
-        rating: true,
+        createdAt: true,
       },
     });
 
@@ -63,8 +64,7 @@ export async function GET(req: NextRequest) {
         rank: index + 1,
         address: user.address!.toLowerCase(),
         name: user.name,
-        points: user.points,
-        rating: user.rating,
+        points: user.points ?? 1000,
       }));
 
     let viewer = null;
