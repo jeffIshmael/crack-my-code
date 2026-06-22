@@ -173,12 +173,6 @@ export function clueTileStyle(tileClue: TileClue | Clue): {
         boxShadow: 'var(--tile-shadow)',
       };
     case 'duplicate':
-      return {
-        background: 'var(--tile-absent)',
-        border: '2px solid transparent',
-        color: 'var(--tile-absent-text)',
-        boxShadow: 'var(--tile-shadow)',
-      };
     case 'absent':
     case 'gray':
     default:

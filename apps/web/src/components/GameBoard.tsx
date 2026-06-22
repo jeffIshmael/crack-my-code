@@ -86,11 +86,10 @@ export default function GameBoard({
   }, [isAI, phase, isPlayerTurn, opponentCurrentInput.length, pendingOpponentTileClues]);
 
   useEffect(() => {
-    if (!isAI || !isPlayerTurn) return;
+    if (!isAI || phase !== 'playing' || !isPlayerTurn) return;
     if (opponentCurrentInput.length > 0 || pendingOpponentTileClues !== null) return;
-    const timer = setTimeout(() => setView('player'), 900);
-    return () => clearTimeout(timer);
-  }, [isAI, isPlayerTurn, opponentCurrentInput.length, pendingOpponentTileClues]);
+    setView('player');
+  }, [isAI, phase, isPlayerTurn, opponentCurrentInput.length, pendingOpponentTileClues]);
 
   // PvP board switching follows whose turn it is. The deliberate "review the
   // result first" delay is handled upstream (the turn flag is held briefly
