@@ -15,6 +15,9 @@ import { ChevronRight, X } from 'lucide-react';
 import { ThemeLogo } from '@/components/ThemeLogo';
 import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
 import JoinChallenge from '@/components/JoinChallenge';
+import { FarcasterShareGameButton } from '@/components/FarcasterShareGameButton';
+import { FarcasterAddMiniAppButton } from '@/components/FarcasterAddMiniAppButton';
+import { buildGameShareUrl } from '@/lib/farcaster-embed';
 
 interface LobbyProps {
   rating: number;
@@ -298,6 +301,7 @@ export default function Lobby({
                     onSignInRequired={() => login()}
                     collapsible
                   />
+                  <FarcasterAddMiniAppButton variant="compact" />
                 </>
               )}
             </div>
@@ -694,6 +698,20 @@ function InviteWaiting({
             </span>
           </div>
         </div>
+
+        <FarcasterShareGameButton joinCode={joinCode} />
+
+        <button
+          type="button"
+          onClick={() => {
+            const url = buildGameShareUrl(joinCode);
+            void navigator.clipboard.writeText(url);
+            toast.success('Share link copied!');
+          }}
+          className="w-full rounded-2xl border border-[var(--border-mid)] bg-white py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] transition-all hover:bg-[var(--bg-elevated)]"
+        >
+          Copy share link
+        </button>
 
         <button
           onClick={onCancel}

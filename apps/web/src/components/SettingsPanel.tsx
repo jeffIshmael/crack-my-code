@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { ChevronRight, Copy, Check } from 'lucide-react';
 import type { NavTab } from '@/components/BottomNav';
+import { FarcasterAddMiniAppButton } from '@/components/FarcasterAddMiniAppButton';
 
 interface SettingsPanelProps {
   address?: string;
@@ -135,6 +136,8 @@ export function SettingsPanel({
       </div>
 
       <div className="flex flex-col gap-2">
+        <FarcasterAddMiniAppButton />
+
         {menuItems.map((item) => (
           <motion.button
             key={item.tab}

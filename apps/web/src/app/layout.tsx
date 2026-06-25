@@ -5,26 +5,17 @@ import { WalletProvider } from '@/components/wallet-provider';
 import { FarcasterProvider } from '@/components/farcaster-provider';
 import { ThemeBackground } from '@/components/ThemeBackground';
 import { Toaster } from '@/components/ui/toaster';
+import {
+  buildDefaultFcMiniAppEmbed,
+  stringifyFcMiniAppEmbed,
+} from '@/lib/farcaster-embed';
 
 export const metadata: Metadata = {
   title: 'Crack-My-Code',
   description: 'Crack the code first to win.',
 };
 
-const FC_MINIAPP_EMBED = JSON.stringify({
-  version: '1',
-  imageUrl: 'https://crack-my-code.vercel.app/logo.png',
-  button: {
-    title: 'Play Now',
-    action: {
-      type: 'launch_miniapp',
-      name: 'Crack-My-Code',
-      url: 'https://crack-my-code.vercel.app',
-      splashImageUrl: 'https://crack-my-code.vercel.app/logo.png',
-      splashBackgroundColor: '#E3F2FA',
-    },
-  },
-});
+const FC_MINIAPP_EMBED = stringifyFcMiniAppEmbed(buildDefaultFcMiniAppEmbed());
 
 export default function RootLayout({
   children,
