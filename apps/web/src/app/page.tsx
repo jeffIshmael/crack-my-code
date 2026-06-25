@@ -52,6 +52,7 @@ const screenVariants = {
 import { pusherClient } from '@/lib/pusher-client';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { isRegisteredPlayer } from '@/lib/guest';
+import { useMiniAppEnvironment } from '@/hooks/use-mini-app-environment';
 
 function isDuplicateOfLastGuess(
   guesses: GuessEntry[],
@@ -70,6 +71,7 @@ export default function Home() {
   const searchParams = useSearchParams();
   const { address: wagmiAddress, isConnected } = useAccount();
   const { login, logout, authenticated, user } = usePrivy();
+  const { isAutoConnect: isEmbeddedWalletEnv } = useMiniAppEnvironment();
   const address = wagmiAddress || user?.wallet?.address;
   const publicClient = usePublicClient();
   const { writeContractAsync } = useWriteContract();
@@ -1896,7 +1898,7 @@ export default function Home() {
         }}
         onTabChange={setActiveTab}
       />
-      {address && !(typeof window !== 'undefined' && ((window as any).ethereum?.isMiniPay || (window as any).ethereum?.isFarcaster)) && (
+      {address && !isEmbeddedWalletEnv && (
         <button
           type="button"
           onClick={() => { logout(); setActiveTab('home'); }}

@@ -11,6 +11,21 @@ export const metadata: Metadata = {
   description: 'Crack the code first to win.',
 };
 
+const FC_MINIAPP_EMBED = JSON.stringify({
+  version: '1',
+  imageUrl: 'https://crack-my-code.vercel.app/logo.png',
+  button: {
+    title: 'Play Now',
+    action: {
+      type: 'launch_miniapp',
+      name: 'Crack-My-Code',
+      url: 'https://crack-my-code.vercel.app',
+      splashImageUrl: 'https://crack-my-code.vercel.app/logo.png',
+      splashBackgroundColor: '#E3F2FA',
+    },
+  },
+});
+
 export default function RootLayout({
   children,
 }: {
@@ -20,7 +35,9 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <meta name="talentapp:project_verification" content="9af4936c363200c2c29e3c154ef6fcb3e0f0cc120f9ebe5f2972226558494b0063366b4864d11d567957a6127b28ccc2f3def949a27b20a84ef62becd4d884ba" />
-        <meta name="fc:miniapp" content='{"version":"1","imageUrl":"https://crack-my-code.vercel.app/logo.png","button":{"title":"Play Now","action":{"type":"launch_miniapp","name":"Crack-My-Code","url":"https://crack-my-code.vercel.app","splashImageUrl":"https://crack-my-code.vercel.app/logo.png","splashBackgroundColor":"#E3F2FA"}}}' />
+        <meta name="fc:miniapp" content={FC_MINIAPP_EMBED} />
+        {/* Backward compatibility for legacy Farcaster clients (Neynar / Mini App spec) */}
+        <meta name="fc:frame" content={FC_MINIAPP_EMBED} />
       </head>
       <body className="h-dvh antialiased flex flex-col items-center justify-start overflow-hidden">
         <div className="theme-shell relative w-full max-w-[440px] shadow-[var(--shell-shadow)]">

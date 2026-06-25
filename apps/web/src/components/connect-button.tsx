@@ -5,6 +5,7 @@ import { useAccount, useBalance } from "wagmi";
 import { useEffect, useState, useCallback } from "react";
 import { Wallet } from "lucide-react";
 import { USDT_ADDRESS } from "../../blockchain/constants";
+import { useMiniAppEnvironment } from "@/hooks/use-mini-app-environment";
 
 interface ConnectButtonProps {
   onWalletClick?: () => void;
@@ -42,36 +43,12 @@ export function ConnectButton({ onWalletClick }: ConnectButtonProps) {
     }
   }, [authenticated, isConnected, address, fetchPoints]);
 
-  const [isAutoConnectEnv, setIsAutoConnectEnv] = useState(false);
-
-  useEffect(() => {
-    const checkEnv = async () => {
-      const isMiniPay = (window as any).ethereum?.isMiniPay === true;
-      let isFarcaster = false;
-      
-      try {
-        const { sdk } = await import("@farcaster/frame-sdk");
-        const context = await sdk.context;
-        if (context?.client) isFarcaster = true;
-      } catch (e) {}
-
-      if (!isFarcaster) {
-        isFarcaster = !!(
-          (window as any).ethereum?.isFarcaster || 
-          (window as any).farcaster ||
-          window.location.search.includes('miniApp=true') || 
-          window.location.pathname.includes('/mini')
-        );
-      }
-      setIsAutoConnectEnv(isMiniPay || isFarcaster);
-    };
-    checkEnv();
-  }, []);
+  const { isAutoConnect: isAutoConnectEnv, isReady: envReady } = useMiniAppEnvironment();
 
   const isSyncIssue = authenticated && isConnected && wagmiAddress !== user?.wallet?.address;
 
   if (!authenticated && !isConnected) {
-    if (isAutoConnectEnv) {
+    if (!envReady || isAutoConnectEnv) {
       return (
         <div className="flex w-full justify-end">
           <div className="flex items-center gap-2 rounded-full border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-6 py-2.5">
