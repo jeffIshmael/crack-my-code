@@ -236,7 +236,9 @@ export default function GameBoard({
           padding: '4px 2px',
         }}
       >
-        <AnimatePresence mode="popLayout">
+        {/* key={view} forces a clean remount when switching boards — avoids
+            AnimatePresence popLayout leaving opponent rows visible on your board */}
+        <div key={view}>
           {view === 'player' ? (
             playerGuesses.map((g, i) => (
               <GuessRow key={g.id} digits={g.digits} clues={g.clues} tileClues={g.tileClues} rowIndex={i} type="player" />
@@ -287,11 +289,11 @@ export default function GameBoard({
           )}
           {Array.from({ length: emptyRowCount }).map((_, i) => (
             <EmptyGuessRow
-              key={`empty-${i}`}
+              key={`empty-${view}-${i}`}
               rowIndex={activeGuesses.length + i + (!isPlayerTurn && opponentCurrentInput.length > 0 && view === 'opponent' ? 1 : 0)}
             />
           ))}
-        </AnimatePresence>
+        </div>
       </div>
 
       {/* Fixed bottom controls */}

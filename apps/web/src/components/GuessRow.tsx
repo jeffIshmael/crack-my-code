@@ -55,10 +55,7 @@ export default function GuessRow({ digits, clues, tileClues, rowIndex, instant =
       transition={{ duration: 0.3, delay: instant ? 0 : 0.05 }}
     >
       {type === 'opponent' && (
-        <motion.div
-          layoutId={`accent-${rowIndex}`}
-          className="w-1 h-8 rounded-full bg-[var(--orange)]"
-        />
+        <div className="w-1 h-8 rounded-full bg-[var(--orange)]" />
       )}
 
       <span

@@ -53,6 +53,19 @@ import { pusherClient } from '@/lib/pusher-client';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { isRegisteredPlayer } from '@/lib/guest';
 
+function isDuplicateOfLastGuess(
+  guesses: GuessEntry[],
+  digits: number[],
+  clues: Clue[],
+): boolean {
+  const last = guesses.at(-1);
+  if (!last) return false;
+  return (
+    last.digits.join('') === digits.join('') &&
+    last.clues.join('') === clues.join('')
+  );
+}
+
 export default function Home() {
   const searchParams = useSearchParams();
   const { address: wagmiAddress, isConnected } = useAccount();
@@ -532,7 +545,14 @@ export default function Home() {
           data.opponentGuesses.at(-1)?.digits.join('') !== prev.opponentGuesses.at(-1)?.digits.join('');
         const turnChanged = data.isYourTurn !== prev.isPlayerTurn;
 
-        if (data.playerGuesses.length < prev.playerGuesses.length) return prev;
+        // Trust the server when it has fewer guesses (fixes duplicate local entries),
+        // unless we're mid-submit and still waiting for the server to catch up.
+        if (
+          data.playerGuesses.length < prev.playerGuesses.length &&
+          isSubmittingRef.current
+        ) {
+          return prev;
+        }
 
         if (!guessesChanged && !turnChanged) return prev;
 
@@ -604,6 +624,11 @@ export default function Home() {
           tileClues: data.tileClues,
           id: `opp-${Date.now()}`,
         };
+
+        if (isDuplicateOfLastGuess(prev.opponentGuesses, entry.digits, entry.clues)) {
+          return prev;
+        }
+
         const newGuesses = [...prev.opponentGuesses, entry];
 
         if (opponentWon) {
@@ -1253,39 +1278,60 @@ export default function Home() {
         const data = await res.json();
 
         if (data.success) {
-          const clues = data.clues;
-          const entry: GuessEntry = {
-            digits,
-            clues: data.clues as any[],
-            tileClues: data.tileClues,
-            id: `${Date.now()}`,
-          };
-          const newGuesses = [...gs.playerGuesses, entry];
+          const clues = data.clues as Clue[];
+          const tileClues = data.tileClues as TileClue[] | undefined;
           const won = isWinningClues(clues);
-          const reachedMax = newGuesses.length >= MAX_GUESSES;
           const mode = gs.gameMode === 'ai' ? 'ai' : gs.gameMode;
 
+          setGs((prev: GameState) => {
+            if (isDuplicateOfLastGuess(prev.playerGuesses, digits, clues)) {
+              return prev;
+            }
+
+            const entry: GuessEntry = {
+              digits,
+              clues,
+              tileClues,
+              id: `${Date.now()}`,
+            };
+            const newGuesses = [...prev.playerGuesses, entry];
+            const reachedMax = newGuesses.length >= MAX_GUESSES;
+
+            if (won) {
+              clearOppTimer();
+              return {
+                ...prev,
+                playerGuesses: newGuesses,
+                phase: 'result',
+                result: 'win',
+                ratingDelta: isRegisteredPlayer(address) ? scoreDeltaForMode(mode, true) : 0,
+                currentInput: [],
+                opponentCode: data.opponentCode,
+              };
+            }
+
+            if (reachedMax) {
+              return {
+                ...prev,
+                playerGuesses: newGuesses,
+                isPlayerTurn: false,
+              };
+            }
+
+            if (prev.gameMode === 'ai') {
+              playerReviewUntilRef.current = Date.now() + PLAYER_GUESS_REVIEW_MS;
+              return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
+            }
+
+            return { ...prev, playerGuesses: newGuesses, currentInput: [] };
+          });
+
           if (won) {
-            clearOppTimer();
-            setGs((prev: GameState) => ({
-              ...prev,
-              playerGuesses: newGuesses,
-              phase: 'result',
-              result: 'win',
-              ratingDelta: isRegisteredPlayer(address) ? scoreDeltaForMode(mode, true) : 0,
-              currentInput: [],
-              opponentCode: data.opponentCode,
-            }));
             if (isRegisteredPlayer(address)) {
               await syncResultStats(scoreDeltaForMode(mode, true));
             }
-          } else if (reachedMax) {
+          } else if (gs.playerGuesses.length + 1 >= MAX_GUESSES) {
             const loss = scoreDeltaForMode(mode, false);
-            setGs((prev: GameState) => ({
-              ...prev,
-              playerGuesses: newGuesses,
-              isPlayerTurn: false,
-            }));
             try {
               const revealRes = await fetch('/api/games/reveal', {
                 method: 'POST',
@@ -1295,7 +1341,6 @@ export default function Home() {
               const revealData = await revealRes.json();
               setGs((prev: GameState) => ({
                 ...prev,
-                playerGuesses: newGuesses,
                 phase: 'result',
                 result: 'lose',
                 ratingDelta: isRegisteredPlayer(address) ? loss : 0,
@@ -1308,18 +1353,8 @@ export default function Home() {
             } catch (revealErr) {
               console.error('Reveal after max guesses failed', revealErr);
             }
-          } else {
-            setGs((prev: GameState) => {
-              if (prev.gameMode === 'ai') {
-                playerReviewUntilRef.current = Date.now() + PLAYER_GUESS_REVIEW_MS;
-                return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
-              }
-              return { ...prev, playerGuesses: newGuesses, currentInput: [] };
-            });
-
-            if (gs.gameMode !== 'ai') {
-              scheduleTurnHandover(false);
-            }
+          } else if (gs.gameMode !== 'ai') {
+            scheduleTurnHandover(false);
           }
         }
       } catch (err) {
