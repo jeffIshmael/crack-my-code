@@ -1,13 +1,11 @@
 {
-  "frame": {
-    "name": "Crack-my-code",
+  "miniapp": {
+    "name": "Crack-My-Code",
     "version": "1",
     "iconUrl": "https://crack-my-code.vercel.app/icon.png",
     "homeUrl": "https://crack-my-code.vercel.app",
-    "imageUrl": "https://crack-my-code.vercel.app/icon.png",
-    "buttonTitle": "Play Now",
-    "splashImageUrl": "https://crack-my-code.vercel.app/icon.png",
-    "splashBackgroundColor": "#03111C",
+    "splashImageUrl": "https://crack-my-code.vercel.app/logo.png",
+    "splashBackgroundColor": "#E3F2FA",
     "webhookUrl": "https://crack-my-code.vercel.app/api/webhook",
     "primaryCategory": "games",
     "subtitle": "Crack the code and win.",
@@ -15,7 +13,8 @@
     "screenshotUrls": [
       "https://crack-my-code.vercel.app/1.png"
     ],
-    "heroImageUrl": "https://crack-my-code.vercel.app/logo.png",
+    "heroImageUrl": "https://crack-my-code.vercel.app/embed.png",
+    "ogImageUrl": "https://crack-my-code.vercel.app/embed.png",
     "tags": [
       "games",
       "strategy",

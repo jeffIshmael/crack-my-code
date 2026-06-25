@@ -21,6 +21,21 @@ export interface FcMiniAppEmbed {
   };
 }
 
+export interface FcFrameEmbed {
+  version: '1';
+  imageUrl: string;
+  button: {
+    title: string;
+    action: {
+      type: 'launch_frame';
+      name: string;
+      url: string;
+      splashImageUrl: string;
+      splashBackgroundColor: string;
+    };
+  };
+}
+
 export function isValidJoinCodeFormat(code: string): boolean {
   const normalized = normalizeJoinCodeInput(code);
   return /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/.test(normalized);
@@ -62,6 +77,35 @@ export function buildGameFcMiniAppEmbed(joinCode?: string): FcMiniAppEmbed {
   };
 }
 
+export function toLegacyFcFrameEmbed(embed: FcMiniAppEmbed): FcFrameEmbed {
+  return {
+    version: '1',
+    imageUrl: embed.imageUrl,
+    button: {
+      title: embed.button.title,
+      action: {
+        type: 'launch_frame',
+        name: embed.button.action.name,
+        url: embed.button.action.url,
+        splashImageUrl: embed.button.action.splashImageUrl,
+        splashBackgroundColor: embed.button.action.splashBackgroundColor,
+      },
+    },
+  };
+}
+
 export function stringifyFcMiniAppEmbed(embed: FcMiniAppEmbed): string {
   return JSON.stringify(embed);
+}
+
+export function stringifyFcFrameEmbed(embed: FcFrameEmbed): string {
+  return JSON.stringify(embed);
+}
+
+export function buildFcEmbedMetadata(joinCode?: string) {
+  const miniapp = buildGameFcMiniAppEmbed(joinCode);
+  return {
+    'fc:miniapp': stringifyFcMiniAppEmbed(miniapp),
+    'fc:frame': stringifyFcFrameEmbed(toLegacyFcFrameEmbed(miniapp)),
+  };
 }
