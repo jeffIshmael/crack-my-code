@@ -13,13 +13,18 @@
     "screenshotUrls": [
       "https://crack-my-code.vercel.app/1.png"
     ],
-    "heroImageUrl": "https://crack-my-code.vercel.app/embed.png",
-    "ogImageUrl": "https://crack-my-code.vercel.app/embed.png",
+    "heroImageUrl": "https://crack-my-code.vercel.app/logo.png",
+    "ogImageUrl": "https://crack-my-code.vercel.app/logo.png",
     "tags": [
       "games",
       "strategy",
       "pvp",
       "celo"
     ]
+  },
+  "accountAssociation": {
+    "header": "eyJmaWQiOjEwNzc5MzIsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHhiYzM1OGM5OEI4OEI5Mjg4NjRlMmMzYzVkMTc2NjcxMzU0MTAzNTg3In0",
+    "payload": "eyJkb21haW4iOiJjcmFjay1teS1jb2RlLnZlcmNlbC5hcHAifQ",
+    "signature": "bEr7w6Id7aj2Qen3XJRt/0I5QgaZz0wsrOtTRB1KlQUJE/1cZEJEK4nRo4QBrSK8WwXtbqV/ijwjRLllwCU5dhs="
   }
 }
