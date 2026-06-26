@@ -22,9 +22,23 @@ const WEB_DEFAULT: MiniAppEnvironment = {
 
 let detectionPromise: Promise<MiniAppEnvironment> | null = null;
 
-function isMiniPayClient(): boolean {
+export function isMiniPayClient(): boolean {
   if (typeof window === 'undefined') return false;
   return (window as Window & { ethereum?: { isMiniPay?: boolean } }).ethereum?.isMiniPay === true;
+}
+
+const MINIPAY_ENV: MiniAppEnvironment = {
+  environment: 'minipay',
+  isMiniPay: true,
+  isFarcaster: false,
+  isAutoConnect: true,
+  isReady: true,
+};
+
+/** Instant MiniPay detection — avoids awaiting the Farcaster SDK. */
+export function getSyncMiniAppEnvironment(): MiniAppEnvironment | null {
+  if (isMiniPayClient()) return MINIPAY_ENV;
+  return null;
 }
 
 /** Dev-only fallbacks when testing outside a Farcaster host (e.g. ?miniApp=true). */
@@ -51,7 +65,9 @@ export async function detectMiniAppEnvironment(): Promise<MiniAppEnvironment> {
     return { ...WEB_DEFAULT, isReady: true };
   }
 
-  const isMiniPay = isMiniPayClient();
+  if (isMiniPayClient()) {
+    return MINIPAY_ENV;
+  }
 
   let isFarcaster = false;
   try {
@@ -60,21 +76,17 @@ export async function detectMiniAppEnvironment(): Promise<MiniAppEnvironment> {
     isFarcaster = false;
   }
 
-  if (!isFarcaster && !isMiniPay) {
+  if (!isFarcaster) {
     isFarcaster = isFarcasterDevFallback();
   }
 
-  const environment: AppEnvironment = isMiniPay
-    ? 'minipay'
-    : isFarcaster
-      ? 'farcaster'
-      : 'web';
+  const environment: AppEnvironment = isFarcaster ? 'farcaster' : 'web';
 
   return {
     environment,
-    isMiniPay,
+    isMiniPay: false,
     isFarcaster,
-    isAutoConnect: isMiniPay || isFarcaster,
+    isAutoConnect: isFarcaster,
     isReady: true,
   };
 }

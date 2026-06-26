@@ -9,6 +9,7 @@ import { PrivyProvider, usePrivy } from "@privy-io/react-auth";
 import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 import { farcasterMiniApp as farcasterFrame } from "@farcaster/miniapp-wagmi-connector";
 import { useMiniAppEnvironment } from "@/hooks/use-mini-app-environment";
+import { isMiniPayClient } from "@/lib/mini-app-environment";
 
 const queryClient = new QueryClient();
 
@@ -19,12 +20,11 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   const isAppIdValid = appId && appId !== 'undefined' && appId.length > 5;
 
-  // During SSR (prerendering), we return a null or a simple div to avoid 
-  // executing children that rely on Privy/Wagmi hooks, which would crash the build.
-  if (!mounted) {
-    return (
-      <div style={{ visibility: 'hidden' }} />
-    );
+  // MiniPay injects ethereum before hydration — render immediately to avoid a blank shell.
+  const skipMountGate = mounted || (typeof window !== 'undefined' && isMiniPayClient());
+
+  if (!skipMountGate) {
+    return null;
   }
 
   // If we are on the client but the appId is missing or invalid, we log a warning 
@@ -94,21 +94,13 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  // Wait for host detection before gating on Privy (Farcaster / MiniPay skip Privy login).
-  if (!envReady) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#03111C]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-      </div>
-    );
+  // Auto-connect hosts (MiniPay / Farcaster) render the app immediately; wallet connects in background.
+  if (!envReady && !isAutoConnectEnv) {
+    return null;
   }
 
   if (!ready && !isAutoConnectEnv) {
-    return (
-      <div className="flex h-screen w-screen items-center justify-center bg-[#03111C]">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
-      </div>
-    );
+    return null;
   }
 
   return (

@@ -10,5 +10,5 @@ export const FARCASTER_SPLASH = {
   backgroundColor: '#E3F2FA',
 } as const;
 
-/** 3:2 landscape image for Farcaster feed embeds (min 600×400). */
+/** 3:2 full-bleed logo for Farcaster feed embeds (min 600×400). */
 export const FARCASTER_EMBED_IMAGE = `${APP_BASE_URL}/embed.png`;

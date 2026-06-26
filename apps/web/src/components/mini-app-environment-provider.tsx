@@ -4,6 +4,7 @@ import { createContext, useEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import {
   detectMiniAppEnvironment,
+  getSyncMiniAppEnvironment,
   type MiniAppEnvironment,
 } from '@/lib/mini-app-environment';
 
@@ -18,26 +19,29 @@ const PENDING: MiniAppEnvironment = {
 export const MiniAppEnvironmentContext = createContext<MiniAppEnvironment>(PENDING);
 
 /**
- * Detects MiniPay / Farcaster hosts once. Calls sdk.actions.ready() immediately
- * on mount so Farcaster clients dismiss the splash without waiting on detection.
+ * Detects MiniPay / Farcaster hosts. MiniPay is resolved synchronously;
+ * Farcaster calls sdk.actions.ready() without blocking other hosts.
  */
 export function MiniAppEnvironmentProvider({ children }: { children: React.ReactNode }) {
-  const [environment, setEnvironment] = useState<MiniAppEnvironment>(PENDING);
+  const [environment, setEnvironment] = useState<MiniAppEnvironment>(
+    () => getSyncMiniAppEnvironment() ?? PENDING,
+  );
 
   useEffect(() => {
     let cancelled = false;
 
     const init = async () => {
-      try {
-        await sdk.actions.ready();
-      } catch (error) {
-        // No-op outside a Farcaster Mini App host.
-        console.debug('sdk.actions.ready() skipped:', error);
-      }
-
       const detected = await detectMiniAppEnvironment();
       if (!cancelled) {
         setEnvironment(detected);
+      }
+
+      if (detected.isFarcaster) {
+        try {
+          await sdk.actions.ready();
+        } catch (error) {
+          console.debug('sdk.actions.ready() skipped:', error);
+        }
       }
     };
 
