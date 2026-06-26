@@ -6,7 +6,7 @@ export const APP_BASE_URL =
 export const FARCASTER_APP_NAME = 'Crack-My-Code';
 
 export const FARCASTER_SPLASH = {
-  imageUrl: `${APP_BASE_URL}/logo.png`,
+  imageUrl: `${APP_BASE_URL}/splash.png`,
   backgroundColor: '#E3F2FA',
 } as const;
 

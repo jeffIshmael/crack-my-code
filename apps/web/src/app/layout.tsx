@@ -3,6 +3,7 @@ import './globals.css';
 
 import { WalletProvider } from '@/components/wallet-provider';
 import { FarcasterProvider } from '@/components/farcaster-provider';
+import { FarcasterMiniAppProvider } from '@/components/farcaster-miniapp-provider';
 import { ThemeBackground } from '@/components/ThemeBackground';
 import { Toaster } from '@/components/ui/toaster';
 import { buildFcEmbedMetadata } from '@/lib/farcaster-embed';
@@ -31,12 +32,14 @@ export default function RootLayout({
           </div>
           <div className="theme-shell__content">
             <FarcasterProvider>
-              <WalletProvider>
-                <main className="flex flex-1 flex-col min-h-0 overflow-hidden">
-                  {children}
-                </main>
-                <Toaster position="top-center" expand={false} richColors />
-              </WalletProvider>
+              <FarcasterMiniAppProvider>
+                <WalletProvider>
+                  <main className="flex flex-1 flex-col min-h-0 overflow-hidden">
+                    {children}
+                  </main>
+                  <Toaster position="top-center" expand={false} richColors />
+                </WalletProvider>
+              </FarcasterMiniAppProvider>
             </FarcasterProvider>
           </div>
         </div>

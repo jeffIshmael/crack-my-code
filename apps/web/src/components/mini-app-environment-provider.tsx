@@ -18,8 +18,8 @@ const PENDING: MiniAppEnvironment = {
 export const MiniAppEnvironmentContext = createContext<MiniAppEnvironment>(PENDING);
 
 /**
- * Detects MiniPay / Farcaster hosts once and calls sdk.actions.ready() only
- * inside a real Farcaster Mini App (per Neynar docs).
+ * Detects MiniPay / Farcaster hosts once. Calls sdk.actions.ready() immediately
+ * on mount so Farcaster clients dismiss the splash without waiting on detection.
  */
 export function MiniAppEnvironmentProvider({ children }: { children: React.ReactNode }) {
   const [environment, setEnvironment] = useState<MiniAppEnvironment>(PENDING);
@@ -28,17 +28,14 @@ export function MiniAppEnvironmentProvider({ children }: { children: React.React
     let cancelled = false;
 
     const init = async () => {
-      const detected = await detectMiniAppEnvironment();
-      if (cancelled) return;
-
-      if (detected.isFarcaster) {
-        try {
-          await sdk.actions.ready();
-        } catch (error) {
-          console.error('Farcaster sdk.actions.ready() failed:', error);
-        }
+      try {
+        await sdk.actions.ready();
+      } catch (error) {
+        // No-op outside a Farcaster Mini App host.
+        console.debug('sdk.actions.ready() skipped:', error);
       }
 
+      const detected = await detectMiniAppEnvironment();
       if (!cancelled) {
         setEnvironment(detected);
       }

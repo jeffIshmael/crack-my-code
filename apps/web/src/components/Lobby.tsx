@@ -16,7 +16,6 @@ import { ThemeLogo } from '@/components/ThemeLogo';
 import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
 import JoinChallenge from '@/components/JoinChallenge';
 import { FarcasterShareGameButton } from '@/components/FarcasterShareGameButton';
-import { FarcasterAddMiniAppButton } from '@/components/FarcasterAddMiniAppButton';
 import { buildGameShareUrl } from '@/lib/farcaster-embed';
 
 interface LobbyProps {
@@ -301,7 +300,6 @@ export default function Lobby({
                     onSignInRequired={() => login()}
                     collapsible
                   />
-                  <FarcasterAddMiniAppButton variant="compact" />
                 </>
               )}
             </div>

@@ -4,7 +4,7 @@
     "version": "1",
     "iconUrl": "https://crack-my-code.vercel.app/icon.png",
     "homeUrl": "https://crack-my-code.vercel.app",
-    "splashImageUrl": "https://crack-my-code.vercel.app/logo.png",
+    "splashImageUrl": "https://crack-my-code.vercel.app/splash.png",
     "splashBackgroundColor": "#E3F2FA",
     "webhookUrl": "https://crack-my-code.vercel.app/api/webhook",
     "primaryCategory": "games",
