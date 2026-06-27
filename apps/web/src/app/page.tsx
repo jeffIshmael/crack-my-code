@@ -29,15 +29,15 @@ import {
   PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
 import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
-import { useAccount, useWriteContract, usePublicClient, useBalance, useSendTransaction } from 'wagmi';
+import { useAccount, useWriteContract, usePublicClient, useBalance, useDisconnect } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
-import { parseUnits, parseEventLogs, encodeFunctionData, parseEther } from 'viem';
+import { parseUnits, parseEventLogs, encodeFunctionData } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS, USDT_ADDRESS } from '../../blockchain/constants';
 import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, Send, ArrowLeft, ChevronRight } from 'lucide-react';
+import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, ArrowLeft, ChevronRight } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -71,16 +71,12 @@ export default function Home() {
   const searchParams = useSearchParams();
   const { address: wagmiAddress, isConnected } = useAccount();
   const { login, logout, authenticated, user } = usePrivy();
-  const { isAutoConnect: isEmbeddedWalletEnv } = useMiniAppEnvironment();
+  const { isMiniPay, isFarcaster } = useMiniAppEnvironment();
   const address = wagmiAddress || user?.wallet?.address;
   const publicClient = usePublicClient();
+  const { disconnect } = useDisconnect();
   const { writeContractAsync } = useWriteContract();
-  const { sendTransactionAsync } = useSendTransaction();
   const { client: smartWalletClient } = useSmartWallets();
-
-  const { data: celoData } = useBalance({
-    address: address as `0x${string}` | undefined,
-  });
 
   const { data: usdtData } = useBalance({
     address: address as `0x${string}` | undefined,
@@ -167,116 +163,13 @@ export default function Home() {
     addressRef.current = address;
   }, [address]);
 
-  const [isSendSectionOpen, setIsSendSectionOpen] = useState(false);
-  const [sendTab, setSendTab] = useState<'celo' | 'usdt'>('usdt');
-  const [sendAddress, setSendAddress] = useState('');
-  const [sendAmount, setSendAmount] = useState('');
-  const [isSending, setIsSending] = useState(false);
-
-  const handleSend = async () => {
-    if (!sendAddress || !sendAmount) return;
-    setIsSending(true);
-    console.log("[handleSend] Initializing", {
-      sendTab,
-      sendAddress,
-      sendAmount,
-      hasSmartWallet: !!smartWalletClient,
-      celoBalance: celoData?.formatted,
-      usdtBalance: usdtData?.formatted,
-    });
-    try {
-      if (sendTab === 'celo') {
-        const celoAddress = "0x471ece3750da237f93b8e339c536989b8978a438" as `0x${string}`;
-        const amount = parseEther(sendAmount);
-        console.log("[handleSend] Sending CELO via ERC20", { amount: amount.toString() });
-        const ERC20_TRANSFER_ABI = [{ "constant": false, "inputs": [ { "name": "_to", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "transfer", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" }] as const;
-
-        if (smartWalletClient) {
-            console.log("[handleSend] Using smartWalletClient for CELO ERC20");
-            const data = encodeFunctionData({
-              abi: ERC20_TRANSFER_ABI,
-              functionName: 'transfer',
-              args: [sendAddress as `0x${string}`, amount]
-            });
-            const txHash = await smartWalletClient.sendTransaction({
-              to: celoAddress,
-              data: data,
-              value: BigInt(0),
-              type: 'legacy'
-            });
-            console.log("[handleSend] smartWalletClient CELO txHash", txHash);
-            if (!publicClient) throw new Error("Public client not available");
-            const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
-            console.log("[handleSend] smartWalletClient receipt", receipt);
-        } else {
-            console.log("[handleSend] Using writeContractAsync for CELO ERC20");
-            const hash = await writeContractAsync({
-              address: celoAddress,
-              abi: ERC20_TRANSFER_ABI,
-              functionName: 'transfer',
-              args: [sendAddress as `0x${string}`, amount],
-              type: 'legacy'
-            });
-            console.log("[handleSend] writeContractAsync CELO hash", hash);
-            if (!publicClient) throw new Error("Public client not available");
-            const receipt = await publicClient.waitForTransactionReceipt({ hash });
-            console.log("[handleSend] receipt", receipt);
-        }
-      } else {
-        const amount = parseUnits(sendAmount, 6); // assuming 6 decimals for USDT on Celo
-        console.log("[handleSend] Sending USDT", { amount: amount.toString() });
-        const ERC20_TRANSFER_ABI = [{ "constant": false, "inputs": [ { "name": "_to", "type": "address" }, { "name": "_value", "type": "uint256" } ], "name": "transfer", "outputs": [ { "name": "", "type": "bool" } ], "type": "function" }] as const;
-
-        if (smartWalletClient) {
-            console.log("[handleSend] Using smartWalletClient for USDT");
-            const data = encodeFunctionData({
-              abi: ERC20_TRANSFER_ABI,
-              functionName: 'transfer',
-              args: [sendAddress as `0x${string}`, amount]
-            });
-            const txHash = await smartWalletClient.sendTransaction({
-              to: USDT_ADDRESS as `0x${string}`,
-              data: data,
-              value: BigInt(0),
-              type: 'legacy'
-            });
-            console.log("[handleSend] smartWalletClient USDT txHash", txHash);
-            if (!publicClient) throw new Error("Public client not available");
-            const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
-            console.log("[handleSend] smartWalletClient USDT receipt", receipt);
-        } else {
-            console.log("[handleSend] Using writeContractAsync for USDT");
-            const hash = await writeContractAsync({
-              address: USDT_ADDRESS,
-              abi: ERC20_TRANSFER_ABI,
-              functionName: 'transfer',
-              args: [sendAddress as `0x${string}`, amount],
-              type: 'legacy'
-            });
-            console.log("[handleSend] writeContractAsync USDT hash", hash);
-            if (!publicClient) throw new Error("Public client not available");
-            const receipt = await publicClient.waitForTransactionReceipt({ hash });
-            console.log("[handleSend] receipt", receipt);
-        }
-      }
-      toast.success("Transaction successful!");
-      setIsSendSectionOpen(false);
-      setSendAmount('');
-      setSendAddress('');
-    } catch (err: any) {
-      console.error("[handleSend] Error caught:", err);
-      const debugMsg = err?.message || err?.shortMessage || (typeof err === 'object' ? JSON.stringify(err) : String(err));
-      alert("DEBUG ERROR: " + debugMsg);
-      toast.error("Send failed", { 
-        description: debugMsg,
-        duration: 10000
-      });
-    } finally {
-      setIsSending(false);
-    }
-  };
-
   const { cancelChallenge } = useGuessMyCode();
+
+  const handleSignOut = useCallback(async () => {
+    if (isConnected) disconnect();
+    if (authenticated) await logout();
+    setActiveTab('home');
+  }, [authenticated, disconnect, isConnected, logout]);
 
   const clearOppTimer = () => { if (oppTimerRef.current) clearTimeout(oppTimerRef.current); };
 
@@ -1898,10 +1791,10 @@ export default function Home() {
         }}
         onTabChange={setActiveTab}
       />
-      {address && !isEmbeddedWalletEnv && (
+      {address && !isMiniPay && !isFarcaster && (
         <button
           type="button"
-          onClick={() => { logout(); setActiveTab('home'); }}
+          onClick={() => void handleSignOut()}
           className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-100/80 py-3.5 font-ui text-sm font-bold text-red-600 transition-colors hover:bg-red-100"
         >
           <LogOut size={16} />
