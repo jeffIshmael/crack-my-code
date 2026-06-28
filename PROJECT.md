@@ -52,46 +52,39 @@ The design intent: **play first, earn second**. A new user can crack codes in un
 
 **Make Crack My Code the easiest on-ramp to competitive, skill-based play on Celo** — a game you can open from a Farcaster cast or MiniPay, beat Cipher in one session, challenge a friend with a Game ID, and eventually stake real USDT on your logic.
 
-We are not building more product features for their own sake. The mission now is **distribution**: get Crack My Code in front of players, give them a reason to win and share, and grow daily active games through Celo’s social and wallet surfaces.
+We are not building more product features for their own sake. The mission now is **distribution**: grow from **~75 to 500+ active players**, give them a reason to win and share, and layer USDT rewards (Cipher wins → staked PvP → leaderboard prizes) as players graduate through the funnel.
 
 ---
 
-## Milestones (Future) — Distribution Focus
+## Milestones
 
-The product is **ready**. Upcoming work prioritizes **player acquisition, retention, and on-chain activity** over new game mechanics.
+**Today:** ~75 active players · **Target:** 500+ active players
 
-### Phase 1 — Win-to-earn vs Cipher AI (near term)
+Each milestone is a title and a short plan for how we get there.
 
-**Goal:** Turn every Cipher victory into a shareable, on-chain moment.
+---
 
-- **Reward:** **0.1 USDT** paid to the player’s wallet when they **beat Cipher AI** (aligned with the contract’s existing `MIN_STAKE` of 0.1 USDT).
-- **Requirements:** Wallet connected (Privy / MiniPay / Farcaster); one claim per win; basic sybil resistance (registered address, rate limits, daily cap if needed).
-- **Why 0.1 USDT:** Small enough to fund a meaningful campaign, large enough to feel real on Celo; matches the minimum stake already defined in `GuessMyCode.sol`.
-- **Distribution hook:** Result screen + Farcaster share — *“I cracked Cipher and earned 0.1 USDT — can you?”*
+### Grow the community (75 → 500+ players)
 
-### Phase 2 — Farcaster & social distribution
+We want more people playing every day, not just trying the game once. The plan is to pay **0.1 USDT** every time someone **beats Cipher AI**, so winning feels real and worth sharing. Players connect a wallet to claim (Privy, MiniPay, or Farcaster). To keep the campaign sustainable and fair, each wallet gets a **daily limit of 3–5 rewarded wins** — enough to build a habit, not enough to farm. Wins show up on the result screen with a Farcaster share prompt (*“I cracked Cipher and earned 0.1 USDT — can you?”*). We push discovery through casts, Game ID invites, and promo on X, Farcaster, and MiniPay until we pass **500 active players**.
 
-- Push **verified Mini App** discovery: casts, challenge embeds, and “Join Challenge” deep links (`/?game=GAMEID`).
-- Run weekly **leaderboard spotlights** (top CMC players featured in casts).
-- Optional: frame notifications for rematch prompts and streak nudges (webhook + Neynar already scaffolded).
+---
 
-### Phase 3 — Viral PvP loops
+### Raise the stakes (Professional USDT PvP)
 
-- Promote **invite-only Game ID** challenges as the primary friend-acquisition mechanic.
-- Highlight **+15 / −15 CMC** PvP scoring so wins have leaderboard stakes even before USDT mode is live.
-- Short-form promo (Remotion asset in `apps/promo-video`) for X / Farcaster / MiniPay channels.
+Once players know the game from Cipher, we turn on **Professional mode**: when two people play each other, they **lock USDT on-chain** before the match starts and the winner takes ~99% of the pool. The contract and UI are already built — we enable `PROFESSIONAL_MODE_ENABLED`, wire up gas-sponsored flows where we can, and make sure each player’s wallet, balance, and approvals line up so staking just works. This is the step from “play for fun” to “put money on your logic.”
 
-### Phase 4 — Professional (USDT) mode launch
+---
 
-- Enable **Professional mode** (`PROFESSIONAL_MODE_ENABLED`) for player-created USDT stakes on Celo.
-- Winner receives ~99% of the pool; gas-sponsored flows via Privy smart wallets where possible.
-- Cross-promote: players who learned the game via Cipher rewards graduate to staked PvP.
+### Reward the top players (Leaderboard prizes)
 
-### Phase 5 — Retention & ecosystem fit
+Cipher rewards bring people in; **leaderboard prizes** keep the most competitive players coming back. We will pay **USDT to top CMC scorers** on a recurring basis (weekly or seasonal — structure TBD), spotlight winners in-app and on Farcaster, and optionally reset or theme seasons so the race stays fresh. The leaderboard becomes something you fight for, not just a scoreboard.
 
-- Seasonal leaderboard resets or themed Cipher difficulty events.
-- MiniPay-specific campaigns (add-cash → first staked match bonus).
-- Track funnel: guest Cipher plays → wallet connect → first USDT win → first PvP invite sent.
+---
+
+### Keep them coming back (later)
+
+MiniPay campaigns, rematch nudges via Farcaster notifications, and funnel tracking from first Cipher play → wallet connect → first USDT win → first staked match — so we know what actually retains players after the initial growth push.
 
 ---
 
@@ -99,13 +92,16 @@ The product is **ready**. Upcoming work prioritizes **player acquisition, retent
 
 | Area | Status |
 |------|--------|
+| Active players | ~75 |
+| Growth target | 500+ (“Grow the community”) |
 | Cipher AI | ✅ Live |
 | Friendly PvP (public + Game ID) | ✅ Live |
 | CMC points & leaderboard | ✅ Live |
 | Farcaster Mini App manifest | ✅ Verified |
 | Privy wallets + USDT balance UI | ✅ Live |
-| Professional USDT staking | 🔜 Built, not enabled |
-| Cipher win USDT reward (0.1) | 📋 Planned — distribution milestone |
+| Grow the community (Cipher rewards) | 📋 Planned |
+| Raise the stakes (Professional PvP) | 🔜 Built, not enabled |
+| Reward the top players (Leaderboard) | 📋 Planned |
 
 ---
 

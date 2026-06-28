@@ -129,6 +129,7 @@ export {
   getPossibleCodes as filterSecretCandidates,
   cipherNextGuess,
   pickCipherGuess as pickAIGuess,
+  generateCipherSecretCode,
 } from './cipher';
 
 export function isWinningClues(clues: Clue[]): boolean {

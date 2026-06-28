@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
-import { generateSecretCode } from '@/lib/game';
+import { generateCipherSecretCode } from '@/lib/game';
 import { generateJoinCode } from '@/lib/join-code';
 import { createGameRecord } from '@/lib/prisma-game';
 import { ensureGuestUser, ensureRegisteredUser } from '@/lib/user-address';
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     // Generate AI code if applicable
     let aiCode = null;
     if (isAI) {
-      aiCode = generateSecretCode().join('');
+      aiCode = generateCipherSecretCode().join('');
     }
     
     let joinCode: string | undefined;
