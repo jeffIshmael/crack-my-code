@@ -64,21 +64,21 @@ Each milestone is a title and a short plan for how we get there.
 
 ---
 
-### Grow the community (75 → 500+ players)
+### Grow the community (75 → 500+ players) — Milestone 1
 
-We want more people playing every day, not just trying the game once. The plan is to pay **0.1 USDT** every time someone **beats Cipher AI**, so winning feels real and worth sharing. Players connect a wallet to claim (Privy, MiniPay, or Farcaster). To keep the campaign sustainable and fair, each wallet gets a **daily limit of 3–5 rewarded wins** — enough to build a habit, not enough to farm. Wins show up on the result screen with a Farcaster share prompt (*“I cracked Cipher and earned 0.1 USDT — can you?”*). We push discovery through casts, Game ID invites, and promo on X, Farcaster, and MiniPay until we pass **500 active players**.
-
----
-
-### Raise the stakes (Professional USDT PvP)
-
-Once players know the game from Cipher, we turn on **Professional mode**: when two people play each other, they **lock USDT on-chain** before the match starts and the winner takes ~99% of the pool. The contract and UI are already built — we enable `PROFESSIONAL_MODE_ENABLED`, wire up gas-sponsored flows where we can, and make sure each player’s wallet, balance, and approvals line up so staking just works. This is the step from “play for fun” to “put money on your logic.”
+Cipher-only USDT rewards to drive acquisition. Each wallet gets up to **5 Cipher games per day**; every **win** pays **0.1 USDT** (max 0.5 USDT/day) from the on-contract reward pool via `rewardCipherWin`. No weekly leaderboard prizes in this phase — that comes later. Grant USDT deposits through `depositToRewardPool`. Wins trigger Farcaster share prompts; discovery via casts, Game ID invites, X, Farcaster, and MiniPay until we pass **500 active players**.
 
 ---
 
-### Reward the top players (Leaderboard prizes)
+### Raise the stakes (Professional USDT PvP) — Milestone 2
 
-Cipher rewards bring people in; **leaderboard prizes** keep the most competitive players coming back. We will pay **USDT to top CMC scorers** on a recurring basis (weekly or seasonal — structure TBD), spotlight winners in-app and on Farcaster, and optionally reset or theme seasons so the race stays fresh. The leaderboard becomes something you fight for, not just a scoreboard.
+Once players know the game from Cipher, enable **Professional mode**: two players **lock USDT on-chain** before a match and the winner takes ~99% of the pool. Contract and UI are built — enable `PROFESSIONAL_MODE_ENABLED`, wire gas-sponsored flows, and validate approve → escrow → resolve → payout.
+
+---
+
+### Weekly retention (500+ players) — Milestone 3
+
+**Activates only after Milestone 1 succeeds (500+ players).** Cipher rewards brought them in; **weekly on-chain prizes** keep them coming back. Every **Monday**, audit the prior week and pay **top 3 CMC scorers** and **most games played** via `rewardWeekly`. Spotlight winners in-app and on Farcaster. This is the retention layer, not the growth layer.
 
 ---
 

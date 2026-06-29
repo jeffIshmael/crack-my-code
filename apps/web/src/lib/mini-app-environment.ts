@@ -1,4 +1,5 @@
 import { sdk } from '@farcaster/miniapp-sdk';
+import { isLikelyMiniPayHost, isMiniPayClient } from '@/lib/minipay-host';
 
 export type AppEnvironment = 'minipay' | 'farcaster' | 'web';
 
@@ -22,10 +23,7 @@ const WEB_DEFAULT: MiniAppEnvironment = {
 
 let detectionPromise: Promise<MiniAppEnvironment> | null = null;
 
-export function isMiniPayClient(): boolean {
-  if (typeof window === 'undefined') return false;
-  return (window as Window & { ethereum?: { isMiniPay?: boolean } }).ethereum?.isMiniPay === true;
-}
+export { isMiniPayClient, isLikelyMiniPayHost } from '@/lib/minipay-host';
 
 const MINIPAY_ENV: MiniAppEnvironment = {
   environment: 'minipay',
@@ -37,7 +35,7 @@ const MINIPAY_ENV: MiniAppEnvironment = {
 
 /** Instant MiniPay detection — avoids awaiting the Farcaster SDK. */
 export function getSyncMiniAppEnvironment(): MiniAppEnvironment | null {
-  if (isMiniPayClient()) return MINIPAY_ENV;
+  if (isLikelyMiniPayHost()) return MINIPAY_ENV;
   return null;
 }
 
@@ -56,37 +54,51 @@ function isFarcasterDevFallback(): boolean {
   );
 }
 
+async function isInMiniAppWithTimeout(timeoutMs = 600): Promise<boolean> {
+  try {
+    return await Promise.race([
+      sdk.isInMiniApp(),
+      new Promise<boolean>((resolve) => {
+        setTimeout(() => resolve(isLikelyMiniPayHost()), timeoutMs);
+      }),
+    ]);
+  } catch {
+    return isLikelyMiniPayHost();
+  }
+}
+
 /**
  * Detect whether the app is running in MiniPay, a Farcaster Mini App, or the open web.
- * Uses sdk.isInMiniApp() per Neynar / Farcaster Mini App SDK guidance.
  */
 export async function detectMiniAppEnvironment(): Promise<MiniAppEnvironment> {
   if (typeof window === 'undefined') {
     return { ...WEB_DEFAULT, isReady: true };
   }
 
-  if (isMiniPayClient()) {
+  if (isLikelyMiniPayHost()) {
     return MINIPAY_ENV;
   }
 
-  let isFarcaster = false;
-  try {
-    isFarcaster = await sdk.isInMiniApp();
-  } catch {
-    isFarcaster = false;
-  }
+  const isFarcaster = await isInMiniAppWithTimeout();
 
   if (!isFarcaster) {
-    isFarcaster = isFarcasterDevFallback();
+    if (isFarcasterDevFallback()) {
+      return {
+        environment: 'farcaster',
+        isMiniPay: false,
+        isFarcaster: true,
+        isAutoConnect: true,
+        isReady: true,
+      };
+    }
+    return { ...WEB_DEFAULT, isReady: true };
   }
 
-  const environment: AppEnvironment = isFarcaster ? 'farcaster' : 'web';
-
   return {
-    environment,
+    environment: 'farcaster',
     isMiniPay: false,
-    isFarcaster,
-    isAutoConnect: isFarcaster,
+    isFarcaster: true,
+    isAutoConnect: true,
     isReady: true,
   };
 }

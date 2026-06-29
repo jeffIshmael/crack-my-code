@@ -24,11 +24,11 @@ import {
   evaluateGuess,
   toTileClues,
   isWinningClues,
-  cipherNextGuess,
   MAX_GUESSES,
   PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
 import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
+import { cipherNextGuessAsync, prefetchCipherGuess, warmCipherWorker } from '@/lib/cipher-async';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useDisconnect } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
 import { parseUnits, parseEventLogs, encodeFunctionData } from 'viem';
@@ -683,6 +683,7 @@ export default function Home() {
     const waitForPlayerReview = Math.max(0, playerReviewUntilRef.current - Date.now());
 
     oppTimerRef.current = setTimeout(() => {
+      void (async () => {
       const currentGs = gsRef.current;
       if (currentGs.phase !== 'playing' || currentGs.isPlayerTurn) {
         aiTurnRunningRef.current = false;
@@ -696,7 +697,18 @@ export default function Home() {
         return;
       }
 
-      const targetDigits = cipherNextGuess(history);
+      let targetDigits: number[];
+      try {
+        targetDigits = await cipherNextGuessAsync(history);
+      } catch (err) {
+        console.error('Cipher guess failed, using fallback', err);
+        targetDigits = [0, 1, 2, 3];
+      }
+
+      if (gsRef.current.phase !== 'playing' || gsRef.current.isPlayerTurn) {
+        aiTurnRunningRef.current = false;
+        return;
+      }
 
       let typeIndex = 0;
       const typeDigit = () => {
@@ -770,6 +782,10 @@ export default function Home() {
               };
             });
             setPendingOpponentTileClues(null);
+            prefetchCipherGuess([
+              ...history,
+              { digits: entry.digits, clues: entry.clues },
+            ]);
             aiTurnRunningRef.current = false;
           }, revealMs);
         }
@@ -777,6 +793,7 @@ export default function Home() {
 
       setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: [] }));
       typeDigit();
+      })();
     }, waitForPlayerReview);
   }, [currentGameId, address, syncResultStats, AI_DIGIT_MS, AI_REVEAL_MS]);
 
@@ -1127,6 +1144,7 @@ export default function Home() {
 
     // For AI games, skip the synchronizing modal and go straight to playing
     if (gs.gameMode === 'ai') {
+      warmCipherWorker();
       setGs((prev: GameState): GameState => ({ ...prev, phase: 'playing' }));
       // Do the server lock-code in the background without blocking
       fetch('/api/games/lock-code', {
@@ -1162,6 +1180,7 @@ export default function Home() {
     setIsSubmitting(true);
     isSubmittingRef.current = true;
 
+    try {
     // 1. Send guess to server
     if (currentGameId) {
       try {
@@ -1255,10 +1274,11 @@ export default function Home() {
       } catch (err) {
         console.error('Failed to submit guess', err);
         toast.error('Submission Failed', { description: getErrorMessage(err) });
-      } finally {
-        setIsSubmitting(false);
-        isSubmittingRef.current = false;
       }
+    }
+    } finally {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   }, [gs, currentGameId, address, isSubmitting, syncResultStats, scheduleTurnHandover]);
 
