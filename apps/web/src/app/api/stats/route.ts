@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { startOfUtcDay } from '@/lib/stats';
+import { startOfUtcDay, startOfUtcDayDaysAgo, movingAverageDaily } from '@/lib/stats';
 import { isGuestAddress, registeredPlayerWhere } from '@/lib/guest';
 
 export const dynamic = 'force-dynamic';
@@ -93,6 +93,11 @@ async function getMyStats(address: string) {
 
 async function getGlobalStats() {
   const todayStart = startOfUtcDay();
+  const fourteenDaysAgo = startOfUtcDayDaysAgo(14);
+  const completedInWindow = {
+    status: 'COMPLETED' as const,
+    updatedAt: { gte: fourteenDaysAgo },
+  };
 
   const [
     totalUsers,
@@ -101,6 +106,9 @@ async function getGlobalStats() {
     opponentPlayed,
     cipherWins,
     playedToday,
+    completedLast14Days,
+    cipherLast14Days,
+    pvpLast14Days,
   ] = await Promise.all([
     prisma.user.count({
       where: registeredPlayerWhere,
@@ -122,7 +130,24 @@ async function getGlobalStats() {
         updatedAt: { gte: todayStart },
       },
     }),
+    prisma.game.count({ where: completedInWindow }),
+    prisma.game.count({ where: { ...completedInWindow, mode: 'ai' } }),
+    prisma.game.count({
+      where: { ...completedInWindow, mode: { in: ['fun', 'cash'] } },
+    }),
   ]);
+
+  const ON_CHAIN_TX_PER_CIPHER_GAME = 1; // trackGame
+  const ON_CHAIN_TX_PER_PVP_GAME = 3; // createChallenge → joinChallenge → resolveMatch
+
+  const onChainTxLast14Days =
+    cipherLast14Days * ON_CHAIN_TX_PER_CIPHER_GAME +
+    pvpLast14Days * ON_CHAIN_TX_PER_PVP_GAME;
+
+  const twoWeekMovingAverageDailyOnChainTx = movingAverageDaily(
+    onChainTxLast14Days,
+    14,
+  );
 
   return {
     totalUsers,
@@ -131,6 +156,20 @@ async function getGlobalStats() {
     opponentPlayed,
     cipherWins,
     playedToday,
+    onChain: {
+      windowDays: 14,
+      completedGamesInWindow: completedLast14Days,
+      cipherGamesInWindow: cipherLast14Days,
+      pvpGamesInWindow: pvpLast14Days,
+      onChainTxInWindow: onChainTxLast14Days,
+      txPerCipherGame: ON_CHAIN_TX_PER_CIPHER_GAME,
+      txPerPvpGame: ON_CHAIN_TX_PER_PVP_GAME,
+      movingAverageDailyOnChainTx: twoWeekMovingAverageDailyOnChainTx,
+      pvpFlow: ['createChallenge', 'joinChallenge', 'resolveMatch'],
+      note: 'Cipher: 1× trackGame per game. PvP: 3 txs per match (host createChallenge, opponent joinChallenge, agent resolveMatch). Daily volume varies with player activity.',
+      contractAddress: '0x0317e55136a46557516aa40EA96d66772767C72C',
+      celoscanUrl: 'https://celoscan.io/address/0x0317e55136a46557516aa40EA96d66772767C72C',
+    },
   };
 }
 

@@ -22,8 +22,25 @@ export type CipherHistory = Pick<GuessEntry, 'digits' | 'clues'>[];
 /** First guess only — four unique digits for maximum initial coverage. */
 const OPENING_GUESS: number[] = [0, 1, 2, 3];
 
+/** Second guess — four more unique digits (opening book). */
+const SECOND_OPENING_GUESS: number[] = [4, 5, 6, 7];
+
 /** Prefer minimax (worst-case bucket) when the pool is this small. */
 const MINIMAX_THRESHOLD = 50;
+
+/** When the candidate pool is large, probe candidates plus these duplicate patterns. */
+const DUPLICATE_PATTERN_PROBES: number[][] = [
+  [0, 0, 1, 1],
+  [1, 1, 2, 2],
+  [0, 1, 0, 1],
+  [1, 2, 2, 3],
+  [0, 0, 0, 1],
+  [2, 2, 2, 2],
+  [0, 1, 2, 2],
+  [8, 8, 9, 9],
+  [9, 0, 1, 2],
+  [5, 5, 6, 6],
+];
 
 export function cluesMatch(a: Clue[], b: Clue[]): boolean {
   return a.length === b.length && a.every((c, i) => c === b[i]);
@@ -126,14 +143,39 @@ function pickBestGuess(
   return [...bestGuess];
 }
 
+function buildProbePool(candidates: number[][]): number[][] {
+  if (candidates.length === 1) return [candidates[0]];
+  if (candidates.length === 2) return candidates.map((c) => [...c]);
+
+  if (candidates.length <= 500) {
+    return allSecretCodes();
+  }
+
+  const keys = new Set<string>();
+  const probes: number[][] = [];
+  const add = (code: number[]) => {
+    const k = codeKey(code);
+    if (!keys.has(k)) {
+      keys.add(k);
+      probes.push(code);
+    }
+  };
+
+  for (const c of candidates) add(c);
+  for (const p of DUPLICATE_PATTERN_PROBES) add(p);
+
+  return probes;
+}
+
 /** Cipher's next guess given guess history against the human's secret code. */
 export function pickCipherGuess(possible: number[][], turnIndex: number): number[] {
   if (possible.length === 0) return [...OPENING_GUESS];
   if (possible.length === 1) return [...possible[0]];
 
   if (turnIndex === 0) return [...OPENING_GUESS];
+  if (turnIndex === 1) return [...SECOND_OPENING_GUESS];
 
-  return pickBestGuess(allSecretCodes(), possible);
+  return pickBestGuess(buildProbePool(possible), possible);
 }
 
 export function cipherNextGuess(history: CipherHistory): number[] {

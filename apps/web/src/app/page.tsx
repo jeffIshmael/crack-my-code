@@ -696,7 +696,14 @@ export default function Home() {
         return;
       }
 
-      const targetDigits = cipherNextGuess(history);
+      const targetDigits = (() => {
+        try {
+          return cipherNextGuess(history);
+        } catch (err) {
+          console.error('Cipher guess failed, using fallback', err);
+          return [0, 1, 2, 3];
+        }
+      })();
 
       let typeIndex = 0;
       const typeDigit = () => {
@@ -1162,6 +1169,7 @@ export default function Home() {
     setIsSubmitting(true);
     isSubmittingRef.current = true;
 
+    try {
     // 1. Send guess to server
     if (currentGameId) {
       try {
@@ -1255,10 +1263,11 @@ export default function Home() {
       } catch (err) {
         console.error('Failed to submit guess', err);
         toast.error('Submission Failed', { description: getErrorMessage(err) });
-      } finally {
-        setIsSubmitting(false);
-        isSubmittingRef.current = false;
       }
+    }
+    } finally {
+      setIsSubmitting(false);
+      isSubmittingRef.current = false;
     }
   }, [gs, currentGameId, address, isSubmitting, syncResultStats, scheduleTurnHandover]);
 

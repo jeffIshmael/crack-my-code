@@ -12,6 +12,19 @@ export function startOfUtcDay(date = new Date()) {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
+/** Start of UTC day, N days before the given date (N=14 → 14 days ago at 00:00 UTC). */
+export function startOfUtcDayDaysAgo(days: number, date = new Date()) {
+  const start = startOfUtcDay(date);
+  start.setUTCDate(start.getUTCDate() - days);
+  return start;
+}
+
+/** Completed games in the window ÷ window days (e.g. 14-day moving average daily games). */
+export function movingAverageDaily(count: number, windowDays: number) {
+  if (windowDays <= 0) return 0;
+  return Math.round((count / windowDays) * 100) / 100;
+}
+
 export function formatLastPlayed(date: Date | string | null | undefined) {
   if (!date) return 'Never';
 
