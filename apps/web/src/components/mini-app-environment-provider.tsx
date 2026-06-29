@@ -19,8 +19,8 @@ const PENDING: MiniAppEnvironment = {
 export const MiniAppEnvironmentContext = createContext<MiniAppEnvironment>(PENDING);
 
 /**
- * Detects MiniPay / Farcaster hosts. MiniPay is resolved synchronously;
- * Farcaster calls sdk.actions.ready() without blocking other hosts.
+ * Detects MiniPay / Farcaster hosts. MiniPay is resolved synchronously.
+ * Both hosts require sdk.actions.ready() to dismiss the splash screen.
  */
 export function MiniAppEnvironmentProvider({ children }: { children: React.ReactNode }) {
   const [environment, setEnvironment] = useState<MiniAppEnvironment>(
@@ -30,18 +30,33 @@ export function MiniAppEnvironmentProvider({ children }: { children: React.React
   useEffect(() => {
     let cancelled = false;
 
+    const dismissSplash = async () => {
+      try {
+        await sdk.actions.ready();
+      } catch (error) {
+        console.debug('sdk.actions.ready() skipped:', error);
+      }
+    };
+
+    // MiniPay: dismiss splash immediately — waiting on async detection leaves an infinite loader.
+    const sync = getSyncMiniAppEnvironment();
+    if (sync?.isMiniPay) {
+      void dismissSplash();
+    } else {
+      // Mini App hosts (Farcaster, MiniPay discover) may not expose isMiniPay synchronously.
+      void sdk.isInMiniApp().then((inMiniApp) => {
+        if (inMiniApp) void dismissSplash();
+      });
+    }
+
     const init = async () => {
       const detected = await detectMiniAppEnvironment();
       if (!cancelled) {
         setEnvironment(detected);
       }
 
-      if (detected.isFarcaster) {
-        try {
-          await sdk.actions.ready();
-        } catch (error) {
-          console.debug('sdk.actions.ready() skipped:', error);
-        }
+      if (detected.isAutoConnect) {
+        await dismissSplash();
       }
     };
 

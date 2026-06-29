@@ -3,10 +3,7 @@
  *
  * Solver: constraint elimination + full 10⁴ probe search (entropy / expected
  * pool reduction; minimax when ≤50 candidates). Opening: fixed `0123`, then
- * dynamic optimal second guess and beyond.
- *
- * Defense: `generateCipherSecretCode()` prefers duplicate-heavy codes and
- * digits outside the opening probe (8/9).
+ * dynamic optimal guesses from the full space.
  */
 
 import {
@@ -22,25 +19,8 @@ export type CipherHistory = Pick<GuessEntry, 'digits' | 'clues'>[];
 /** First guess only — four unique digits for maximum initial coverage. */
 const OPENING_GUESS: number[] = [0, 1, 2, 3];
 
-/** Second guess — four more unique digits (opening book). */
-const SECOND_OPENING_GUESS: number[] = [4, 5, 6, 7];
-
 /** Prefer minimax (worst-case bucket) when the pool is this small. */
 const MINIMAX_THRESHOLD = 50;
-
-/** When the candidate pool is large, probe candidates plus these duplicate patterns. */
-const DUPLICATE_PATTERN_PROBES: number[][] = [
-  [0, 0, 1, 1],
-  [1, 1, 2, 2],
-  [0, 1, 0, 1],
-  [1, 2, 2, 3],
-  [0, 0, 0, 1],
-  [2, 2, 2, 2],
-  [0, 1, 2, 2],
-  [8, 8, 9, 9],
-  [9, 0, 1, 2],
-  [5, 5, 6, 6],
-];
 
 export function cluesMatch(a: Clue[], b: Clue[]): boolean {
   return a.length === b.length && a.every((c, i) => c === b[i]);
@@ -143,39 +123,14 @@ function pickBestGuess(
   return [...bestGuess];
 }
 
-function buildProbePool(candidates: number[][]): number[][] {
-  if (candidates.length === 1) return [candidates[0]];
-  if (candidates.length === 2) return candidates.map((c) => [...c]);
-
-  if (candidates.length <= 500) {
-    return allSecretCodes();
-  }
-
-  const keys = new Set<string>();
-  const probes: number[][] = [];
-  const add = (code: number[]) => {
-    const k = codeKey(code);
-    if (!keys.has(k)) {
-      keys.add(k);
-      probes.push(code);
-    }
-  };
-
-  for (const c of candidates) add(c);
-  for (const p of DUPLICATE_PATTERN_PROBES) add(p);
-
-  return probes;
-}
-
 /** Cipher's next guess given guess history against the human's secret code. */
 export function pickCipherGuess(possible: number[][], turnIndex: number): number[] {
   if (possible.length === 0) return [...OPENING_GUESS];
   if (possible.length === 1) return [...possible[0]];
 
   if (turnIndex === 0) return [...OPENING_GUESS];
-  if (turnIndex === 1) return [...SECOND_OPENING_GUESS];
 
-  return pickBestGuess(buildProbePool(possible), possible);
+  return pickBestGuess(allSecretCodes(), possible);
 }
 
 export function cipherNextGuess(history: CipherHistory): number[] {
@@ -183,72 +138,7 @@ export function cipherNextGuess(history: CipherHistory): number[] {
   return pickCipherGuess(possible, history.length);
 }
 
-// ─── Cipher defense (secret code generation) ───────────────────────────────
-
-function countColorHits(guess: number[], secret: number[]): number {
-  return evaluateGuess(guess, secret).filter((c) => c !== 'gray').length;
-}
-
-function duplicateScore(code: number[]): number {
-  const freq = new Map<number, number>();
-  for (const d of code) freq.set(d, (freq.get(d) || 0) + 1);
-  let score = 0;
-  for (const n of freq.values()) {
-    if (n >= 2) score += n * n;
-  }
-  return score;
-}
-
-function isTrivialCode(code: number[]): boolean {
-  const key = codeKey(code);
-  if (/^(\d)\1{3}$/.test(key)) return true;
-  if (key === '0123' || key === '1234' || key === '3210') return true;
-  return false;
-}
-
-function defenseScore(code: number[]): number {
-  if (isTrivialCode(code)) return -1;
-
-  const openingHits = countColorHits(OPENING_GUESS, code);
-  const dups = duplicateScore(code);
-  const eightNineCount = code.filter((d) => d >= 8).length;
-  const onlyHighDigits = code.every((d) => d >= 6);
-
-  let score = 0;
-  score += (4 - openingHits) * 12;
-  score += dups * 4;
-  score += eightNineCount * 5;
-  if (onlyHighDigits) score += 6;
-
-  return score;
-}
-
-/**
- * Generate a secret code for Cipher that is harder to crack than uniform random:
- * duplicate digits, digits outside the `0123` opening, and 8/9 heavy patterns.
- */
+/** Uniform random secret code for Cipher matches. */
 export function generateCipherSecretCode(): number[] {
-  const pool = allSecretCodes();
-  const scored: { code: number[]; score: number }[] = [];
-
-  for (const code of pool) {
-    const score = defenseScore(code);
-    if (score >= 0) scored.push({ code, score });
-  }
-
-  scored.sort((a, b) => b.score - a.score);
-
-  const topCount = Math.max(1, Math.floor(scored.length * 0.12));
-  const tier = scored.slice(0, topCount);
-  const maxScore = tier[0]?.score ?? 0;
-  const minTierScore = tier[tier.length - 1]?.score ?? 0;
-  const span = Math.max(1, maxScore - minTierScore);
-
-  let roll = Math.random() * tier.reduce((sum, { score }) => sum + (score - minTierScore + 1), 0);
-  for (const { code, score } of tier) {
-    roll -= score - minTierScore + 1;
-    if (roll <= 0) return [...code];
-  }
-
-  return [...tier[tier.length - 1].code];
+  return Array.from({ length: CODE_LENGTH }, () => Math.floor(Math.random() * 10));
 }
