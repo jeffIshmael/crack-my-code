@@ -24,7 +24,9 @@ export function DismissMiniAppSplash() {
     const dismissForMiniAppHost = (inMiniApp: boolean) => {
       if (!inMiniApp) return;
       tryDismissSplash();
-      timers = RETRY_DELAYS_MS.map((delay) => window.setTimeout(tryDismissSplash, delay));
+      for (const delay of RETRY_DELAYS_MS) {
+        timers.push(setTimeout(tryDismissSplash, delay));
+      }
     };
 
     void sdk.isInMiniApp().then(dismissForMiniAppHost).catch(() => {});
