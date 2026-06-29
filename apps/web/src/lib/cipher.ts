@@ -13,6 +13,7 @@ import {
   evaluateGuess,
   allSecretCodes,
 } from './game';
+import { shouldUseMiniPayCipherFastPath } from './minipay-host';
 
 export type CipherHistory = Pick<GuessEntry, 'digits' | 'clues'>[];
 
@@ -27,6 +28,9 @@ const FULL_PROBE_THRESHOLD = 500;
 
 /** When the pool is larger, sample this many candidate probes (fast on mobile). */
 const LARGE_POOL_PROBE_CAP = 200;
+
+const MINIPAY_FULL_PROBE_THRESHOLD = 80;
+const MINIPAY_PROBE_CAP = 40;
 
 export function cluesMatch(a: Clue[], b: Clue[]): boolean {
   return a.length === b.length && a.every((c, i) => c === b[i]);
@@ -130,20 +134,31 @@ function pickBestGuess(
 }
 
 function buildProbePool(candidates: number[][]): number[][] {
+  const mobile = shouldUseMiniPayCipherFastPath();
+  const fullThreshold = mobile ? MINIPAY_FULL_PROBE_THRESHOLD : FULL_PROBE_THRESHOLD;
+  const probeCap = mobile ? MINIPAY_PROBE_CAP : LARGE_POOL_PROBE_CAP;
+
   if (candidates.length <= 1) {
     return candidates.length === 1 ? [[...candidates[0]]] : [[...OPENING_GUESS]];
   }
   if (candidates.length === 2) {
     return candidates.map((c) => [...c]);
   }
-  if (candidates.length <= FULL_PROBE_THRESHOLD) {
+  if (candidates.length <= fullThreshold) {
+    if (mobile) {
+      return sampleCandidates(candidates, probeCap);
+    }
     return allSecretCodes();
   }
 
-  const cap = Math.min(LARGE_POOL_PROBE_CAP, candidates.length);
+  return sampleCandidates(candidates, probeCap);
+}
+
+function sampleCandidates(candidates: number[][], cap: number): number[][] {
+  const limit = Math.min(cap, candidates.length);
   const probes: number[][] = [];
-  for (let i = 0; i < cap; i++) {
-    const idx = Math.floor((i * candidates.length) / cap);
+  for (let i = 0; i < limit; i++) {
+    const idx = Math.floor((i * candidates.length) / limit);
     probes.push([...candidates[idx]]);
   }
   return probes;

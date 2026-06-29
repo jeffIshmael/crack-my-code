@@ -29,7 +29,6 @@ import {
 } from '@/lib/game';
 import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
 import { cipherNextGuessAsync, prefetchCipherGuess, warmCipherWorker } from '@/lib/cipher-async';
-import { cipherNextGuess } from '@/lib/cipher';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useDisconnect } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
 import { parseUnits, parseEventLogs, encodeFunctionData } from 'viem';
@@ -703,11 +702,7 @@ export default function Home() {
         targetDigits = await cipherNextGuessAsync(history);
       } catch (err) {
         console.error('Cipher guess failed, using fallback', err);
-        try {
-          targetDigits = cipherNextGuess(history);
-        } catch {
-          targetDigits = [0, 1, 2, 3];
-        }
+        targetDigits = [0, 1, 2, 3];
       }
 
       if (gsRef.current.phase !== 'playing' || gsRef.current.isPlayerTurn) {

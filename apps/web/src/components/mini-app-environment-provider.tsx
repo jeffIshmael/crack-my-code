@@ -1,12 +1,14 @@
 'use client';
 
-import { createContext, useEffect, useState } from 'react';
+import { createContext, useEffect, useLayoutEffect, useState } from 'react';
 import { sdk } from '@farcaster/miniapp-sdk';
 import {
   detectMiniAppEnvironment,
   getSyncMiniAppEnvironment,
   type MiniAppEnvironment,
 } from '@/lib/mini-app-environment';
+import { isLikelyMiniPayHost } from '@/lib/minipay-host';
+import { DismissMiniAppSplash } from '@/components/dismiss-mini-app-splash';
 
 const PENDING: MiniAppEnvironment = {
   environment: 'web',
@@ -27,18 +29,22 @@ const MINI_APP_BOOTSTRAP: MiniAppEnvironment = {
 export const MiniAppEnvironmentContext = createContext<MiniAppEnvironment>(PENDING);
 
 /**
- * Detects MiniPay / Farcaster hosts. MiniPay is resolved synchronously.
- * Splash dismissal is handled by DismissMiniAppSplash after the shell paints.
+ * Detects MiniPay / Farcaster hosts. MiniPay bootstraps synchronously when possible.
  */
 export function MiniAppEnvironmentProvider({ children }: { children: React.ReactNode }) {
   const [environment, setEnvironment] = useState<MiniAppEnvironment>(
     () => getSyncMiniAppEnvironment() ?? PENDING,
   );
 
+  useLayoutEffect(() => {
+    if (isLikelyMiniPayHost()) {
+      setEnvironment((prev) => (prev.isMiniPay ? prev : getSyncMiniAppEnvironment() ?? prev));
+    }
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
 
-    // MiniPay discover may not expose isMiniPay immediately — unblock auto-connect early.
     if (!getSyncMiniAppEnvironment()) {
       void sdk.isInMiniApp().then((inMiniApp) => {
         if (!cancelled && inMiniApp) {
@@ -60,6 +66,7 @@ export function MiniAppEnvironmentProvider({ children }: { children: React.React
 
   return (
     <MiniAppEnvironmentContext.Provider value={environment}>
+      <DismissMiniAppSplash />
       {children}
     </MiniAppEnvironmentContext.Provider>
   );
