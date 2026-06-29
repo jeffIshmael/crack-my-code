@@ -17,6 +17,14 @@ export function isLikelyMiniPayHost(): boolean {
   const ua = navigator.userAgent ?? '';
   if (/minipay/i.test(ua)) return true;
 
+  const referrer = document.referrer ?? '';
+  if (/minipay/i.test(referrer)) return true;
+
+  // Opened from MiniPay discover / deep link without isMiniPay injected yet.
+  if (window.location.search.includes('minipay') || window.location.search.includes('miniApp')) {
+    return true;
+  }
+
   // MiniPay Android WebView often includes "wv" without the brand in UA.
   if (/; wv\)/i.test(ua) && /android/i.test(ua) && /celo|opera|chrome/i.test(ua)) {
     return true;

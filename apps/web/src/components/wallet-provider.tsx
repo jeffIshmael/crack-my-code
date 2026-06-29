@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { createConfig, WagmiProvider } from "@privy-io/wagmi";
 import { http, useConnect, injected, useAccount } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
@@ -14,16 +14,11 @@ import { isLikelyMiniPayHost, isMiniPayClient } from "@/lib/mini-app-environment
 const queryClient = new QueryClient();
 
 export function WalletProvider({ children }: { children: React.ReactNode }) {
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
   const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
   const isAppIdValid = appId && appId !== 'undefined' && appId.length > 5;
 
-  const miniPayHost = typeof window !== 'undefined' && isLikelyMiniPayHost();
-  const skipMountGate = mounted || miniPayHost;
-
-  if (!skipMountGate) {
+  // SSR: Privy/Wagmi hooks are client-only. Client: render immediately (no mount flash).
+  if (typeof window === 'undefined') {
     return null;
   }
 
@@ -78,7 +73,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
   const { ready } = usePrivy();
   const { isAutoConnect: isAutoConnectEnv, isReady: envReady } = useMiniAppEnvironment();
-  const miniPayHost = typeof window !== 'undefined' && isLikelyMiniPayHost();
+  const miniPayHost = isLikelyMiniPayHost();
   const autoConnectHost = isAutoConnectEnv || miniPayHost;
   const wagmiConfig = useMemo(() => {
     return createConfig({
