@@ -16,11 +16,19 @@ const PENDING: MiniAppEnvironment = {
   isReady: false,
 };
 
+const MINI_APP_BOOTSTRAP: MiniAppEnvironment = {
+  environment: 'farcaster',
+  isMiniPay: false,
+  isFarcaster: true,
+  isAutoConnect: true,
+  isReady: false,
+};
+
 export const MiniAppEnvironmentContext = createContext<MiniAppEnvironment>(PENDING);
 
 /**
  * Detects MiniPay / Farcaster hosts. MiniPay is resolved synchronously.
- * Both hosts require sdk.actions.ready() to dismiss the splash screen.
+ * Splash dismissal is handled by DismissMiniAppSplash after the shell paints.
  */
 export function MiniAppEnvironmentProvider({ children }: { children: React.ReactNode }) {
   const [environment, setEnvironment] = useState<MiniAppEnvironment>(
@@ -30,37 +38,20 @@ export function MiniAppEnvironmentProvider({ children }: { children: React.React
   useEffect(() => {
     let cancelled = false;
 
-    const dismissSplash = async () => {
-      try {
-        await sdk.actions.ready();
-      } catch (error) {
-        console.debug('sdk.actions.ready() skipped:', error);
-      }
-    };
-
-    // MiniPay: dismiss splash immediately — waiting on async detection leaves an infinite loader.
-    const sync = getSyncMiniAppEnvironment();
-    if (sync?.isMiniPay) {
-      void dismissSplash();
-    } else {
-      // Mini App hosts (Farcaster, MiniPay discover) may not expose isMiniPay synchronously.
+    // MiniPay discover may not expose isMiniPay immediately — unblock auto-connect early.
+    if (!getSyncMiniAppEnvironment()) {
       void sdk.isInMiniApp().then((inMiniApp) => {
-        if (inMiniApp) void dismissSplash();
+        if (!cancelled && inMiniApp) {
+          setEnvironment((prev) => (prev.isAutoConnect ? prev : MINI_APP_BOOTSTRAP));
+        }
       });
     }
 
-    const init = async () => {
-      const detected = await detectMiniAppEnvironment();
+    void detectMiniAppEnvironment().then((detected) => {
       if (!cancelled) {
         setEnvironment(detected);
       }
-
-      if (detected.isAutoConnect) {
-        await dismissSplash();
-      }
-    };
-
-    void init();
+    });
 
     return () => {
       cancelled = true;

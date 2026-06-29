@@ -10,6 +10,7 @@ import { SmartWalletsProvider } from "@privy-io/react-auth/smart-wallets";
 import { farcasterMiniApp as farcasterFrame } from "@farcaster/miniapp-wagmi-connector";
 import { useMiniAppEnvironment } from "@/hooks/use-mini-app-environment";
 import { isMiniPayClient } from "@/lib/mini-app-environment";
+import { DismissMiniAppSplash } from "@/components/dismiss-mini-app-splash";
 
 const queryClient = new QueryClient();
 
@@ -36,6 +37,7 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
     return (
       <QueryClientProvider client={queryClient}>
         {children}
+        <DismissMiniAppSplash />
       </QueryClientProvider>
     );
   }
@@ -80,6 +82,8 @@ export function WalletProvider({ children }: { children: React.ReactNode }) {
 function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
   const { ready } = usePrivy();
   const { isAutoConnect: isAutoConnectEnv, isReady: envReady } = useMiniAppEnvironment();
+  const miniPayHost = typeof window !== 'undefined' && isMiniPayClient();
+  const autoConnectHost = isAutoConnectEnv || miniPayHost;
   const wagmiConfig = useMemo(() => {
     return createConfig({
       chains: [celo],
@@ -95,11 +99,11 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Auto-connect hosts (MiniPay / Farcaster) render the app immediately; wallet connects in background.
-  if (!envReady && !isAutoConnectEnv) {
+  if (!envReady && !autoConnectHost) {
     return null;
   }
 
-  if (!ready && !isAutoConnectEnv) {
+  if (!ready && !autoConnectHost) {
     return null;
   }
 
@@ -116,15 +120,9 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
   const { isFarcaster, isMiniPay, isReady: envReady } = useMiniAppEnvironment();
 
   useEffect(() => {
-    if (!envReady || isConnected) return;
+    if (isConnected) return;
 
-    if (isFarcaster) {
-      console.log("Auto-connecting to Farcaster via farcasterMiniApp()");
-      connect({ connector: farcasterFrame() });
-      return;
-    }
-
-    if (isMiniPay) {
+    if (isMiniPay || isMiniPayClient()) {
       const injectedConnector = connectors.find(c => c.id === 'injected' || c.id === 'metaMask');
       if (injectedConnector) {
         console.log("Auto-connecting to MiniPay");
@@ -132,8 +130,16 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
       } else if (connectors.length > 1) {
         connect({ connector: connectors[1] });
       }
+      return;
+    }
+
+    if (!envReady) return;
+
+    if (isFarcaster) {
+      console.log("Auto-connecting to Farcaster via farcasterMiniApp()");
+      connect({ connector: farcasterFrame() });
     }
   }, [connect, connectors, isConnected, isFarcaster, isMiniPay, envReady]);
 
-  return <>{children}</>;
+  return <>{children}<DismissMiniAppSplash /></>;
 }
