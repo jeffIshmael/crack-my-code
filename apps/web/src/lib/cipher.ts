@@ -22,6 +22,12 @@ const OPENING_GUESS: number[] = [0, 1, 2, 3];
 /** Prefer minimax (worst-case bucket) when the pool is this small. */
 const MINIMAX_THRESHOLD = 50;
 
+/** Score every code as a probe when the candidate pool is at most this size. */
+const FULL_PROBE_THRESHOLD = 500;
+
+/** When the pool is larger, sample this many candidate probes (fast on mobile). */
+const LARGE_POOL_PROBE_CAP = 200;
+
 export function cluesMatch(a: Clue[], b: Clue[]): boolean {
   return a.length === b.length && a.every((c, i) => c === b[i]);
 }
@@ -123,6 +129,26 @@ function pickBestGuess(
   return [...bestGuess];
 }
 
+function buildProbePool(candidates: number[][]): number[][] {
+  if (candidates.length <= 1) {
+    return candidates.length === 1 ? [[...candidates[0]]] : [[...OPENING_GUESS]];
+  }
+  if (candidates.length === 2) {
+    return candidates.map((c) => [...c]);
+  }
+  if (candidates.length <= FULL_PROBE_THRESHOLD) {
+    return allSecretCodes();
+  }
+
+  const cap = Math.min(LARGE_POOL_PROBE_CAP, candidates.length);
+  const probes: number[][] = [];
+  for (let i = 0; i < cap; i++) {
+    const idx = Math.floor((i * candidates.length) / cap);
+    probes.push([...candidates[idx]]);
+  }
+  return probes;
+}
+
 /** Cipher's next guess given guess history against the human's secret code. */
 export function pickCipherGuess(possible: number[][], turnIndex: number): number[] {
   if (possible.length === 0) return [...OPENING_GUESS];
@@ -130,7 +156,7 @@ export function pickCipherGuess(possible: number[][], turnIndex: number): number
 
   if (turnIndex === 0) return [...OPENING_GUESS];
 
-  return pickBestGuess(allSecretCodes(), possible);
+  return pickBestGuess(buildProbePool(possible), possible);
 }
 
 export function cipherNextGuess(history: CipherHistory): number[] {

@@ -28,7 +28,7 @@ import {
   PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
 import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
-import { cipherNextGuessAsync } from '@/lib/cipher-async';
+import { cipherNextGuessAsync, prefetchCipherGuess, warmCipherWorker } from '@/lib/cipher-async';
 import { cipherNextGuess } from '@/lib/cipher';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useDisconnect } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
@@ -787,6 +787,10 @@ export default function Home() {
               };
             });
             setPendingOpponentTileClues(null);
+            prefetchCipherGuess([
+              ...history,
+              { digits: entry.digits, clues: entry.clues },
+            ]);
             aiTurnRunningRef.current = false;
           }, revealMs);
         }
@@ -1145,6 +1149,7 @@ export default function Home() {
 
     // For AI games, skip the synchronizing modal and go straight to playing
     if (gs.gameMode === 'ai') {
+      warmCipherWorker();
       setGs((prev: GameState): GameState => ({ ...prev, phase: 'playing' }));
       // Do the server lock-code in the background without blocking
       fetch('/api/games/lock-code', {
