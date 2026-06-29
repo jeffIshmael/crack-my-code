@@ -24,11 +24,12 @@ import {
   evaluateGuess,
   toTileClues,
   isWinningClues,
-  cipherNextGuess,
   MAX_GUESSES,
   PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
 import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
+import { cipherNextGuessAsync } from '@/lib/cipher-async';
+import { cipherNextGuess } from '@/lib/cipher';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useDisconnect } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
 import { parseUnits, parseEventLogs, encodeFunctionData } from 'viem';
@@ -683,6 +684,7 @@ export default function Home() {
     const waitForPlayerReview = Math.max(0, playerReviewUntilRef.current - Date.now());
 
     oppTimerRef.current = setTimeout(() => {
+      void (async () => {
       const currentGs = gsRef.current;
       if (currentGs.phase !== 'playing' || currentGs.isPlayerTurn) {
         aiTurnRunningRef.current = false;
@@ -696,14 +698,22 @@ export default function Home() {
         return;
       }
 
-      const targetDigits = (() => {
+      let targetDigits: number[];
+      try {
+        targetDigits = await cipherNextGuessAsync(history);
+      } catch (err) {
+        console.error('Cipher guess failed, using fallback', err);
         try {
-          return cipherNextGuess(history);
-        } catch (err) {
-          console.error('Cipher guess failed, using fallback', err);
-          return [0, 1, 2, 3];
+          targetDigits = cipherNextGuess(history);
+        } catch {
+          targetDigits = [0, 1, 2, 3];
         }
-      })();
+      }
+
+      if (gsRef.current.phase !== 'playing' || gsRef.current.isPlayerTurn) {
+        aiTurnRunningRef.current = false;
+        return;
+      }
 
       let typeIndex = 0;
       const typeDigit = () => {
@@ -784,6 +794,7 @@ export default function Home() {
 
       setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: [] }));
       typeDigit();
+      })();
     }, waitForPlayerReview);
   }, [currentGameId, address, syncResultStats, AI_DIGIT_MS, AI_REVEAL_MS]);
 
