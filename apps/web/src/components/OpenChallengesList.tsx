@@ -34,7 +34,7 @@ export default function OpenChallengesList({
         <span className="text-4xl" aria-hidden>📭</span>
         <p className="font-ui text-sm font-bold text-[var(--text)]">No open challenges</p>
         <p className="font-body text-sm text-[var(--text-dim)] max-w-[260px]">
-          Create an invite-only match from Home and share the Game ID with a friend.
+          Create a match from Home. Invite-only challenges show a Game ID to share.
         </p>
       </div>
     );
@@ -51,33 +51,35 @@ export default function OpenChallengesList({
         >
           <div className="flex items-center justify-between">
             <span className="font-body text-xs font-bold uppercase tracking-wider text-[var(--text-dim)]">
-              {game.mode === 'cash' ? `${game.stake} USDT` : 'Free Match'}
+              {game.isPublic ? 'Public search' : game.mode === 'cash' ? `${game.stake} USDT` : 'Invite only'}
             </span>
-            {(game.joinCode || game.id) && (
+            {!game.isPublic && (game.joinCode || game.id) && (
               <span className="font-ui text-xs font-bold tracking-wider text-[var(--accent)]">
                 {game.joinCode || game.id}
               </span>
             )}
           </div>
           <div className="flex gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                const code = game.joinCode || game.id;
-                navigator.clipboard.writeText(code);
-                toast.success('Game ID copied!');
-              }}
-              className="theme-game-btn theme-game-btn--ai flex-1 min-h-0 py-2.5"
-            >
-              <span className="theme-game-btn__title text-xs">Copy ID</span>
-            </button>
+            {!game.isPublic && (
+              <button
+                type="button"
+                onClick={() => {
+                  const code = game.joinCode || game.id;
+                  navigator.clipboard.writeText(code);
+                  toast.success('Game ID copied!');
+                }}
+                className="theme-game-btn theme-game-btn--ai flex-1 min-h-0 py-2.5"
+              >
+                <span className="theme-game-btn__title text-xs">Copy ID</span>
+              </button>
+            )}
             <button
               type="button"
               disabled={isCancellingId === game.id}
               onClick={() => onCancelOpenChallenge(game.id, game.onChainMatchId ?? undefined)}
-              className="rounded-xl border-2 border-red-200 bg-red-50 px-4 py-2.5 font-ui text-xs font-bold text-red-500 disabled:opacity-50"
+              className={`rounded-xl border-2 border-red-200 bg-red-50 px-4 py-2.5 font-ui text-xs font-bold text-red-500 disabled:opacity-50 ${game.isPublic ? 'w-full' : ''}`}
             >
-              {isCancellingId === game.id ? 'Closing…' : 'Cancel'}
+              {isCancellingId === game.id ? 'Closing…' : game.isPublic ? 'Cancel search' : 'Cancel'}
             </button>
           </div>
         </motion.div>

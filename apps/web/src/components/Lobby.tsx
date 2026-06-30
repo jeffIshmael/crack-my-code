@@ -29,6 +29,7 @@ interface LobbyProps {
   onWalletClick?: () => void;
   searchTime?: number;
   onCancelMatchmaking?: () => void;
+  isCancellingMatchmaking?: boolean;
   shareableJoinCode?: string;
   joinGameIdInput?: string;
   onJoinGameIdInputChange?: (value: string) => void;
@@ -55,6 +56,7 @@ export default function Lobby({
   onWalletClick,
   searchTime = 0,
   onCancelMatchmaking,
+  isCancellingMatchmaking = false,
   shareableJoinCode,
   joinGameIdInput = '',
   onJoinGameIdInputChange,
@@ -236,6 +238,7 @@ export default function Lobby({
                   mode={selectedMode}
                   searchTime={searchTime}
                   onCancel={onCancelMatchmaking}
+                  isCancelling={isCancellingMatchmaking}
                 />
               )}
             </div>
@@ -546,12 +549,14 @@ function MatchmakingPulse({
   opponentName,
   mode,
   searchTime = 0,
-  onCancel
+  onCancel,
+  isCancelling = false,
 }: {
   opponentName: string,
   mode: GameMode,
   searchTime?: number,
-  onCancel?: () => void
+  onCancel?: () => void,
+  isCancelling?: boolean,
 }) {
   const isAI = mode === 'ai';
 
@@ -610,10 +615,12 @@ function MatchmakingPulse({
             </div>
 
             <button
+              type="button"
               onClick={onCancel}
-              className="rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 active:scale-95"
+              disabled={isCancelling || !onCancel}
+              className="rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 active:scale-95 disabled:opacity-50"
             >
-              CANCEL SEARCH
+              {isCancelling ? 'CANCELLING...' : 'CANCEL SEARCH'}
             </button>
           </div>
         )}

@@ -14,6 +14,7 @@ export interface OpenGameItem {
   stake: number;
   player1Address: string;
   onChainMatchId?: string | null;
+  isPublic?: boolean;
 }
 
 interface OpenGamesPanelProps {
@@ -106,33 +107,35 @@ export default function OpenGamesPanel({
                 >
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] font-black uppercase tracking-widest text-black/40">
-                      {game.mode === 'cash' ? `${game.stake} USDT` : 'Free'}
+                      {game.isPublic ? 'Public search' : game.mode === 'cash' ? `${game.stake} USDT` : 'Invite only'}
                     </span>
-                    {(game.joinCode || game.id) && (
+                    {!game.isPublic && (game.joinCode || game.id) && (
                       <span className="font-code text-xs font-bold tracking-widest text-[var(--accent)]">
                         {game.joinCode || game.id}
                       </span>
                     )}
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const code = game.joinCode || game.id;
-                        navigator.clipboard.writeText(code);
-                        toast.success('Game ID copied!');
-                      }}
-                      className="flex-1 rounded-lg border-2 border-black/10 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]"
-                    >
-                      Copy ID
-                    </button>
+                    {!game.isPublic && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const code = game.joinCode || game.id;
+                          navigator.clipboard.writeText(code);
+                          toast.success('Game ID copied!');
+                        }}
+                        className="flex-1 rounded-lg border-2 border-black/10 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]"
+                      >
+                        Copy ID
+                      </button>
+                    )}
                     <button
                       type="button"
                       disabled={isCancellingId === game.id}
                       onClick={() => onCancelOpenChallenge(game.id, game.onChainMatchId ?? undefined)}
-                      className="rounded-lg border-2 border-red-500/20 bg-red-500/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-red-500 disabled:opacity-50"
+                      className={`rounded-lg border-2 border-red-500/20 bg-red-500/5 px-4 py-2.5 text-[10px] font-black uppercase tracking-widest text-red-500 disabled:opacity-50 ${game.isPublic ? 'w-full' : ''}`}
                     >
-                      {isCancellingId === game.id ? 'Closing...' : 'Cancel'}
+                      {isCancellingId === game.id ? 'Closing...' : game.isPublic ? 'Cancel search' : 'Cancel'}
                     </button>
                   </div>
                 </div>

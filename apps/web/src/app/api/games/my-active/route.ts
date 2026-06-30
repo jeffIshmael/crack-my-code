@@ -18,7 +18,6 @@ export async function GET(req: NextRequest) {
       where: {
         player1Address: normalizedAddress,
         status: 'PENDING',
-        isPublic: false,
         player2Address: null,
       },
       orderBy: {

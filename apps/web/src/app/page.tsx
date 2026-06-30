@@ -144,6 +144,14 @@ export default function Home() {
   const [searchTime, setSearchTime] = useState(0);
   const [countdown, setCountdown] = useState<number | 'GO' | null>(null);
   const [currentOnChainMatchId, setCurrentOnChainMatchId] = useState<string | null>(null);
+  const currentGameIdRef = useRef<string | null>(null);
+  const currentOnChainMatchIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    currentGameIdRef.current = currentGameId;
+  }, [currentGameId]);
+  useEffect(() => {
+    currentOnChainMatchIdRef.current = currentOnChainMatchId;
+  }, [currentOnChainMatchId]);
   const [turnNotification, setTurnNotification] = useState<'player' | 'opponent' | null>(null);
   const [pendingOpponentTileClues, setPendingOpponentTileClues] = useState<TileClue[] | null>(null);
   const [copied, setCopied] = useState(false);
@@ -227,30 +235,67 @@ export default function Home() {
     if (activeTab === 'games' && address) fetchMyActive();
   }, [activeTab, address, fetchMyActive]);
 
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (gs.phase === 'matchmaking') {
-      interval = setInterval(() => {
-        setSearchTime(prev => {
-          // Public search timeout: 60s, Private search timeout: 300s (5m)
-          const timeout = (gs.opponentName === 'WAITING' || gs.gameMode === 'cash') ? 300 : 60;
-          
-          if (prev >= timeout) {
-            clearInterval(interval);
-            setGs(curr => ({ ...curr, phase: 'lobby' }));
-            toast.error("Matchmaking Timeout", {
-              description: gs.opponentName === 'WAITING' ? "Invite expired. No one joined in time." : "No opponents found. Try again or invite a friend."
+  const handleCancelChallenge = useCallback(async (gameId: string, onChainMatchId?: string) => {
+    if (!isConnected || !address) return false;
+    setIsCancelling(gameId);
+    let onChainOk = !onChainMatchId;
+    let dbOk = false;
+
+    try {
+      if (onChainMatchId) {
+        try {
+          if (smartWalletClient) {
+            const data = encodeFunctionData({
+              abi: CONTRACT_ABI,
+              functionName: 'cancelChallenge',
+              args: [onChainMatchId as `0x${string}`]
             });
-            return 0;
+            const txHash = await smartWalletClient.sendTransaction({
+              to: CONTRACT_ADDRESS as `0x${string}`,
+              data: data,
+              value: BigInt(0)
+            });
+            if (!publicClient) throw new Error("Public client not available");
+            await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+          } else {
+            await cancelChallenge(onChainMatchId as `0x${string}`);
           }
-          return prev + 1;
+          onChainOk = true;
+        } catch (err) {
+          console.error('On-chain cancel failed', err);
+        }
+      }
+
+      try {
+        const res = await fetch('/api/games/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gameId })
         });
-      }, 1000);
-    } else {
-      setSearchTime(0);
+        dbOk = res.ok;
+        if (res.ok) {
+          setMyActiveGames(prev => prev.filter(g => g.id !== gameId));
+        }
+      } catch (err) {
+        console.error('DB cancel failed', err);
+      }
+
+      if (!onChainOk && !dbOk) {
+        toast.error('Cancel Failed', { description: 'Could not close the challenge. Try again from Open.' });
+        return false;
+      }
+
+      if (!onChainOk || !dbOk) {
+        toast.warning('Challenge partially closed', {
+          description: 'One step failed — check Open if the search still appears.',
+        });
+      }
+
+      return true;
+    } finally {
+      setIsCancelling(null);
     }
-    return () => clearInterval(interval);
-  }, [gs.phase, gs.gameMode, gs.opponentName]);
+  }, [isConnected, address, smartWalletClient, publicClient, cancelChallenge]);
 
   // Prefill Game ID from legacy ?invite= or ?game= query (no auto-join — user taps Join)
   useEffect(() => {
@@ -954,47 +999,6 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [gs.phase, currentGameId, gs.gameMode]);
 
-  const handleCancelChallenge = useCallback(async (gameId: string, onChainMatchId?: string) => {
-    if (!isConnected || !address) return;
-    setIsCancelling(gameId);
-    try {
-      if (onChainMatchId) {
-        // --- ON-CHAIN: Cancel Challenge ---
-        if (smartWalletClient) {
-          const data = encodeFunctionData({
-            abi: CONTRACT_ABI,
-            functionName: 'cancelChallenge',
-            args: [onChainMatchId as `0x${string}`]
-          });
-          const txHash = await smartWalletClient.sendTransaction({
-            to: CONTRACT_ADDRESS as `0x${string}`,
-            data: data,
-            value: BigInt(0)
-          });
-          if (!publicClient) throw new Error("Public client not available");
-          await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
-        } else {
-          await cancelChallenge(onChainMatchId as `0x${string}`);
-        }
-      }
-
-      const res = await fetch('/api/games/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameId })
-      });
-
-      if (res.ok) {
-        setMyActiveGames(prev => prev.filter(g => g.id !== gameId));
-      }
-    } catch (err) {
-      console.error('Cancel failed', err);
-      toast.error('Cancel Failed', { description: getErrorMessage(err) });
-    } finally {
-      setIsCancelling(null);
-    }
-  }, [isConnected, address, smartWalletClient, publicClient, cancelChallenge]);
-
   const handleFindMatch = useCallback(async (mode: GameMode, stake: number, isPublic: boolean = true, userBalance?: number) => {
     if (mode === 'cash' && !PROFESSIONAL_MODE_ENABLED) {
       toast.info('Professional mode coming soon', {
@@ -1056,6 +1060,7 @@ export default function Home() {
 
         if (logs.length > 0) {
           onChainMatchId = logs[0].args.matchId;
+          setCurrentOnChainMatchId(onChainMatchId);
         }
       }
 
@@ -1095,7 +1100,7 @@ export default function Home() {
           stakeAmount: stake,
           opponentName: !isPublic ? 'WAITING' : (mode === 'ai' ? 'Cipher' : 'Searching...')
         }));
-        if (!isPublic) fetchMyActive();
+        fetchMyActive();
       }
     } catch (err: any) {
       console.error('Matchmaking failed', err);
@@ -1110,17 +1115,76 @@ export default function Home() {
     }
   }, [address, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive]);
 
-  const handleCancelMatchmaking = useCallback(async () => {
-    if (currentGameId) {
-      await handleCancelChallenge(currentGameId, currentOnChainMatchId || undefined);
+  const handleCancelMatchmaking = useCallback(async (options?: { fromTimeout?: boolean }) => {
+    const gameId = currentGameIdRef.current;
+    const onChainMatchId = currentOnChainMatchIdRef.current ?? undefined;
+
+    if (gameId) {
+      await handleCancelChallenge(gameId, onChainMatchId);
+    } else if (onChainMatchId && isConnected && address) {
+      setIsCancelling('pending');
+      try {
+        if (smartWalletClient) {
+          const data = encodeFunctionData({
+            abi: CONTRACT_ABI,
+            functionName: 'cancelChallenge',
+            args: [onChainMatchId as `0x${string}`]
+          });
+          const txHash = await smartWalletClient.sendTransaction({
+            to: CONTRACT_ADDRESS as `0x${string}`,
+            data: data,
+            value: BigInt(0)
+          });
+          if (!publicClient) throw new Error("Public client not available");
+          await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+        } else {
+          await cancelChallenge(onChainMatchId as `0x${string}`);
+        }
+      } catch (err) {
+        console.error('On-chain cancel failed during setup', err);
+        toast.error('Cancel Failed', { description: getErrorMessage(err) });
+        return;
+      } finally {
+        setIsCancelling(null);
+      }
     }
+
     setGs((prev: GameState): GameState => ({ ...prev, phase: 'lobby' }));
     setSearchTime(0);
     setCurrentGameId(null);
     setShareableJoinCode(null);
     setCurrentOnChainMatchId(null);
-    toast.info("Search Cancelled");
-  }, [currentGameId, currentOnChainMatchId, handleCancelChallenge]);
+    fetchMyActive();
+    if (!options?.fromTimeout) {
+      toast.info("Search Cancelled");
+    }
+  }, [handleCancelChallenge, isConnected, address, smartWalletClient, publicClient, cancelChallenge, fetchMyActive]);
+
+  useEffect(() => {
+    let interval: NodeJS.Timeout;
+    if (gs.phase === 'matchmaking') {
+      interval = setInterval(() => {
+        setSearchTime(prev => {
+          const timeout = (gs.opponentName === 'WAITING' || gs.gameMode === 'cash') ? 300 : 60;
+
+          if (prev >= timeout) {
+            clearInterval(interval);
+            void handleCancelMatchmaking({ fromTimeout: true });
+            toast.error("Matchmaking Timeout", {
+              description: gs.opponentName === 'WAITING'
+                ? "Invite expired. No one joined in time."
+                : "No opponents found. Try again or invite a friend."
+            });
+            return 0;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+    } else {
+      setSearchTime(0);
+    }
+    return () => clearInterval(interval);
+  }, [gs.phase, gs.gameMode, gs.opponentName, handleCancelMatchmaking]);
 
   const handleQuitGame = useCallback(() => {
     if (window.confirm("Are you sure you want to quit the game?")) {
@@ -1579,6 +1643,7 @@ export default function Home() {
           onWalletClick={() => setActiveTab('wallet')}
           searchTime={searchTime}
           onCancelMatchmaking={handleCancelMatchmaking}
+          isCancellingMatchmaking={!!isCancelling}
           shareableJoinCode={
             shareableJoinCode ??
             (gs.phase === 'matchmaking' && gs.opponentName === 'WAITING' ? currentGameId ?? undefined : undefined)
