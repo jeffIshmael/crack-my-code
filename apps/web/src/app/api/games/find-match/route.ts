@@ -31,8 +31,9 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: 'Guests can only play against AI' }, { status: 403 });
     }
 
-    // 2. Auto-pair public challenges via live matchmaking (not the lobby board)
-    if (mode === 'fun' || mode === 'cash') {
+    // 2. Auto-pair public challenges via live matchmaking (not the lobby board).
+    // Invite-only hosts must never be pulled into someone else's public queue.
+    if (isPublic && (mode === 'fun' || mode === 'cash')) {
       const pendingGame = await prisma.game.findFirst({
         where: {
           status: 'PENDING',
