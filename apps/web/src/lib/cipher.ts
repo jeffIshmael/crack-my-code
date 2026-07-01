@@ -5,8 +5,8 @@
  * pool reduction; minimax when ≤50 candidates). Opening: fixed `0123`, then
  * dynamic optimal guesses from the full space.
  *
- * Defense: `generateCipherSecretCode()` prefers duplicate-heavy codes and
- * digits outside the opening probe (8/9).
+ * Defense: `generateCipherSecretCode()` picks randomly among codes with no
+ * duplicated digits, one duplicated digit, or two duplicated digits.
  */
 
 import {
@@ -34,6 +34,11 @@ const LARGE_POOL_PROBE_CAP = 200;
 
 const MINIPAY_FULL_PROBE_THRESHOLD = 80;
 const MINIPAY_PROBE_CAP = 40;
+
+/** Chance Cipher picks a strong-but-not-best guess (human imperfection). */
+const HUMAN_JITTER_CHANCE = 0.22;
+
+export type DuplicateProfile = 'none' | 'one' | 'two';
 
 export function cluesMatch(a: Clue[], b: Clue[]): boolean {
   return a.length === b.length && a.every((c, i) => c === b[i]);
@@ -114,26 +119,63 @@ function isBetterScore(a: GuessScore, b: GuessScore, minimaxMode: boolean): bool
   return a.isCandidate && !b.isCandidate;
 }
 
+function digitsStillPossible(candidates: number[][]): Set<number> {
+  const live = new Set<number>();
+  for (const code of candidates) {
+    for (const d of code) live.add(d);
+  }
+  return live;
+}
+
+/** Drop probe guesses that reuse digits ruled out by earlier gray feedback. */
+function filterHumanPlausibleProbes(
+  probes: number[][],
+  candidates: number[][],
+): number[][] {
+  const live = digitsStillPossible(candidates);
+  const filtered = probes.filter((guess) => guess.every((d) => live.has(d)));
+  return filtered.length > 0 ? filtered : probes;
+}
+
+interface RankedGuess {
+  guess: number[];
+  score: GuessScore;
+}
+
+function rankGuesses(
+  probePool: number[][],
+  candidates: number[][],
+): RankedGuess[] {
+  const candidateKeys = new Set(candidates.map(codeKey));
+  const minimaxMode = candidates.length <= MINIMAX_THRESHOLD;
+
+  const ranked: RankedGuess[] = probePool.map((guess) => ({
+    guess,
+    score: scoreGuess(guess, candidates, candidateKeys),
+  }));
+
+  ranked.sort((a, b) => {
+    if (isBetterScore(a.score, b.score, minimaxMode)) return -1;
+    if (isBetterScore(b.score, a.score, minimaxMode)) return 1;
+    return 0;
+  });
+
+  return ranked;
+}
+
 function pickBestGuess(
   probePool: number[][],
   candidates: number[][],
 ): number[] {
-  const candidateKeys = new Set(candidates.map(codeKey));
-  const minimaxMode = candidates.length <= MINIMAX_THRESHOLD;
+  const ranked = rankGuesses(probePool, candidates);
+  if (ranked.length === 0) return [...OPENING_GUESS];
 
-  let bestGuess = probePool[0];
-  let bestScore = scoreGuess(bestGuess, candidates, candidateKeys);
-
-  for (let i = 1; i < probePool.length; i++) {
-    const guess = probePool[i];
-    const score = scoreGuess(guess, candidates, candidateKeys);
-    if (isBetterScore(score, bestScore, minimaxMode)) {
-      bestGuess = guess;
-      bestScore = score;
-    }
+  if (ranked.length > 1 && Math.random() < HUMAN_JITTER_CHANCE) {
+    const pick = ranked[Math.floor(Math.random() * Math.min(3, ranked.length))];
+    return [...pick.guess];
   }
 
-  return [...bestGuess];
+  return [...ranked[0].guess];
 }
 
 function buildProbePool(candidates: number[][]): number[][] {
@@ -174,7 +216,8 @@ export function pickCipherGuess(possible: number[][], turnIndex: number): number
 
   if (turnIndex === 0) return [...OPENING_GUESS];
 
-  return pickBestGuess(buildProbePool(possible), possible);
+  const probes = filterHumanPlausibleProbes(buildProbePool(possible), possible);
+  return pickBestGuess(probes, possible);
 }
 
 export function cipherNextGuess(history: CipherHistory): number[] {
@@ -184,20 +227,6 @@ export function cipherNextGuess(history: CipherHistory): number[] {
 
 // ─── Cipher defense (secret code generation) ───────────────────────────────
 
-function countColorHits(guess: number[], secret: number[]): number {
-  return evaluateGuess(guess, secret).filter((c) => c !== 'gray').length;
-}
-
-function duplicateScore(code: number[]): number {
-  const freq = new Map<number, number>();
-  for (const d of code) freq.set(d, (freq.get(d) || 0) + 1);
-  let score = 0;
-  for (const n of freq.values()) {
-    if (n >= 2) score += n * n;
-  }
-  return score;
-}
-
 function isTrivialCode(code: number[]): boolean {
   const key = codeKey(code);
   if (/^(\d)\1{3}$/.test(key)) return true;
@@ -205,48 +234,36 @@ function isTrivialCode(code: number[]): boolean {
   return false;
 }
 
-function defenseScore(code: number[]): number {
-  if (isTrivialCode(code)) return -1;
+/** How many distinct digits are repeated (appear 2+ times). */
+export function duplicateProfile(code: number[]): DuplicateProfile {
+  const repeatedDigitCount = [...new Set(code)]
+    .map((d) => code.filter((x) => x === d).length)
+    .filter((n) => n >= 2).length;
 
-  const openingHits = countColorHits(OPENING_GUESS, code);
-  const dups = duplicateScore(code);
-  const eightNineCount = code.filter((d) => d >= 8).length;
-  const onlyHighDigits = code.every((d) => d >= 6);
+  if (repeatedDigitCount === 0) return 'none';
+  if (repeatedDigitCount === 1) return 'one';
+  return 'two';
+}
 
-  let score = 0;
-  score += (4 - openingHits) * 12;
-  score += dups * 4;
-  score += eightNineCount * 5;
-  if (onlyHighDigits) score += 6;
+const DUPLICATE_PROFILES: DuplicateProfile[] = ['none', 'one', 'two'];
 
-  return score;
+function codesForProfile(profile: DuplicateProfile): number[][] {
+  return allSecretCodes().filter(
+    (code) => !isTrivialCode(code) && duplicateProfile(code) === profile,
+  );
 }
 
 /**
- * Generate a secret code for Cipher that is harder to crack than uniform random:
- * duplicate digits, digits outside the `0123` opening, and 8/9 heavy patterns.
+ * Pick a Cipher secret code with varied duplicate structure:
+ * all-unique, one repeated digit, or two repeated digits — each equally likely.
  */
 export function generateCipherSecretCode(): number[] {
-  const pool = allSecretCodes();
-  const scored: { code: number[]; score: number }[] = [];
-
-  for (const code of pool) {
-    const score = defenseScore(code);
-    if (score >= 0) scored.push({ code, score });
+  const profile = DUPLICATE_PROFILES[Math.floor(Math.random() * DUPLICATE_PROFILES.length)];
+  const pool = codesForProfile(profile);
+  if (pool.length > 0) {
+    return [...pool[Math.floor(Math.random() * pool.length)]];
   }
 
-  scored.sort((a, b) => b.score - a.score);
-
-  const topCount = Math.max(1, Math.floor(scored.length * 0.12));
-  const tier = scored.slice(0, topCount);
-  const maxScore = tier[0]?.score ?? 0;
-  const minTierScore = tier[tier.length - 1]?.score ?? 0;
-
-  let roll = Math.random() * tier.reduce((sum, { score }) => sum + (score - minTierScore + 1), 0);
-  for (const { code, score } of tier) {
-    roll -= score - minTierScore + 1;
-    if (roll <= 0) return [...code];
-  }
-
-  return [...tier[tier.length - 1].code];
+  const fallback = allSecretCodes().filter((code) => !isTrivialCode(code));
+  return [...fallback[Math.floor(Math.random() * fallback.length)]];
 }
