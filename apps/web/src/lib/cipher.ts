@@ -5,8 +5,9 @@
  * pool reduction; minimax when ≤50 candidates). Opening: fixed `0123`, then
  * dynamic optimal guesses from the full space.
  *
- * Defense: `generateCipherSecretCode()` picks randomly among codes with no
- * duplicated digits, one duplicated digit, or two duplicated digits.
+ * Defense: `generateCipherSecretCode()` picks all-unique codes or exactly one
+ * digit repeated twice with two other distinct digits (e.g. `8786`). No double-
+ * pairs (`1122`) or triples (`1112`).
  */
 
 import {
@@ -38,7 +39,7 @@ const MINIPAY_PROBE_CAP = 40;
 /** Chance Cipher picks a strong-but-not-best guess (human imperfection). */
 const HUMAN_JITTER_CHANCE = 0.22;
 
-export type DuplicateProfile = 'none' | 'one' | 'two';
+export type DuplicateProfile = 'none' | 'one';
 
 export function cluesMatch(a: Clue[], b: Clue[]): boolean {
   return a.length === b.length && a.every((c, i) => c === b[i]);
@@ -234,36 +235,61 @@ function isTrivialCode(code: number[]): boolean {
   return false;
 }
 
-/** How many distinct digits are repeated (appear 2+ times). */
+/** Exactly one digit appears twice; anything else (double-pair, triple) is excluded. */
 export function duplicateProfile(code: number[]): DuplicateProfile {
-  const repeatedDigitCount = [...new Set(code)]
-    .map((d) => code.filter((x) => x === d).length)
-    .filter((n) => n >= 2).length;
-
-  if (repeatedDigitCount === 0) return 'none';
-  if (repeatedDigitCount === 1) return 'one';
-  return 'two';
+  const counts = [...new Set(code)].map((d) => code.filter((x) => x === d).length);
+  const repeated = counts.filter((n) => n >= 2);
+  if (repeated.length === 0) return 'none';
+  if (repeated.length === 1 && repeated[0] === 2) return 'one';
+  return 'none';
 }
 
-const DUPLICATE_PROFILES: DuplicateProfile[] = ['none', 'one', 'two'];
+function isValidCipherSecret(code: number[]): boolean {
+  if (isTrivialCode(code)) return false;
+  const counts = [...new Set(code)].map((d) => code.filter((x) => x === d).length);
+  const repeated = counts.filter((n) => n >= 2);
+  if (repeated.length === 0) return true;
+  return repeated.length === 1 && repeated[0] === 2;
+}
 
-function codesForProfile(profile: DuplicateProfile): number[][] {
-  return allSecretCodes().filter(
-    (code) => !isTrivialCode(code) && duplicateProfile(code) === profile,
-  );
+const SECRET_CODE_PROFILES: DuplicateProfile[] = ['none', 'one'];
+
+function shuffleDigits<T>(items: T[]): T[] {
+  const arr = [...items];
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+
+function pickDistinctDigits(count: number, exclude = new Set<number>()): number[] {
+  const pool = Array.from({ length: 10 }, (_, d) => d).filter((d) => !exclude.has(d));
+  return shuffleDigits(pool).slice(0, count);
+}
+
+/** Build a code by shuffling digit slots — the single repeat need not be adjacent. */
+function buildRandomCodeForProfile(profile: DuplicateProfile): number[] {
+  if (profile === 'none') {
+    return pickDistinctDigits(CODE_LENGTH);
+  }
+
+  const repeated = Math.floor(Math.random() * 10);
+  const others = pickDistinctDigits(2, new Set([repeated]));
+  return shuffleDigits([repeated, repeated, others[0], others[1]]);
 }
 
 /**
- * Pick a Cipher secret code with varied duplicate structure:
- * all-unique, one repeated digit, or two repeated digits — each equally likely.
+ * Pick a Cipher secret: all-unique, or one digit twice plus two random others.
+ * Repeats can sit anywhere (`8786` and `8876` both valid).
  */
 export function generateCipherSecretCode(): number[] {
-  const profile = DUPLICATE_PROFILES[Math.floor(Math.random() * DUPLICATE_PROFILES.length)];
-  const pool = codesForProfile(profile);
-  if (pool.length > 0) {
-    return [...pool[Math.floor(Math.random() * pool.length)]];
+  for (let attempt = 0; attempt < 50; attempt++) {
+    const profile = SECRET_CODE_PROFILES[Math.floor(Math.random() * SECRET_CODE_PROFILES.length)];
+    const code = buildRandomCodeForProfile(profile);
+    if (isValidCipherSecret(code)) return [...code];
   }
 
-  const fallback = allSecretCodes().filter((code) => !isTrivialCode(code));
+  const fallback = allSecretCodes().filter(isValidCipherSecret);
   return [...fallback[Math.floor(Math.random() * fallback.length)]];
 }
