@@ -201,9 +201,7 @@ export default function ResultModal({
             transition={{ delay: 0.45 }}
           >
             <p className="text-center text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
-              {!isWin && gameMode === 'ai'
-                ? 'Your Secret Code (Cracked)'
-                : `${opponentName}'s Secret Code`}
+              {isWin ? 'Code You Cracked' : "Code You Couldn't Crack"}
             </p>
             <div className="flex justify-center gap-2.5">
               {opponentCode.map((d, i) => (

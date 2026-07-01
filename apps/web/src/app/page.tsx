@@ -786,28 +786,38 @@ export default function Home() {
 
               setGs((prev: GameState) => ({
                 ...prev,
-                phase: 'result',
-                result: 'lose',
-                ratingDelta: isRegisteredPlayer(address) ? loss : 0,
                 opponentGuesses: [...prev.opponentGuesses, entry],
                 opponentGuessCount: prev.opponentGuessCount + 1,
                 opponentCurrentInput: [],
-                opponentCode: prev.playerCode,
                 isPlayerTurn: false,
               }));
 
               void (async () => {
                 try {
-                  await fetch('/api/games/reveal', {
+                  const res = await fetch('/api/games/reveal', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
                   });
+                  const revealData = await res.json();
+                  setGs((prev: GameState) => ({
+                    ...prev,
+                    phase: 'result',
+                    result: 'lose',
+                    ratingDelta: isRegisteredPlayer(address) ? loss : 0,
+                    opponentCode: revealData.opponentCode || prev.opponentCode,
+                  }));
                   if (isRegisteredPlayer(address)) {
                     await syncResultStats(loss);
                   }
                 } catch (err) {
                   console.error('AI reveal sync failed', err);
+                  setGs((prev: GameState) => ({
+                    ...prev,
+                    phase: 'result',
+                    result: 'lose',
+                    ratingDelta: isRegisteredPlayer(address) ? loss : 0,
+                  }));
                 } finally {
                   aiTurnRunningRef.current = false;
                   clearOppTimer();
