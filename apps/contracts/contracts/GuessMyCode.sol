@@ -22,7 +22,9 @@ contract GuessMyCode is
     uint256 public constant POINTS_LOSS  = 15;
     uint256 public constant POINTS_QUIT  = 20;
     uint256 public constant MIN_POINTS   = 0;
-    uint256 public constant MIN_STAKE    = 100_000; // 0.1 USDT (6 decimals)
+    uint256 public constant MIN_STAKE           = 100_000; // 0.1 USDT (6 decimals)
+    uint256 public constant CIPHER_DAILY_WIN_CAP = 5;
+    uint8   public constant WEEKLY_PRIZE_COUNT   = 4; // top 3 CMC + most active
 
     // ─── Enums ────────────────────────────────────────────────────────────────
 
@@ -79,7 +81,17 @@ contract GuessMyCode is
     uint256 public totalPvPFreeGames;
     address public backendAddress;  // authorized address for resolving matches
 
-    uint256[46] private __gap;
+    // ─── Reward Pool (V2 — separate from escrow stakes & accumulatedFees) ─────
+
+    uint256 public rewardPoolBalance;
+    uint256 public cipherWinReward;   // default 0.1 USDT (6 decimals)
+    uint256[4] public weeklyPrizes;   // [1st CMC, 2nd CMC, 3rd CMC, most active]
+
+    mapping(address => uint256) public lastCipherRewardDay;
+    mapping(address => uint256) public cipherRewardsToday;
+    mapping(uint256 => mapping(address => mapping(uint8 => bool))) public weeklyRewardClaimed;
+
+    uint256[37] private __gap;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -107,6 +119,9 @@ contract GuessMyCode is
     event TokenUpdated      (address indexed oldToken, address indexed newToken);
     event GameTracked       (MatchType matchType, bool isAI, uint256 totalAI, uint256 totalPvPPaid, uint256 totalPvPFree);
     event BackendUpdated    (address indexed oldBackend, address indexed newBackend);
+    event RewardPoolDeposited(address indexed from, uint256 amount, uint256 newBalance);
+    event CipherRewardPaid  (address indexed player, uint256 amount, uint256 dailyCount);
+    event WeeklyRewardPaid  (address indexed player, uint256 amount, uint8 prizeIndex, uint256 weekId);
 
     // ─── Modifiers ────────────────────────────────────────────────────────────
 
@@ -137,6 +152,18 @@ contract GuessMyCode is
     }
 
     function _authorizeUpgrade(address) internal override onlyOwner {}
+
+    /**
+     * @dev Call once after upgrading to V2 to set reward defaults.
+     *      cipherWinReward = 0.1 USDT; weekly prizes = 1 / 0.5 / 0.25 / 0.25 USDT.
+     */
+    function initializeV2() public reinitializer(2) onlyOwner {
+        cipherWinReward = 100_000;
+        weeklyPrizes[0] = 1_000_000;
+        weeklyPrizes[1] = 500_000;
+        weeklyPrizes[2] = 250_000;
+        weeklyPrizes[3] = 250_000;
+    }
 
     // ─── Registration ─────────────────────────────────────────────────────────
 
@@ -591,6 +618,77 @@ contract GuessMyCode is
         backendAddress = _newBackend;
     }
 
+    // ─── Reward Pool ──────────────────────────────────────────────────────────
+
+    /// @notice Anyone can fund the reward pool (grant USDT, treasury top-ups).
+    function depositToRewardPool(uint256 amount) external nonReentrant whenNotPaused {
+        require(amount > 0, "CB: zero amount");
+        require(usdToken.transferFrom(msg.sender, address(this), amount), "CB: deposit failed");
+        rewardPoolBalance += amount;
+        emit RewardPoolDeposited(msg.sender, amount, rewardPoolBalance);
+    }
+
+    /**
+     * @notice Pay a Cipher win reward after backend verification.
+     *         Enforces the on-chain daily cap (5 wins / wallet / day).
+     */
+    function rewardCipherWin(address player) external nonReentrant onlyBackend whenNotPaused {
+        require(player != address(0), "CB: zero address");
+        require(cipherWinReward > 0, "CB: cipher reward disabled");
+
+        uint256 today = block.timestamp / 1 days;
+        if (lastCipherRewardDay[player] != today) {
+            lastCipherRewardDay[player] = today;
+            cipherRewardsToday[player]  = 0;
+        }
+        require(cipherRewardsToday[player] < CIPHER_DAILY_WIN_CAP, "CB: daily cipher cap");
+
+        _payoutFromRewardPool(player, cipherWinReward);
+
+        cipherRewardsToday[player] += 1;
+        emit CipherRewardPaid(player, cipherWinReward, cipherRewardsToday[player]);
+    }
+
+    /**
+     * @notice Pay a weekly prize after backend audit.
+     * @param prizeIndex 0 = 1st CMC, 1 = 2nd CMC, 2 = 3rd CMC, 3 = most active
+     * @param weekId     Unix timestamp of the Monday that starts the rewarded week
+     */
+    function rewardWeekly(address player, uint8 prizeIndex, uint256 weekId)
+        external
+        nonReentrant
+        onlyBackend
+        whenNotPaused
+    {
+        require(player != address(0),           "CB: zero address");
+        require(prizeIndex < WEEKLY_PRIZE_COUNT, "CB: invalid prize index");
+        require(weekId > 0,                     "CB: invalid week");
+        require(!weeklyRewardClaimed[weekId][player][prizeIndex], "CB: already rewarded");
+
+        uint256 amount = weeklyPrizes[prizeIndex];
+        require(amount > 0, "CB: prize disabled");
+
+        weeklyRewardClaimed[weekId][player][prizeIndex] = true;
+        _payoutFromRewardPool(player, amount);
+
+        emit WeeklyRewardPaid(player, amount, prizeIndex, weekId);
+    }
+
+    function setCipherWinReward(uint256 amount) external onlyOwner {
+        cipherWinReward = amount;
+    }
+
+    function setWeeklyPrizes(uint256[4] calldata prizes) external onlyOwner {
+        weeklyPrizes = prizes;
+    }
+
+    function _payoutFromRewardPool(address to, uint256 amount) internal {
+        require(amount > 0, "CB: zero amount");
+        require(rewardPoolBalance >= amount, "CB: insufficient reward pool");
+        rewardPoolBalance -= amount;
+        require(usdToken.transfer(to, amount), "CB: reward transfer failed");
+    }
+
     function pause()   external onlyOwner { _pause(); }
     function unpause() external onlyOwner { _unpause(); }
 
@@ -603,8 +701,9 @@ contract GuessMyCode is
     }
 
     // ─── Upgrade Storage Safety ───────────────────────────────────────────────
-    // When adding new state variables in V2+:
-    //   1. Append AFTER __gap, never reorder existing variables
+    // V2 added reward-pool state (9 slots); __gap reduced 46 → 37.
+    // When adding new state variables in V3+:
+    //   1. Append AFTER weeklyRewardClaimed, never reorder existing variables
     //   2. Reduce __gap size by the number of new slots added
     //   3. Never change existing struct field order or types
 }
