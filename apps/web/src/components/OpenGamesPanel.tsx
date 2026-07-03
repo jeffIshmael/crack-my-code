@@ -46,14 +46,14 @@ export default function OpenGamesPanel({
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex rounded-xl border-2 border-black/10 bg-black/5 p-1">
+      <div className="theme-tab-switcher">
         <button
           type="button"
           onClick={() => setOpenTab('join')}
-          className={`flex-1 rounded-lg py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+          className={`theme-tab-switcher__btn text-[10px] font-black uppercase tracking-widest ${
             openTab === 'join'
-              ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm'
-              : 'text-black/40'
+              ? 'theme-tab-switcher__btn--active'
+              : 'theme-tab-switcher__btn--inactive'
           }`}
         >
           Join Challenge
@@ -61,10 +61,10 @@ export default function OpenGamesPanel({
         <button
           type="button"
           onClick={() => setOpenTab('challenges')}
-          className={`flex-1 rounded-lg py-2.5 text-[10px] font-black uppercase tracking-widest transition-all ${
+          className={`theme-tab-switcher__btn text-[10px] font-black uppercase tracking-widest ${
             openTab === 'challenges'
-              ? 'bg-[var(--bg-elevated)] text-[var(--accent)] shadow-sm'
-              : 'text-black/40'
+              ? 'theme-tab-switcher__btn--active'
+              : 'theme-tab-switcher__btn--inactive'
           }`}
         >
           My Open Challenges
@@ -96,17 +96,17 @@ export default function OpenGamesPanel({
             className="flex flex-col gap-3"
           >
             {!isConnected ? (
-              <p className="py-8 text-center text-[10px] font-black uppercase tracking-widest text-black/30">
+              <p className="py-8 text-center text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">
                 Connect wallet to manage challenges
               </p>
             ) : myActiveGames.length > 0 ? (
               myActiveGames.map((game) => (
                 <div
                   key={game.id}
-                  className="flex flex-col gap-3 rounded-2xl border-2 border-black/10 bg-[var(--bg-elevated)] p-5 shadow-sm"
+                  className="theme-sky-readout flex flex-col gap-3 p-5"
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-black/40">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">
                       {game.isPublic ? 'Public search' : game.mode === 'cash' ? `${game.stake} USDT` : 'Invite only'}
                     </span>
                     {!game.isPublic && (game.joinCode || game.id) && (
@@ -124,7 +124,7 @@ export default function OpenGamesPanel({
                           navigator.clipboard.writeText(code);
                           toast.success('Game ID copied!');
                         }}
-                        className="flex-1 rounded-lg border-2 border-black/10 py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]"
+                        className="flex-1 rounded-lg border border-[var(--border-mid)] py-2.5 text-[10px] font-black uppercase tracking-widest text-[var(--accent-bright)]"
                       >
                         Copy ID
                       </button>

@@ -32,7 +32,7 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[440px] -translate-x-1/2 justify-center px-3 pb-[max(0.5rem,env(safe-area-inset-bottom))] pointer-events-none">
+    <div className="fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[440px] -translate-x-1/2 justify-center px-4 pb-[max(0.65rem,env(safe-area-inset-bottom))] pointer-events-none">
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
@@ -52,15 +52,9 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
               {isActive && (
                 <motion.div
                   layoutId="active-tab"
-                  className="absolute inset-0 flex flex-col items-center justify-center p-1"
-                  transition={{ type: 'spring', bounce: 0.2, duration: 0.6 }}
-                >
-                  <div className="h-full w-full rounded-full bg-white/5" />
-                  <motion.div
-                    layoutId="active-dot"
-                    className="theme-bottom-nav__active-dot absolute bottom-[-1px] h-1.5 w-1.5 rounded-full shadow-[0_0_8px_var(--accent-glow)]"
-                  />
-                </motion.div>
+                  className="theme-bottom-nav__active-pill absolute inset-1"
+                  transition={{ type: 'spring', bounce: 0.25, duration: 0.55 }}
+                />
               )}
               <Icon
                 size={22}

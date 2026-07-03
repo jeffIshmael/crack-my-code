@@ -7,7 +7,7 @@ export const FARCASTER_APP_NAME = 'Crack-My-Code';
 
 export const FARCASTER_SPLASH = {
   imageUrl: `${APP_BASE_URL}/splash.png`,
-  backgroundColor: '#E3F2FA',
+  backgroundColor: '#4ab8e8',
 } as const;
 
 /** 3:2 full-bleed logo for Farcaster feed embeds (min 600×400). */

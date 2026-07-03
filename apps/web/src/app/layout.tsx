@@ -32,8 +32,8 @@ export default function RootLayout({
           }}
         />
       </head>
-      <body className="h-dvh antialiased flex flex-col items-center justify-start overflow-hidden">
-        <div className="theme-shell relative w-full max-w-[440px] shadow-[var(--shell-shadow)]">
+      <body className="h-dvh antialiased flex flex-col items-center justify-start overflow-hidden bg-[var(--shell-outer-bg)]">
+        <div className="theme-shell relative h-dvh w-full max-w-[440px] shadow-[var(--shell-shadow)]">
           <div className="theme-shell__effects">
             <ThemeBackground />
           </div>

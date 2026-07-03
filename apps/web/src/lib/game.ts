@@ -178,12 +178,34 @@ export function clueTileStyle(tileClue: TileClue | Clue): {
     case 'gray':
     default:
       return {
-        background: 'var(--tile-default)',
-        border: '2px solid var(--border-mid)',
-        color: 'var(--text-dim)',
-        boxShadow: 'var(--tile-shadow)',
+        background: 'var(--tile-absent)',
+        border: '2px solid transparent',
+        color: 'var(--tile-absent-text)',
+        boxShadow: 'inset 0 2px 0 rgba(0, 0, 0, 0.18)',
       };
   }
+}
+
+/** Best per-digit hint across all guesses (for keyboard coloring). */
+export function digitHintStates(guesses: GuessEntry[]): Partial<Record<number, TileClue>> {
+  const priority: Record<TileClue, number> = {
+    green: 4,
+    yellow: 3,
+    duplicate: 2,
+    absent: 1,
+  };
+  const states: Partial<Record<number, TileClue>> = {};
+  for (const guess of guesses) {
+    const tiles = tileCluesForGuess(guess);
+    guess.digits.forEach((digit, i) => {
+      const clue = tiles[i];
+      const prev = states[digit];
+      if (!prev || priority[clue] > priority[prev]) {
+        states[digit] = clue;
+      }
+    });
+  }
+  return states;
 }
 
 export function randomOpponentName(): string {

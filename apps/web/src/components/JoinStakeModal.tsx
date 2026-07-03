@@ -90,7 +90,7 @@ export default function JoinStakeModal({
             initial={{ opacity: 0, y: 40, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.96 }}
-            className="relative w-full max-w-[400px] rounded-3xl border-2 border-black/10 bg-[#FDFCFB] p-8 shadow-2xl pointer-events-auto"
+            className="theme-card relative w-full max-w-[400px] rounded-3xl border border-[var(--border-mid)] p-8 shadow-2xl pointer-events-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex flex-col gap-6 text-center">
@@ -98,7 +98,7 @@ export default function JoinStakeModal({
                 <h2 className="font-orbitron text-lg font-black tracking-[0.2em] text-[var(--orange)] uppercase">
                   Lock Stake
                 </h2>
-                <p className="mt-2 text-[10px] font-bold text-black/40 uppercase tracking-widest">
+                <p className="mt-2 text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest">
                   {opponentLabel
                     ? `Join ${opponentLabel}'s paid challenge`
                     : 'Approve and lock USDT before setting your code'}
@@ -106,14 +106,14 @@ export default function JoinStakeModal({
               </div>
 
               <div className="rounded-2xl border border-[var(--orange)]/20 bg-[var(--orange)]/5 p-5">
-                <span className="text-[10px] font-black uppercase tracking-widest text-black/40">Required stake</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)]">Required stake</span>
                 <p className="font-orbitron text-3xl font-black text-[var(--orange)] mt-1">
                   {stake.toFixed(2)} <span className="text-sm">USDT</span>
                 </p>
-                <p className="text-[9px] font-bold text-black/40 uppercase tracking-wider mt-2">
+                <p className="text-[9px] font-bold text-[var(--text-dim)] uppercase tracking-wider mt-2">
                   Winner receives ~{(stake * 2 * 0.99).toFixed(2)} USDT
                 </p>
-                <p className="text-[9px] font-bold text-black/30 uppercase mt-1">
+                <p className="text-[9px] font-bold text-[var(--text-dim)] uppercase mt-1 opacity-70">
                   Balance: {balance.toFixed(3)} USDT
                 </p>
               </div>
@@ -148,7 +148,7 @@ export default function JoinStakeModal({
                   type="button"
                   onClick={onCancel}
                   disabled={isJoining || isApproving}
-                  className="w-full rounded-2xl border border-black/10 py-4 text-[10px] font-black uppercase tracking-widest text-black/50"
+                  className="w-full rounded-2xl border border-[var(--border-mid)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] hover:border-[var(--border-bright)] hover:text-[var(--text)]"
                 >
                   CANCEL
                 </button>

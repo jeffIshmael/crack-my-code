@@ -65,7 +65,7 @@ export function SettingsPanel({
 }: SettingsPanelProps) {
   if (!address) {
     return (
-      <div className="theme-card flex flex-col items-center gap-5 p-8 text-center">
+      <div className="theme-sky-readout flex flex-col items-center gap-5 p-8 text-center">
         <span className="text-5xl" aria-hidden>👛</span>
         <div className="flex flex-col gap-2">
           <h2 className="font-ui text-xl font-bold text-[var(--text)]">Connect Wallet</h2>
@@ -94,7 +94,7 @@ export function SettingsPanel({
       {/* <ThemePlayfulHeader points={points} usdtFormatted={usdtFormatted} /> */}
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="theme-card flex flex-col gap-2 p-4">
+        <div className="theme-sky-readout flex flex-col gap-2 p-4">
           <div className="flex items-center gap-2">
             <Image src="/usdt-logo.png" alt="" width={20} height={20} aria-hidden />
             <span className="font-body text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">USDT</span>
@@ -103,7 +103,7 @@ export function SettingsPanel({
             {usdtFormatted ? parseFloat(usdtFormatted).toFixed(2) : '0.00'}
           </span>
         </div>
-        <div className="theme-card flex flex-col gap-2 p-4">
+        <div className="theme-sky-readout flex flex-col gap-2 p-4">
           <div className="flex items-center gap-2">
             <span className="theme-playful-coin font-ui" aria-hidden>CMC</span>
             <span className="font-body text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Points</span>
@@ -114,19 +114,19 @@ export function SettingsPanel({
         </div>
       </div>
 
-      <div className="theme-card flex flex-col gap-3 p-4">
+      <div className="theme-sky-readout flex flex-col gap-3 p-4">
         <div className="flex items-center gap-2">
           <span className="text-xl" aria-hidden>👤</span>
           <span className="font-ui text-sm font-bold text-[var(--text)]">Wallet Address</span>
         </div>
         <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-white px-3 py-2.5 font-ui text-xs font-bold text-[var(--text-2)] truncate">
+          <div className="min-w-0 flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] px-3 py-2.5 font-ui text-xs font-bold text-[var(--text-2)] truncate">
             {address}
           </div>
           <button
             type="button"
             onClick={onCopyAddress}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border-2 border-[var(--border-mid)] bg-white text-[var(--accent)] transition-transform active:scale-95"
+            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] text-[var(--accent)] transition-transform active:scale-95"
             aria-label="Copy address"
           >
             {copied ? <Check size={16} /> : <Copy size={16} />}
@@ -141,7 +141,7 @@ export function SettingsPanel({
             type="button"
             whileTap={{ scale: 0.98 }}
             onClick={() => onTabChange(item.tab)}
-            className="theme-card flex w-full items-center justify-between p-4 text-left transition-colors hover:brightness-[0.99]"
+            className="theme-sky-readout flex w-full items-center justify-between p-4 text-left transition-colors hover:brightness-[0.99]"
           >
             <div className="flex items-center gap-3 min-w-0">
               <span className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-lg ${item.accent}`}>
@@ -161,7 +161,7 @@ export function SettingsPanel({
           target="_blank"
           rel="noopener noreferrer"
           whileTap={{ scale: 0.98 }}
-          className="theme-card flex w-full items-center justify-between p-4 text-left transition-colors hover:brightness-[0.99]"
+          className="theme-sky-readout flex w-full items-center justify-between p-4 text-left transition-colors hover:brightness-[0.99]"
         >
           <div className="flex items-center gap-3 min-w-0">
             <span className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-[#15202B] text-lg text-white">

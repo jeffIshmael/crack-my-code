@@ -37,7 +37,7 @@ export default function JoinChallenge({
 
   const inputBlock = (
     <div
-      className={`flex items-center gap-2 rounded-xl border-2 bg-white px-3 py-2 transition-colors ${
+      className={`theme-join-input flex items-center gap-2 rounded-xl border-2 px-3 py-2 transition-colors ${
         signInRequired
           ? 'border-[var(--border-mid)] opacity-60'
           : focused
@@ -46,6 +46,7 @@ export default function JoinChallenge({
       }`}
     >
       <input
+        id="join-challenge-input"
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -94,25 +95,21 @@ export default function JoinChallenge({
         <button
           type="button"
           onClick={handleToggle}
-          className={`theme-game-btn theme-game-btn--ai group w-full ${signInRequired ? 'opacity-60' : ''}`}
+          className={`theme-game-btn theme-game-btn--join theme-game-btn--lively group w-full ${signInRequired ? 'opacity-60' : ''}`}
           aria-expanded={signInRequired ? false : open}
           aria-disabled={signInRequired}
         >
           <div className="theme-game-btn__inner">
-            <span className="theme-game-btn__emoji" aria-hidden>🔗</span>
+            <span className="theme-game-btn__emoji-badge" aria-hidden>🔗</span>
             <div className="theme-game-btn__content flex-1">
               <span className="theme-game-btn__title">Join Challenge</span>
-              <span
-                className={`theme-game-btn__subtitle ${
-                  signInRequired ? 'text-[var(--orange)] font-bold' : ''
-                }`}
-              >
-                {signInRequired ? 'Sign in required' : "Paste a friend's Game ID"}
+              <span className="theme-game-btn__subtitle">
+                {signInRequired ? '🔒 Sign in first' : "Paste a friend's Game ID"}
               </span>
             </div>
             <ChevronDown
-              size={20}
-              className={`flex-shrink-0 text-[var(--text-dim)] transition-transform duration-200 ${
+              size={18}
+              className={`flex-shrink-0 text-white/90 transition-transform duration-200 ${
                 open && !signInRequired ? 'rotate-180' : ''
               }`}
               aria-hidden
@@ -144,6 +141,7 @@ export default function JoinChallenge({
 
   return (
     <motion.div
+      id="join-challenge-section"
       className={`theme-card flex flex-col gap-3 p-4 ${signInRequired ? 'opacity-60' : ''}`}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
