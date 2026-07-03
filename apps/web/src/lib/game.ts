@@ -44,6 +44,11 @@ export interface GameState {
 
 export const GAME_DURATION = 60;            // seconds per match
 export const MAX_GUESSES = 8;
+// Cipher AI: cap matches at 5 player guesses (uncomment block below when ready).
+// export const MAX_CIPHER_GUESSES = 5;
+// export function maxGuessesForMode(mode: GameMode): number {
+//   return mode === 'ai' ? MAX_CIPHER_GUESSES : MAX_GUESSES;
+// }
 export const CODE_LENGTH = 4;
 
 /** Mock opponent — never changes, allows deterministic demo */

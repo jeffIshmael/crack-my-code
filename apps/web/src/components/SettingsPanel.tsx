@@ -1,9 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { ChevronRight, Copy, Check } from 'lucide-react';
+import { ChevronRight, Copy, Check, Send } from 'lucide-react';
+// import { ArrowUpFromLine } from 'lucide-react'; // M-Pesa withdraw — enable when payout is ready
 import type { NavTab } from '@/components/BottomNav';
+import { UsdtWalletModals, type WalletModalKind } from '@/components/UsdtWalletModals';
 
 interface SettingsPanelProps {
   address?: string;
@@ -14,6 +17,8 @@ interface SettingsPanelProps {
   onLogin: () => void;
   onCopyAddress: () => void;
   onTabChange: (tab: NavTab) => void;
+  onWithdrawMpesa?: (phone: string, amount: number) => void | Promise<void>;
+  onSendUsdt?: (recipient: string, amount: number) => void | Promise<void>;
 }
 
 const menuItems: {
@@ -62,7 +67,11 @@ export function SettingsPanel({
   onLogin,
   onCopyAddress,
   onTabChange,
+  onWithdrawMpesa: _onWithdrawMpesa,
+  onSendUsdt,
 }: SettingsPanelProps) {
+  const [walletModal, setWalletModal] = useState<WalletModalKind>(null);
+  const usdtBalance = usdtFormatted ? parseFloat(usdtFormatted) : 0;
   if (!address) {
     return (
       <div className="theme-sky-readout flex flex-col items-center gap-5 p-8 text-center">
@@ -91,17 +100,49 @@ export function SettingsPanel({
 
   return (
     <div className="flex flex-col gap-5">
-      {/* <ThemePlayfulHeader points={points} usdtFormatted={usdtFormatted} /> */}
+      <UsdtWalletModals
+        open={walletModal}
+        onClose={() => setWalletModal(null)}
+        availableBalance={usdtBalance}
+        onSendUsdt={onSendUsdt}
+        // onWithdrawMpesa={onWithdrawMpesa} // M-Pesa — enable when payout is ready
+      />
 
       <div className="grid grid-cols-2 gap-3">
-        <div className="theme-sky-readout flex flex-col gap-2 p-4">
-          <div className="flex items-center gap-2">
-            <Image src="/usdt-logo.png" alt="" width={20} height={20} aria-hidden />
-            <span className="font-body text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">USDT</span>
+        <div className="theme-sky-readout flex flex-row gap-2 p-4">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <div className="flex items-center gap-2">
+              <Image src="/usdt-logo.png" alt="" width={20} height={20} aria-hidden />
+              <span className="font-body text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
+                USDT
+              </span>
+            </div>
+            <span className="font-ui text-2xl font-bold text-[var(--text)]">
+              {usdtFormatted ? usdtBalance.toFixed(2) : '0.00'}
+            </span>
           </div>
-          <span className="font-ui text-2xl font-bold text-[var(--text)]">
-            {usdtFormatted ? parseFloat(usdtFormatted).toFixed(2) : '0.00'}
-          </span>
+          <div className="flex flex-shrink-0 flex-col gap-1.5">
+            {/* M-Pesa withdraw — enable when payout integration is ready
+            <button
+              type="button"
+              onClick={() => setWalletModal('mpesa')}
+              className="account-usdt-action"
+              aria-label="Withdraw to M-Pesa"
+              title="Withdraw"
+            >
+              <ArrowUpFromLine size={16} strokeWidth={2.25} />
+            </button>
+            */}
+            <button
+              type="button"
+              onClick={() => setWalletModal('send')}
+              className="account-usdt-action"
+              aria-label="Send USDT on Celo"
+              title="Send"
+            >
+              <Send size={16} strokeWidth={2.25} />
+            </button>
+          </div>
         </div>
         <div className="theme-sky-readout flex flex-col gap-2 p-4">
           <div className="flex items-center gap-2">

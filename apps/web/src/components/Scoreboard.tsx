@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { ClueDigitTile } from '@/components/GuessRow';
 import type { GuessEntry, TileClue } from '@/lib/game';
 import { CODE_LENGTH, MAX_GUESSES, tileCluesForGuess } from '@/lib/game';
+// import { maxGuessesForMode } from '@/lib/game'; // Cipher 5-try cap — enable with game.ts
 
 interface ScoreboardProps {
   view: 'player' | 'opponent';
@@ -14,6 +15,7 @@ interface ScoreboardProps {
   opponentCurrentInput?: number[];
   pendingOpponentTileClues?: TileClue[] | null;
   phase: 'playing' | 'countdown' | 'result' | string;
+  // maxGuesses?: number; // Cipher 5-try cap — pass maxGuessesForMode('ai') from GameBoard when enabled
 }
 
 function EmptySlots({ active }: { active?: boolean }) {
@@ -70,6 +72,7 @@ export function Scoreboard({
         <span>{boardLabel}</span>
         <span className="scoreboard-plaque__header-count">
           {guesses.length}/{MAX_GUESSES}
+          {/* {guesses.length}/{maxGuesses ?? MAX_GUESSES} — Cipher 5-try cap */}
         </span>
       </div>
       <div className="scoreboard-frame">

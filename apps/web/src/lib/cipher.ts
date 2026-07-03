@@ -1,9 +1,12 @@
 /**
  * Cipher AI — competitive code-cracking opponent for Crack My Code.
  *
- * Solver: constraint elimination + full 10⁴ probe search (entropy / expected
- * pool reduction; minimax when ≤50 candidates). Opening: fixed `0123`, then
- * dynamic optimal guesses from the full space.
+ * Solver: constraint elimination + probe search (entropy / expected pool
+ * reduction; minimax when ≤50 candidates).
+ *
+ * Opening (human-style digit sweep): guess 1 uses 4 random unique digits;
+ * guess 2 uses 4 more from the 6 not yet tried (8 digits tested, 2 held
+ * back). Then switch to information-maximizing probes.
  *
  * Defense: `generateCipherSecretCode()` picks all-unique codes or exactly one
  * digit repeated twice with two other distinct digits (e.g. `8786`). No double-
@@ -21,8 +24,8 @@ import { shouldUseMiniPayCipherFastPath } from './minipay-host';
 
 export type CipherHistory = Pick<GuessEntry, 'digits' | 'clues'>[];
 
-/** First guess only — four unique digits for maximum initial coverage. */
-const OPENING_GUESS: number[] = [0, 1, 2, 3];
+/** Fallback when history is inconsistent — four unique digits, shuffled. */
+const FALLBACK_OPENING = [0, 1, 2, 3];
 
 /** Prefer minimax (worst-case bucket) when the pool is this small. */
 const MINIMAX_THRESHOLD = 50;
@@ -120,6 +123,51 @@ function isBetterScore(a: GuessScore, b: GuessScore, minimaxMode: boolean): bool
   return a.isCandidate && !b.isCandidate;
 }
 
+function shuffleInPlace<T>(items: T[]): T[] {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+  return items;
+}
+
+/** Four unique digits in random order — avoids always opening with 0123. */
+export function randomOpeningGuess(): number[] {
+  const digits = shuffleInPlace(Array.from({ length: 10 }, (_, d) => d)).slice(0, CODE_LENGTH);
+  return [...digits];
+}
+
+/** All ways to pick 4 digits from `pool`, each returned in one shuffled order. */
+function combinationsOfFour(pool: number[]): number[][] {
+  const combos: number[][] = [];
+  for (let a = 0; a < pool.length - 3; a++) {
+    for (let b = a + 1; b < pool.length - 2; b++) {
+      for (let c = b + 1; c < pool.length - 1; c++) {
+        for (let d = c + 1; d < pool.length; d++) {
+          combos.push(shuffleInPlace([pool[a], pool[b], pool[c], pool[d]]));
+        }
+      }
+    }
+  }
+  return combos;
+}
+
+/**
+ * Second guess: 4 digits drawn from the six not used in the opening guess.
+ * Together, turns 1–2 test eight distinct digits (two digits still unseen).
+ */
+function buildCoverageProbeGuesses(firstGuess: number[]): number[][] {
+  const used = new Set(firstGuess);
+  const remaining = Array.from({ length: 10 }, (_, d) => d).filter((d) => !used.has(d));
+  return combinationsOfFour(remaining);
+}
+
+function pickCoverageGuess(firstGuess: number[], candidates: number[][]): number[] {
+  const probes = buildCoverageProbeGuesses(firstGuess);
+  if (probes.length === 0) return randomOpeningGuess();
+  return pickBestGuess(probes, candidates);
+}
+
 function digitsStillPossible(candidates: number[][]): Set<number> {
   const live = new Set<number>();
   for (const code of candidates) {
@@ -169,7 +217,7 @@ function pickBestGuess(
   candidates: number[][],
 ): number[] {
   const ranked = rankGuesses(probePool, candidates);
-  if (ranked.length === 0) return [...OPENING_GUESS];
+  if (ranked.length === 0) return randomOpeningGuess();
 
   if (ranked.length > 1 && Math.random() < HUMAN_JITTER_CHANCE) {
     const pick = ranked[Math.floor(Math.random() * Math.min(3, ranked.length))];
@@ -185,7 +233,7 @@ function buildProbePool(candidates: number[][]): number[][] {
   const probeCap = mobile ? MINIPAY_PROBE_CAP : LARGE_POOL_PROBE_CAP;
 
   if (candidates.length <= 1) {
-    return candidates.length === 1 ? [[...candidates[0]]] : [[...OPENING_GUESS]];
+    return candidates.length === 1 ? [[...candidates[0]]] : [randomOpeningGuess()];
   }
   if (candidates.length === 2) {
     return candidates.map((c) => [...c]);
@@ -211,11 +259,19 @@ function sampleCandidates(candidates: number[][], cap: number): number[][] {
 }
 
 /** Cipher's next guess given guess history against the human's secret code. */
-export function pickCipherGuess(possible: number[][], turnIndex: number): number[] {
-  if (possible.length === 0) return [...OPENING_GUESS];
+export function pickCipherGuess(
+  possible: number[][],
+  turnIndex: number,
+  history: CipherHistory = [],
+): number[] {
+  if (possible.length === 0) return randomOpeningGuess();
   if (possible.length === 1) return [...possible[0]];
 
-  if (turnIndex === 0) return [...OPENING_GUESS];
+  if (turnIndex === 0) return randomOpeningGuess();
+
+  if (turnIndex === 1 && history.length >= 1) {
+    return pickCoverageGuess(history[0].digits, possible);
+  }
 
   const probes = filterHumanPlausibleProbes(buildProbePool(possible), possible);
   return pickBestGuess(probes, possible);
@@ -223,7 +279,7 @@ export function pickCipherGuess(possible: number[][], turnIndex: number): number
 
 export function cipherNextGuess(history: CipherHistory): number[] {
   const possible = getPossibleCodes(history);
-  return pickCipherGuess(possible, history.length);
+  return pickCipherGuess(possible, history.length, history);
 }
 
 // ─── Cipher defense (secret code generation) ───────────────────────────────

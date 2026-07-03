@@ -32,7 +32,7 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[440px] -translate-x-1/2 justify-center px-4 pb-[max(0.65rem,env(safe-area-inset-bottom))] pointer-events-none">
+    <div className="fixed bottom-0 left-1/2 z-[100] flex w-full max-w-[440px] -translate-x-1/2 justify-center app-page-gutter pb-[max(0.65rem,env(safe-area-inset-bottom))] pointer-events-none">
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
