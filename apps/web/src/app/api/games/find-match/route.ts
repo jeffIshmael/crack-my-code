@@ -7,10 +7,12 @@ import { generateCipherSecretCode } from '@/lib/game';
 import { generateJoinCode } from '@/lib/join-code';
 import { createGameRecord } from '@/lib/prisma-game';
 import { ensureGuestUser, ensureRegisteredUser } from '@/lib/user-address';
+import { getCipherDailyStatus } from '@/lib/cipher-daily';
+import { isRegisteredPlayer } from '@/lib/guest';
 
 export async function POST(req: NextRequest) {
   try {
-    const { address, mode, stake, onChainMatchId, isPublic = true } = await req.json();
+    const { address, mode, stake, onChainMatchId, isPublic = true, smartWalletAddress } = await req.json();
 
     const isAI = mode === 'ai';
     const rawAddress = address || (isAI ? 'GUEST' : null);
@@ -21,11 +23,28 @@ export async function POST(req: NextRequest) {
 
     const effectiveAddress = rawAddress === 'GUEST' ? 'GUEST' : rawAddress.toLowerCase();
 
+    if (isAI && isRegisteredPlayer(effectiveAddress)) {
+      const daily = await getCipherDailyStatus(effectiveAddress);
+      if (daily.atDailyCap) {
+        return NextResponse.json(
+          {
+            error: 'Daily Cipher limit reached. See you tomorrow!',
+            code: 'DAILY_CIPHER_CAP',
+            gamesPlayedToday: daily.gamesPlayedToday,
+          },
+          { status: 429 },
+        );
+      }
+    }
+
     // 1. Ensure the user exists (Guests use a shared GUEST account)
     const user =
       effectiveAddress === 'GUEST'
         ? await ensureGuestUser()
-        : await ensureRegisteredUser(effectiveAddress);
+        : await ensureRegisteredUser(
+            effectiveAddress,
+            smartWalletAddress ? String(smartWalletAddress).toLowerCase() : undefined,
+          );
 
     if (effectiveAddress === 'GUEST' && !isAI) {
         return NextResponse.json({ error: 'Guests can only play against AI' }, { status: 403 });

@@ -7,36 +7,53 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const address = searchParams.get('address');
+    const aliasesParam = searchParams.get('aliases');
 
-    if (!address) {
+    if (!address && !aliasesParam) {
       return NextResponse.json({ error: 'Address is required' }, { status: 400 });
     }
 
-    const normalizedAddress = address.toLowerCase();
+    const aliases = (aliasesParam || address || '')
+      .split(',')
+      .map((value) => value.trim().toLowerCase())
+      .filter(Boolean);
 
     const games = await prisma.game.findMany({
       where: {
-        OR: [
-          { player1Address: normalizedAddress },
-          { player2Address: normalizedAddress }
-        ],
-        status: 'COMPLETED'
+        OR: aliases.flatMap((alias) => [
+          { player1Address: alias },
+          { player2Address: alias },
+        ]),
+        status: 'COMPLETED',
       },
       orderBy: {
-        updatedAt: 'desc'
+        updatedAt: 'desc',
       },
-      take: 10
+      take: 20,
+      select: {
+        id: true,
+        mode: true,
+        stake: true,
+        winnerAddress: true,
+        player1Address: true,
+        player2Address: true,
+        cipherRewardPaid: true,
+        cipherRewardAmount: true,
+        cipherRewardTxHash: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
 
     return NextResponse.json(games);
   } catch (error) {
     console.error('Fetch game history error:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to fetch your game history', 
-        details: error instanceof Error ? error.message : String(error)
-      }, 
-      { status: 500 }
+      {
+        error: 'Failed to fetch your game history',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
     );
   }
 }

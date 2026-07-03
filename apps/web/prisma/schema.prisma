@@ -7,15 +7,16 @@ datasource db {
 }
 
 model User {
-  id        Int      @id @default(autoincrement())
-  address   String?  @unique
-  name      String?
-  rating    Int      @default(1000)
-  points    Int      @default(1000)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  
-  games     Game[]   @relation("PlayerGames")
+  id                 Int      @id @default(autoincrement())
+  address            String?  @unique
+  smartWalletAddress String?  @unique
+  name               String?
+  rating             Int      @default(1000)
+  points             Int      @default(1000)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  games              Game[]   @relation("PlayerGames")
 }
 
 model Game {
@@ -31,11 +32,14 @@ model Game {
   isPublic        Boolean  @default(true)
   player1Code     String?  // Code set by player 1
   player2Code     String?  // Code set by player 2 (or AI code)
-  winnerAddress   String?
+  winnerAddress       String?
+  cipherRewardPaid    Boolean  @default(false)
+  cipherRewardAmount  Float?
+  cipherRewardTxHash  String?
   player1WantsRematch Boolean @default(false)
   player2WantsRematch Boolean @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   player          User     @relation("PlayerGames", fields: [userId], references: [id])
   guesses         Guess[]

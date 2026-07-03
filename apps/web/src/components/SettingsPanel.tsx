@@ -18,7 +18,7 @@ interface SettingsPanelProps {
   onCopyAddress: () => void;
   onTabChange: (tab: NavTab) => void;
   onWithdrawMpesa?: (phone: string, amount: number) => void | Promise<void>;
-  onSendUsdt?: (recipient: string, amount: number) => void | Promise<void>;
+  onSendUsdt?: (recipient: string, amount: number) => Promise<string | void>;
 }
 
 const menuItems: {
@@ -75,24 +75,18 @@ export function SettingsPanel({
   if (!address) {
     return (
       <div className="theme-sky-readout flex flex-col items-center gap-5 p-8 text-center">
-        <span className="text-5xl" aria-hidden>👛</span>
+        <span className="text-5xl" aria-hidden>🔑</span>
         <div className="flex flex-col gap-2">
-          <h2 className="font-ui text-xl font-bold text-[var(--text)]">Connect Wallet</h2>
           <p className="font-body text-sm text-[var(--text-dim)] max-w-[240px]">
             Sign in to view balances, copy your address, and manage your account.
           </p>
         </div>
         <button
           onClick={onLogin}
-          className="theme-game-btn theme-game-btn--pvp w-full max-w-[240px]"
+          className="theme-auth-cta"
           type="button"
         >
-          <div className="theme-game-btn__inner justify-center">
-            <span className="theme-game-btn__emoji" aria-hidden>🔑</span>
-            <div className="theme-game-btn__content items-center">
-              <span className="theme-game-btn__title">Sign In</span>
-            </div>
-          </div>
+          Sign In
         </button>
       </div>
     );
