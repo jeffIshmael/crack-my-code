@@ -1,11 +1,13 @@
 "use client";
 
 import { usePrivy } from "@privy-io/react-auth";
+import { useSmartWallets } from "@privy-io/react-auth/smart-wallets";
 import { useAccount, useBalance } from "wagmi";
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { Wallet } from "lucide-react";
 import { USDT_ADDRESS } from "../../blockchain/constants";
 import { useMiniAppEnvironment } from "@/hooks/use-mini-app-environment";
+import { resolvePayoutAddress } from "@/lib/wallet-address";
 
 interface ConnectButtonProps {
   onWalletClick?: () => void;
@@ -14,12 +16,18 @@ interface ConnectButtonProps {
 export function ConnectButton({ onWalletClick }: ConnectButtonProps) {
   const { login, authenticated, user } = usePrivy();
   const { isConnected, address: wagmiAddress } = useAccount();
-  const address = wagmiAddress || user?.wallet?.address;
+  const { client: smartWalletClient } = useSmartWallets();
+  const payoutAddress = useMemo(
+    () => resolvePayoutAddress({ smartWalletClient, user, wagmiAddress }),
+    [smartWalletClient, user, wagmiAddress],
+  );
+  const address = payoutAddress || wagmiAddress || user?.wallet?.address;
   const [points, setPoints] = useState<number | null>(null);
 
   const { data: usdtData } = useBalance({
-    address: address as `0x${string}` | undefined,
+    address: payoutAddress as `0x${string}` | undefined,
     token: USDT_ADDRESS as `0x${string}`,
+    query: { enabled: !!payoutAddress },
   });
 
   const fetchPoints = useCallback(async () => {

@@ -50,15 +50,21 @@ export function SplashScreen({ onComplete, minDurationMs = 12500 }: SplashScreen
     const tick = () => {
       const now = Date.now();
       const elapsed = now - startedRef.current;
+      const overallPct = Math.min(100, (elapsed / minDurationMs) * 100);
 
       if (revealAtRef.current) {
         const sinceReveal = now - revealAtRef.current;
         const loadWindow = Math.max(3200, minDurationMs - getSplashRevealMs());
-        const loadPct = Math.min(100, (sinceReveal / loadWindow) * 100);
-        setProgress(loadPct);
-        setLoadStep(Math.min(LOADING_STEPS.length - 1, Math.floor((loadPct / 100) * LOADING_STEPS.length)));
+        const revealPct = Math.min(100, (sinceReveal / loadWindow) * 100);
+        setProgress(Math.max(overallPct, revealPct));
+        setLoadStep(
+          Math.min(
+            LOADING_STEPS.length - 1,
+            Math.floor((Math.max(overallPct, revealPct) / 100) * LOADING_STEPS.length),
+          ),
+        );
       } else {
-        setProgress(0);
+        setProgress(overallPct);
       }
 
       if (elapsed >= minDurationMs && revealAtRef.current) {
@@ -88,9 +94,13 @@ export function SplashScreen({ onComplete, minDurationMs = 12500 }: SplashScreen
 
       <div className="game-splash__loader">
         <div className="game-splash__loader-track">
-          <motion.div
+          <div
             className="game-splash__loader-fill"
             style={{ width: `${progress}%` }}
+            role="progressbar"
+            aria-valuenow={Math.round(progress)}
+            aria-valuemin={0}
+            aria-valuemax={100}
           />
         </div>
         <p className="game-splash__loader-label">{label}</p>

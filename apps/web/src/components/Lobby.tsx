@@ -8,20 +8,36 @@ import { ConnectButton } from "@/components/connect-button";
 import type { GameMode } from '@/lib/game';
 import { PROFESSIONAL_MODE_ENABLED, MAX_CIPHER_GUESSES, CIPHER_DAILY_WIN_CAP } from '@/lib/game';
 import { parseUnits } from 'viem';
-import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI, CIPHER_STATS_ABI } from '../../blockchain/constants';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { X } from 'lucide-react';
+import { X, Lock } from 'lucide-react';
 import { ThemeLogo } from '@/components/ThemeLogo';
 import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
 import JoinChallenge from '@/components/JoinChallenge';
 import { FarcasterShareGameButton } from '@/components/FarcasterShareGameButton';
 import { buildGameShareUrl } from '@/lib/farcaster-embed';
+import {
+  CipherSignInModal,
+  dismissCipherSignInModal,
+  isCipherSignInModalDismissed,
+} from '@/components/CipherSignInModal';
+
+interface CipherDailyStatus {
+  gamesPlayedToday: number;
+  gamesRemaining: number;
+  dailyCap: number;
+  atDailyCap: boolean;
+  rewardWinsToday: number;
+  signedIn: boolean;
+}
 
 interface LobbyProps {
   rating: number;
   points: number;
   pointsLoading?: boolean;
+  isSignedIn?: boolean;
+  payoutAddress?: string;
   isMatchmaking: boolean;
   opponentName: string;
   onFindMatch: (mode: GameMode, stake: number, isPublic?: boolean, userBalance?: number) => Promise<void>;
@@ -49,6 +65,8 @@ export default function Lobby({
   rating,
   points,
   pointsLoading = false,
+  isSignedIn = false,
+  payoutAddress,
   isMatchmaking,
   opponentName,
   onFindMatch,
@@ -63,14 +81,19 @@ export default function Lobby({
   onJoinByGameId,
   isJoining = false,
 }: LobbyProps) {
-  const { isConnected, address } = useAccount();
+  const { isConnected, address: wagmiAddress } = useAccount();
   const { login } = usePrivy();
+  const walletAddress = payoutAddress || wagmiAddress;
   const { data: usdtData } = useBalance({
-    address,
+    address: walletAddress as `0x${string}` | undefined,
     token: USDT_ADDRESS as `0x${string}`,
+    query: { enabled: !!walletAddress },
   });
 
   const [showPvPModal, setShowPvPModal] = useState(false);
+  const [showCipherSignInModal, setShowCipherSignInModal] = useState(false);
+  const [cipherStatus, setCipherStatus] = useState<CipherDailyStatus | null>(null);
+  const [cipherStatusLoaded, setCipherStatusLoaded] = useState(() => !isSignedIn);
   const [pvpStep, setPvpStep] = useState<'selection' | 'config' | 'visibility'>('selection');
   const [selectedMode, setSelectedMode] = useState<GameMode>('fun');
   const [stake, setStake] = useState<string>('5');
@@ -80,26 +103,45 @@ export default function Lobby({
     address: USDT_ADDRESS,
     abi: ERC20_ABI,
     functionName: 'allowance',
-    args: address ? [address, CONTRACT_ADDRESS] : undefined,
+    args: walletAddress ? [walletAddress, CONTRACT_ADDRESS] : undefined,
     query: {
-      enabled: !!address,
+      enabled: !!walletAddress,
     }
   });
 
   const allowance = (allowanceData as bigint) ?? 0n;
 
-  const { data: cipherRewardsTodayData } = useReadContract({
-    address: CONTRACT_ADDRESS,
-    abi: CIPHER_STATS_ABI,
-    functionName: 'cipherRewardsToday',
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
+  useEffect(() => {
+    if (!isSignedIn || !payoutAddress) {
+      setCipherStatus(null);
+      setCipherStatusLoaded(true);
+      return;
+    }
 
-  const cipherWinsToday = Math.min(
-    Number(cipherRewardsTodayData ?? 0n),
-    CIPHER_DAILY_WIN_CAP,
-  );
+    if (isMatchmaking) return;
+
+    let cancelled = false;
+    setCipherStatusLoaded(false);
+
+    fetch(`/api/games/cipher-status?address=${encodeURIComponent(payoutAddress)}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (!cancelled) setCipherStatus(data);
+      })
+      .catch((err) => console.error('Cipher status fetch failed', err))
+      .finally(() => {
+        if (!cancelled) setCipherStatusLoaded(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [isSignedIn, payoutAddress, isMatchmaking]);
+
+  const cipherStatusPending = isSignedIn && !!payoutAddress && !cipherStatusLoaded;
+  const cipherGamesToday = cipherStatus?.gamesPlayedToday ?? 0;
+  const cipherAtDailyCap = cipherStatusLoaded && Boolean(cipherStatus?.atDailyCap);
+  const cipherButtonDisabled = isCreating || cipherAtDailyCap || cipherStatusPending;
 
   const { writeContract: approve, data: approveHash, isPending: isApprovingAction } = useWriteContract();
 
@@ -169,7 +211,7 @@ export default function Lobby({
     }
   };
 
-  const handleStartAI = async () => {
+  const proceedStartAI = async () => {
     setIsCreating(true);
     setSelectedMode('ai');
     try {
@@ -177,6 +219,30 @@ export default function Lobby({
     } finally {
       setIsCreating(false);
     }
+  };
+
+  const handleStartAI = async () => {
+    if (cipherStatusPending || cipherAtDailyCap) return;
+
+    if (!isSignedIn) {
+      if (!isCipherSignInModalDismissed()) {
+        setShowCipherSignInModal(true);
+        return;
+      }
+    }
+
+    await proceedStartAI();
+  };
+
+  const handleCipherSignIn = () => {
+    setShowCipherSignInModal(false);
+    login();
+  };
+
+  const handleContinueGuest = () => {
+    dismissCipherSignInModal();
+    setShowCipherSignInModal(false);
+    void proceedStartAI();
   };
 
   const openPvPModal = () => {
@@ -196,7 +262,7 @@ export default function Lobby({
           <ThemeLogo />
         </div>
 
-        {isConnected ? (
+        {isSignedIn && walletAddress ? (
           <ThemePlayfulHeader
             points={points}
             pointsLoading={pointsLoading}
@@ -266,13 +332,30 @@ export default function Lobby({
               <motion.div variants={fadeUp} className="flex flex-col gap-4">
                 <button
                   onClick={handleStartAI}
-                  disabled={isCreating}
-                  className="theme-game-btn theme-game-btn--ai theme-game-btn--lively cipher-mode-btn group"
+                  disabled={cipherButtonDisabled}
+                  aria-busy={cipherStatusPending}
+                  aria-label={
+                    cipherAtDailyCap
+                      ? 'Cipher AI daily limit reached. See you tomorrow.'
+                      : cipherStatusPending
+                        ? 'Checking Cipher daily limit'
+                        : 'Play Cipher AI'
+                  }
+                  className={`theme-game-btn theme-game-btn--ai cipher-mode-btn group ${
+                    cipherAtDailyCap
+                      ? 'cipher-mode-btn--locked'
+                      : cipherStatusPending
+                        ? 'cipher-mode-btn--pending'
+                        : 'theme-game-btn--lively'
+                  }`}
                 >
                   <div className="theme-game-btn__inner">
                     <div className="cipher-mode-btn__icon-wrap">
                       <span className="theme-game-btn__emoji-badge" aria-hidden>🤖</span>
-                      <span className="cipher-chances-badge" aria-label={`${MAX_CIPHER_GUESSES} guesses to win`}>
+                      <span
+                        className={`cipher-chances-badge${isSignedIn ? ' cipher-chances-badge--live' : ''}`}
+                        aria-label={`${MAX_CIPHER_GUESSES} guesses to win`}
+                      >
                         <span className="cipher-chances-badge__num">{MAX_CIPHER_GUESSES}</span>
                         <span className="cipher-chances-badge__tag">tries</span>
                       </span>
@@ -280,52 +363,70 @@ export default function Lobby({
                     <div className="theme-game-btn__content">
                       <div className="cipher-mode-btn__title-row">
                         <span className="theme-game-btn__title">Cipher AI</span>
-                        <div
-                          className="cipher-daily-streak"
-                          aria-label={`${cipherWinsToday} of ${CIPHER_DAILY_WIN_CAP} daily rewarded wins`}
-                        >
-                          <div className="cipher-daily-streak__slots" aria-hidden>
-                            {Array.from({ length: CIPHER_DAILY_WIN_CAP }).map((_, i) => (
-                              <span
-                                key={i}
-                                className={`cipher-daily-streak__slot${
-                                  i < cipherWinsToday ? ' cipher-daily-streak__slot--filled' : ''
-                                }`}
-                                style={{ animationDelay: `${i * 0.12}s` }}
-                              />
-                            ))}
+                        {isSignedIn && cipherStatusLoaded && (
+                          <div
+                            className="cipher-daily-streak"
+                            aria-label={`${cipherGamesToday} of ${CIPHER_DAILY_WIN_CAP} Cipher games today`}
+                          >
+                            <div className="cipher-daily-streak__slots" aria-hidden>
+                              {Array.from({ length: CIPHER_DAILY_WIN_CAP }).map((_, i) => (
+                                <span
+                                  key={i}
+                                  className={`cipher-daily-streak__slot${
+                                    i < cipherGamesToday ? ' cipher-daily-streak__slot--filled' : ''
+                                  }`}
+                                  style={{ animationDelay: `${i * 0.12}s` }}
+                                />
+                              ))}
+                            </div>
+                            <span className="cipher-daily-streak__cap">{CIPHER_DAILY_WIN_CAP}/day</span>
                           </div>
-                          <span className="cipher-daily-streak__cap">{CIPHER_DAILY_WIN_CAP}/day</span>
-                        </div>
+                        )}
+                        {cipherStatusPending && (
+                          <span className="cipher-mode-btn__checking">Checking…</span>
+                        )}
                       </div>
                       <span className="theme-game-btn__subtitle">Crack the code to win</span>
                       <span className="cipher-reward-hint">
-                        Earn <span className="cipher-reward-hint__amount">0.1 USDT</span> when you beat Cipher
+                        {isSignedIn ? (
+                          <>
+                            Earn <span className="cipher-reward-hint__amount">0.1 USDT</span> when you beat Cipher
+                          </>
+                        ) : (
+                          <>Sign in to earn 0.1 USDT on a win</>
+                        )}
                       </span>
                     </div>
-                    <span className="theme-game-btn__go">PLAY</span>
+                    <span className="theme-game-btn__go">
+                      {cipherStatusPending ? '…' : 'PLAY'}
+                    </span>
                   </div>
+
+                  {cipherAtDailyCap && (
+                    <div className="cipher-mode-btn__overlay" aria-hidden>
+                      <Lock size={26} strokeWidth={2.5} />
+                      <span className="cipher-mode-btn__overlay-text">See you tomorrow</span>
+                    </div>
+                  )}
                 </button>
 
                 <button
                   type="button"
-                  onClick={isConnected ? openPvPModal : () => login()}
-                  className={`theme-game-btn theme-game-btn--pvp theme-game-btn--lively group ${!isConnected ? 'opacity-60' : ''}`}
-                  aria-disabled={!isConnected}
+                  onClick={isSignedIn ? openPvPModal : () => login()}
+                  className={`theme-game-btn theme-game-btn--pvp group ${
+                    isSignedIn ? 'theme-game-btn--lively' : 'theme-game-btn--signin-required'
+                  }`}
+                  aria-disabled={!isSignedIn}
                 >
                   <div className="theme-game-btn__inner">
                     <span className="theme-game-btn__emoji-badge" aria-hidden>⚔️</span>
                     <div className="theme-game-btn__content">
                       <span className="theme-game-btn__title">Vs Opponent</span>
-                      <span
-                        className={`theme-game-btn__subtitle ${
-                          !isConnected ? '!text-yellow-100' : ''
-                        }`}
-                      >
-                        {!isConnected ? '🔒 Sign in to duel' : 'Public or invite-only match'}
+                      <span className="theme-game-btn__subtitle">
+                        {isSignedIn ? 'Public or invite-only match' : '🔒 Sign in to duel'}
                       </span>
                     </div>
-                    <span className="theme-game-btn__go">DUEL</span>
+                    <span className="theme-game-btn__go">{isSignedIn ? 'DUEL' : '🔒'}</span>
                   </div>
                 </button>
               </motion.div>
@@ -337,7 +438,7 @@ export default function Lobby({
                     onChange={onJoinGameIdInputChange}
                     onJoin={onJoinByGameId}
                     isJoining={isJoining}
-                    disabled={!isConnected}
+                    disabled={!isSignedIn}
                     onSignInRequired={() => login()}
                     collapsible
                   />
@@ -347,6 +448,17 @@ export default function Lobby({
           )}
         </div>
       </div>
+
+      {/* ── Cipher sign-in prompt ── */}
+      <AnimatePresence>
+        {showCipherSignInModal && (
+          <CipherSignInModal
+            onSignIn={handleCipherSignIn}
+            onContinueGuest={handleContinueGuest}
+            onClose={handleContinueGuest}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ── PvP Mode Selection Bottom Sheet ── */}
       <AnimatePresence>

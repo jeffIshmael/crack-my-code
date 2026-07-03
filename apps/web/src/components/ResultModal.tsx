@@ -18,6 +18,12 @@ interface ResultModalProps {
   playerRating: number;
   guessCount: number;
   statsLoading?: boolean;
+  cipherReward?: {
+    paid: boolean;
+    amount?: number;
+    txHash?: string;
+    reason?: string;
+  } | null;
   onPlayAgain: () => void;
   onHome: () => void;
   /** PvP rematch (non-AI modes only) */
@@ -41,6 +47,7 @@ export default function ResultModal({
   playerRating,
   guessCount,
   statsLoading = false,
+  cipherReward = null,
   onPlayAgain,
   onHome,
   rematchStatus = 'idle',
@@ -185,6 +192,31 @@ export default function ResultModal({
                    <span>1% Platform Fee Deducted</span>
                 </div>
               )}
+            </motion.div>
+          )}
+
+          {gameMode === 'ai' && isWin && cipherReward?.paid && (
+            <motion.div
+              className="flex w-full flex-col gap-2 rounded-2xl p-4"
+              style={{
+                background: 'rgba(16,185,129,0.08)',
+                border: '1px solid rgba(16,185,129,0.2)',
+              }}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-2)]">
+                  Cipher Reward
+                </span>
+                <span className="font-orbitron text-xl font-black text-[var(--clue-green)]">
+                  +{(cipherReward.amount ?? 0.1).toFixed(1)} USDT
+                </span>
+              </div>
+              <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wide">
+                Sent to your smart wallet
+              </p>
             </motion.div>
           )}
 

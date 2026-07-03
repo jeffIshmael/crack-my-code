@@ -124,6 +124,78 @@ export async function trackGameOnChain(
   return await publicClient.waitForTransactionReceipt({ hash });
 }
 
+export type CipherRewardResult =
+  | { status: 'paid'; txHash: `0x${string}`; amount: bigint }
+  | { status: 'skipped'; reason: 'insufficient_pool' | 'daily_cap' | 'disabled' | 'already_paid' | 'simulation_failed' };
+
+/**
+ * Pay a Cipher win reward from the on-chain pool (backend only).
+ * Skips gracefully when the pool balance is too low.
+ */
+export async function rewardCipherWinOnChain(
+  player: `0x${string}`,
+): Promise<CipherRewardResult> {
+  if (!account || !walletClient) throw new Error("Agent not initialized");
+
+  const rewardAmount = await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'cipherWinReward',
+  }) as bigint;
+
+  if (rewardAmount <= 0n) {
+    return { status: 'skipped', reason: 'disabled' };
+  }
+
+  const poolBalance = await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'rewardPoolBalance',
+  }) as bigint;
+
+  if (poolBalance < rewardAmount) {
+    console.warn('[Blockchain] Reward pool too low for cipher payout', {
+      poolBalance: poolBalance.toString(),
+      rewardAmount: rewardAmount.toString(),
+    });
+    return { status: 'skipped', reason: 'insufficient_pool' };
+  }
+
+  try {
+    const { request } = await publicClient.simulateContract({
+      account,
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'rewardCipherWin',
+      args: [player],
+    });
+
+    const hash = await walletClient.writeContract(request);
+    const receipt = await publicClient.waitForTransactionReceipt({ hash });
+    return { status: 'paid', txHash: receipt.transactionHash, amount: rewardAmount };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    if (message.includes('daily cipher cap')) {
+      return { status: 'skipped', reason: 'daily_cap' };
+    }
+    console.error('[Blockchain] rewardCipherWin failed:', err);
+    return { status: 'skipped', reason: 'simulation_failed' };
+  }
+}
+
+/**
+ * Read how many cipher rewards a wallet received today (UTC).
+ */
+export async function getCipherRewardsToday(player: `0x${string}`): Promise<number> {
+  const count = await publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'cipherRewardsToday',
+    args: [player],
+  }) as bigint;
+  return Number(count);
+}
+
 /**
  * Send 0.1 Celo from the agent wallet to a specific address
  */

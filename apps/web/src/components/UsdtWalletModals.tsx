@@ -1,12 +1,14 @@
 'use client';
 
 import Image from 'next/image';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X } from 'lucide-react';
+import { X, Check, ExternalLink } from 'lucide-react';
 import { toast } from 'sonner';
+import { getErrorMessage } from '@/lib/errors';
 
 const MIN_MPESA_WITHDRAW_KES = 100;
+const CELOSCAN_TX_URL = 'https://celoscan.io/tx/';
 
 type WalletModalKind = 'mpesa' | 'send' | null;
 
@@ -15,7 +17,7 @@ interface UsdtWalletModalsProps {
   onClose: () => void;
   availableBalance: number;
   onWithdrawMpesa?: (phone: string, amount: number) => void | Promise<void>;
-  onSendUsdt?: (recipient: string, amount: number) => void | Promise<void>;
+  onSendUsdt?: (recipient: string, amount: number) => Promise<string | void>;
 }
 
 function WalletBottomSheet({
@@ -223,18 +225,93 @@ function MpesaWithdrawForm({
   );
 }
 
+function formatAddressShort(address: string) {
+  return `${address.slice(0, 6)}…${address.slice(-4)}`;
+}
+
+function SendUsdtSuccess({
+  amount,
+  recipient,
+  txHash,
+  onDone,
+}: {
+  amount: number;
+  recipient: string;
+  txHash?: string;
+  onDone: () => void;
+}) {
+  return (
+    <div className="wallet-send-success">
+      <div className="wallet-send-success__icon" aria-hidden>
+        <Check size={32} strokeWidth={3} />
+      </div>
+      <h2 className="wallet-send-success__title">USDT sent!</h2>
+      <p className="wallet-send-success__subtitle">
+        <strong>{amount.toFixed(2)} USDT</strong> is on its way to{' '}
+        <span className="font-mono">{formatAddressShort(recipient)}</span>
+      </p>
+      <div className="wallet-send-success__details">
+        <div className="wallet-send-success__row">
+          <span>Amount</span>
+          <strong>{amount.toFixed(2)} USDT</strong>
+        </div>
+        <div className="wallet-send-success__row">
+          <span>To</span>
+          <strong className="font-mono text-xs">{formatAddressShort(recipient)}</strong>
+        </div>
+        <div className="wallet-send-success__row">
+          <span>Network</span>
+          <strong>Celo</strong>
+        </div>
+      </div>
+      {txHash && (
+        <a
+          href={`${CELOSCAN_TX_URL}${txHash}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="wallet-send-success__link"
+        >
+          View on Celoscan
+          <ExternalLink size={14} />
+        </a>
+      )}
+      <button type="button" onClick={onDone} className="wallet-modal-action-btn wallet-modal-action-btn--send">
+        Done
+      </button>
+    </div>
+  );
+}
+
 function SendUsdtForm({
+  active,
   balance,
   onClose,
   onSubmit,
 }: {
+  active: boolean;
   balance: number;
   onClose: () => void;
-  onSubmit?: (recipient: string, amount: number) => void | Promise<void>;
+  onSubmit?: (recipient: string, amount: number) => Promise<string | void>;
 }) {
   const [recipient, setRecipient] = useState('');
   const [amount, setAmount] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<{
+    amount: number;
+    recipient: string;
+    txHash?: string;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!active) {
+      setRecipient('');
+      setAmount('');
+      setSubmitting(false);
+      setError(null);
+      setSuccess(null);
+    }
+  }, [active]);
 
   const parsedAmount = parseFloat(amount) || 0;
   const recipientValid = /^0x[a-fA-F0-9]{40}$/.test(recipient.trim());
@@ -243,21 +320,38 @@ function SendUsdtForm({
   const handleSubmit = async () => {
     if (!canSubmit) return;
     setSubmitting(true);
+    setError(null);
     try {
       if (onSubmit) {
-        await onSubmit(recipient.trim(), parsedAmount);
+        const txHash = await onSubmit(recipient.trim(), parsedAmount);
+        setSuccess({
+          amount: parsedAmount,
+          recipient: recipient.trim(),
+          txHash: txHash || undefined,
+        });
       } else {
         toast.info('Coming soon', {
           description: 'On-chain USDT transfers are on the way.',
         });
+        onClose();
       }
-      onClose();
-    } catch {
-      // Parent handler shows detailed error toast
+    } catch (err) {
+      setError(getErrorMessage(err));
     } finally {
       setSubmitting(false);
     }
   };
+
+  if (success) {
+    return (
+      <SendUsdtSuccess
+        amount={success.amount}
+        recipient={success.recipient}
+        txHash={success.txHash}
+        onDone={onClose}
+      />
+    );
+  }
 
   return (
     <>
@@ -269,7 +363,7 @@ function SendUsdtForm({
 
       <WalletDestinationLogos />
 
-      <div className="wallet-modal-form-card">
+      <div className={`wallet-modal-form-card${submitting ? ' wallet-modal-form-card--busy' : ''}`}>
         <label className="wallet-modal-field">
           <span className="wallet-modal-field__label">
             <span className="wallet-modal-field__label-icon" aria-hidden>👛</span>
@@ -285,6 +379,7 @@ function SendUsdtForm({
             spellCheck={false}
             autoCapitalize="off"
             autoCorrect="off"
+            disabled={submitting}
           />
         </label>
         {recipient.trim().length > 0 && !recipientValid && (
@@ -301,12 +396,14 @@ function SendUsdtForm({
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             className="wallet-modal-field__input"
+            disabled={submitting}
           />
         </label>
         <AvailableBalanceHint balance={balance} />
         {parsedAmount > balance && (
           <p className="wallet-modal-error">That&apos;s more than you have — check your balance.</p>
         )}
+        {error && <p className="wallet-modal-error">{error}</p>}
       </div>
 
       <button
@@ -315,7 +412,14 @@ function SendUsdtForm({
         disabled={!canSubmit}
         className="wallet-modal-action-btn wallet-modal-action-btn--send"
       >
-        {submitting ? 'Sending…' : 'Send USDT'}
+        {submitting ? (
+          <span className="wallet-modal-action-btn__loading">
+            <span className="wallet-modal-action-btn__spinner" aria-hidden />
+            Sending on Celo…
+          </span>
+        ) : (
+          'Send USDT'
+        )}
       </button>
     </>
   );
@@ -343,7 +447,12 @@ export function UsdtWalletModals({
         />
       </WalletBottomSheet>
       <WalletBottomSheet open={open === 'send'} onClose={onClose} variant="send">
-        <SendUsdtForm balance={balance} onClose={onClose} onSubmit={onSendUsdt} />
+        <SendUsdtForm
+          active={open === 'send'}
+          balance={balance}
+          onClose={onClose}
+          onSubmit={onSendUsdt}
+        />
       </WalletBottomSheet>
     </>
   );

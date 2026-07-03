@@ -6,11 +6,16 @@ import { pusherServer } from '@/lib/pusher-server';
 import { evaluateGuess, toTileClues, maxGuessesForMode } from '@/lib/game';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { applyScoreDelta } from '@/lib/user-points';
-import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
+import { resolveMatchOnChain, trackGameOnChain, rewardCipherWinOnChain } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
 import { isRegisteredPlayer } from '@/lib/guest';
 import { findUserByAddress } from '@/lib/user-address';
 import { getNextTurnAddress } from '@/lib/turn';
+
+export type CipherRewardPayload =
+  | { paid: true; amount: number; txHash: string }
+  | { paid: false; reason: string }
+  | null;
 
 export async function POST(req: NextRequest) {
   try {
@@ -59,6 +64,7 @@ export async function POST(req: NextRequest) {
     const isWin = clues.filter(c => c === 'green').length === 4;
     let revealCode = null;
     let winner = null;
+    let cipherReward: CipherRewardPayload = null;
 
     const p1GuessCount = await prisma.guess.count({
       where: { gameId, isPlayer: true },
@@ -88,6 +94,37 @@ export async function POST(req: NextRequest) {
         await applyScoreDelta(normalizedPlayerAddress, winDelta);
       }
 
+      if (isAI && isRegisteredPlayer(normalizedPlayerAddress) && !game.cipherRewardPaid) {
+        try {
+          await trackGameOnChain(0, true);
+        } catch (trackErr) {
+          console.error('[Blockchain] Track game on-chain failed:', trackErr);
+        }
+
+        const rewardResult = await rewardCipherWinOnChain(
+          normalizedPlayerAddress as `0x${string}`,
+        );
+
+        if (rewardResult.status === 'paid') {
+          const amount = Number(rewardResult.amount) / 1_000_000;
+          await prisma.game.update({
+            where: { id: gameId },
+            data: {
+              cipherRewardPaid: true,
+              cipherRewardAmount: amount,
+              cipherRewardTxHash: rewardResult.txHash,
+            },
+          });
+          cipherReward = {
+            paid: true,
+            amount,
+            txHash: rewardResult.txHash,
+          };
+        } else {
+          cipherReward = { paid: false, reason: rewardResult.reason };
+        }
+      }
+
       if (!isAI) {
         const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;
         if (opponentAddress && isRegisteredPlayer(opponentAddress)) {
@@ -98,6 +135,30 @@ export async function POST(req: NextRequest) {
 
       // --- ON-CHAIN + Pusher: run after response (non-blocking) ---
       void (async () => {
+        if (isAI) {
+          if (!isRegisteredPlayer(normalizedPlayerAddress)) {
+            try {
+              await trackGameOnChain(0, true);
+            } catch (trackErr) {
+              console.error('[Blockchain] Track game on-chain failed:', trackErr);
+            }
+          }
+
+          try {
+            await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
+              digits,
+              clues,
+              tileClues,
+              sender: normalizedPlayerAddress,
+              nextTurnAddress,
+              revealCode: isWin ? opponentCode : undefined,
+            });
+          } catch (pusherErr) {
+            console.error('[Pusher] opponent-guess failed:', pusherErr);
+          }
+          return;
+        }
+
         try {
           const matchType = game.mode === 'cash' ? 1 : 0;
           await trackGameOnChain(matchType, isAI);
@@ -223,6 +284,7 @@ export async function POST(req: NextRequest) {
       opponentCode: revealCode,
       winnerAddress: winner,
       playerStats,
+      cipherReward,
       isYourTurn: false,
       nextTurnAddress,
     });

@@ -47,6 +47,8 @@ export const MAX_GUESSES = 8;
 export const MAX_CIPHER_GUESSES = 5;
 /** On-chain cap: rewarded Cipher wins per wallet per UTC day */
 export const CIPHER_DAILY_WIN_CAP = 5;
+/** USDT paid per rewarded Cipher win */
+export const CIPHER_WIN_REWARD_USDT = 0.1;
 
 export function maxGuessesForMode(mode: GameMode): number {
   return mode === 'ai' ? MAX_CIPHER_GUESSES : MAX_GUESSES;

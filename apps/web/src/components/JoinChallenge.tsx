@@ -95,7 +95,9 @@ export default function JoinChallenge({
         <button
           type="button"
           onClick={handleToggle}
-          className={`theme-game-btn theme-game-btn--join theme-game-btn--lively group w-full ${signInRequired ? 'opacity-60' : ''}`}
+          className={`theme-game-btn theme-game-btn--join group w-full ${
+            signInRequired ? 'theme-game-btn--signin-required' : 'theme-game-btn--lively'
+          }`}
           aria-expanded={signInRequired ? false : open}
           aria-disabled={signInRequired}
         >
@@ -109,9 +111,9 @@ export default function JoinChallenge({
             </div>
             <ChevronDown
               size={18}
-              className={`flex-shrink-0 text-white/90 transition-transform duration-200 ${
-                open && !signInRequired ? 'rotate-180' : ''
-              }`}
+              className={`flex-shrink-0 transition-transform duration-200 ${
+                signInRequired ? 'theme-game-btn__chevron--muted' : 'text-white/90'
+              } ${open && !signInRequired ? 'rotate-180' : ''}`}
               aria-hidden
             />
           </div>

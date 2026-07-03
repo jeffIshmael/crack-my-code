@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'framer-motion';
 import Lobby from '@/components/Lobby';
@@ -36,6 +36,7 @@ import { usePrivy } from '@privy-io/react-auth';
 import { parseUnits, parseEventLogs, encodeFunctionData } from 'viem';
 import { CONTRACT_ABI, CONTRACT_ADDRESS, USDT_ADDRESS } from '../../blockchain/constants';
 import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
+import { resolvePayoutAddress, playerAddressAliases, getSmartWalletAddress } from '@/lib/wallet-address';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
@@ -75,15 +76,31 @@ export default function Home() {
   const { address: wagmiAddress, isConnected } = useAccount();
   const { login, logout, authenticated, user } = usePrivy();
   const { isMiniPay, isFarcaster } = useMiniAppEnvironment();
-  const address = wagmiAddress || user?.wallet?.address;
   const publicClient = usePublicClient();
   const { disconnect } = useDisconnect();
   const { writeContractAsync } = useWriteContract();
   const { client: smartWalletClient } = useSmartWallets();
 
+  const payoutAddress = useMemo(
+    () => resolvePayoutAddress({ smartWalletClient, user, wagmiAddress }),
+    [smartWalletClient, user, wagmiAddress],
+  );
+  const smartWalletAddress = useMemo(
+    () => getSmartWalletAddress(smartWalletClient, user),
+    [smartWalletClient, user],
+  );
+  const walletAliases = useMemo(
+    () => playerAddressAliases({ payoutAddress, wagmiAddress, user }),
+    [payoutAddress, wagmiAddress, user],
+  );
+  const isSignedIn = authenticated || isConnected;
+  const address = isSignedIn ? payoutAddress : undefined;
+  const txAddress = wagmiAddress || user?.wallet?.address;
+
   const { data: usdtData, refetch: refetchUsdtBalance } = useBalance({
-    address: address as `0x${string}` | undefined,
+    address: payoutAddress as `0x${string}` | undefined,
     token: USDT_ADDRESS as `0x${string}`,
+    query: { enabled: !!payoutAddress },
   });
   const [gs, setGs] = useState(() => initialGameState());
   const [playerStatsLoaded, setPlayerStatsLoaded] = useState(false);
@@ -178,6 +195,12 @@ export default function Home() {
   } | null>(null);
   const [rematchStatus, setRematchStatus] = useState<'idle' | 'waiting' | 'opponent_wants' | 'declined'>('idle');
   const [rematchLoading, setRematchLoading] = useState(false);
+  const [lastCipherReward, setLastCipherReward] = useState<{
+    paid: boolean;
+    amount?: number;
+    txHash?: string;
+    reason?: string;
+  } | null>(null);
   const [openGamesTab, setOpenGamesTab] = useState<'active' | 'history'>('active');
   const opponentAddressRef = useRef<string | null>(null);
   const addressRef = useRef<string | undefined>(address);
@@ -226,11 +249,12 @@ export default function Home() {
 
   // 1.2 Fetch my private invite challenges
   const fetchMyActive = useCallback(async () => {
-    if (!authenticated || !address) return;
+    if (!isSignedIn || !payoutAddress) return;
     try {
+      const aliasQuery = encodeURIComponent(walletAliases.join(','));
       const [activeRes, historyRes] = await Promise.all([
-        fetch(`/api/games/my-active?address=${address}`),
-        fetch(`/api/games/history?address=${address}`)
+        fetch(`/api/games/my-active?address=${encodeURIComponent(payoutAddress)}`),
+        fetch(`/api/games/history?aliases=${aliasQuery}`),
       ]);
       const activeData = await activeRes.json();
       const historyData = await historyRes.json();
@@ -239,7 +263,7 @@ export default function Home() {
     } catch (err) {
       console.error('Games data fetch failed', err);
     }
-  }, [authenticated, address]);
+  }, [isSignedIn, payoutAddress, walletAliases]);
 
   useEffect(() => {
     fetchMyActive();
@@ -1036,7 +1060,7 @@ export default function Home() {
       setGs(curr => ({ ...curr, phase: 'matchmaking', gameMode: mode, opponentName: 'SEARCHING...' }));
     }
 
-    const effectiveAddress = address || 'GUEST';
+    const effectiveAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
     setCurrentGameId(null);
     setCurrentOnChainMatchId(null);
 
@@ -1044,7 +1068,7 @@ export default function Home() {
       let onChainMatchId: string | undefined;
 
       // --- ON-CHAIN: Create Challenge ---
-      if (mode !== 'ai' && isConnected) {
+      if (mode !== 'ai' && isConnected && txAddress) {
         const isPaid = mode === 'cash';
         const stakeAmt = parseUnits(stake.toString(), 6);
         console.log("the paid status", isPaid);
@@ -1095,14 +1119,18 @@ export default function Home() {
           address: effectiveAddress,
           mode,
           stake,
-          onChainMatchId, // Synchronize with blockchain
-          isPublic
+          onChainMatchId,
+          isPublic,
+          smartWalletAddress: smartWalletAddress || payoutAddress,
         })
       });
 
       const data = await res.json();
 
       if (!res.ok) {
+        if (data.code === 'DAILY_CIPHER_CAP') {
+          throw new Error(data.error || 'Daily Cipher limit reached. See you tomorrow!');
+        }
         throw new Error(data.error || 'Matchmaking failed');
       }
 
@@ -1137,7 +1165,7 @@ export default function Home() {
         }, 1500);
       }
     }
-  }, [address, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive]);
+  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive]);
 
   const handleCancelMatchmaking = useCallback(async (options?: { fromTimeout?: boolean }) => {
     const gameId = currentGameIdRef.current;
@@ -1269,13 +1297,14 @@ export default function Home() {
     isSubmittingRef.current = true;
 
     try {
+    const playerAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
     // 1. Send guess to server
     if (currentGameId) {
       try {
         const res = await fetch('/api/games/submit-guess', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gameId: currentGameId, digits, playerAddress: address || 'GUEST' })
+          body: JSON.stringify({ gameId: currentGameId, digits, playerAddress })
         });
         const data = await res.json();
 
@@ -1302,12 +1331,18 @@ export default function Home() {
 
             if (won) {
               clearOppTimer();
+              if (data.cipherReward) {
+                setLastCipherReward(data.cipherReward);
+                if (data.cipherReward.paid) {
+                  void refetchUsdtBalance();
+                }
+              }
               return {
                 ...prev,
                 playerGuesses: newGuesses,
                 phase: 'result',
                 result: 'win',
-                ratingDelta: isRegisteredPlayer(address) ? scoreDeltaForMode(mode, true) : 0,
+                ratingDelta: isRegisteredPlayer(playerAddress) ? scoreDeltaForMode(mode, true) : 0,
                 currentInput: [],
                 opponentCode: data.opponentCode,
               };
@@ -1330,7 +1365,7 @@ export default function Home() {
           });
 
           if (won) {
-            if (isRegisteredPlayer(address)) {
+            if (isRegisteredPlayer(playerAddress)) {
               await syncResultStats(scoreDeltaForMode(mode, true));
             }
           } else if (gs.playerGuesses.length + 1 >= maxGuessesForMode(gs.gameMode)) {
@@ -1339,18 +1374,18 @@ export default function Home() {
               const revealRes = await fetch('/api/games/reveal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gameId: currentGameId, address: address || 'GUEST' }),
+                body: JSON.stringify({ gameId: currentGameId, address: playerAddress }),
               });
               const revealData = await revealRes.json();
               setGs((prev: GameState) => ({
                 ...prev,
                 phase: 'result',
                 result: 'lose',
-                ratingDelta: isRegisteredPlayer(address) ? loss : 0,
+                ratingDelta: isRegisteredPlayer(playerAddress) ? loss : 0,
                 currentInput: [],
                 opponentCode: revealData.opponentCode || [],
               }));
-              if (isRegisteredPlayer(address)) {
+              if (isRegisteredPlayer(playerAddress)) {
                 await syncResultStats(loss);
               }
             } catch (revealErr) {
@@ -1369,7 +1404,7 @@ export default function Home() {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
     }
-  }, [gs, currentGameId, address, isSubmitting, syncResultStats, scheduleTurnHandover]);
+  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, refetchUsdtBalance]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
@@ -1400,13 +1435,17 @@ export default function Home() {
     const points = resultStats?.pointsAfter ?? gs.playerPoints;
     setGs(initialGameState(points));
     setResultStats(null);
+    setLastCipherReward(null);
     setRematchStatus('idle');
     setRematchLoading(false);
     setCurrentGameId(null);
     setShareableJoinCode(null);
     opponentAddressRef.current = null;
-    if (address) void refreshUserStats();
-  }, [gs.playerPoints, resultStats, address, refreshUserStats, clearTurnHandover]);
+    if (address) {
+      void refreshUserStats();
+      void fetchMyActive();
+    }
+  }, [gs.playerPoints, resultStats, address, refreshUserStats, fetchMyActive, clearTurnHandover]);
 
   const handlePlayAgain = useCallback(() => {
     if (gs.gameMode !== 'ai') return;
@@ -1660,29 +1699,24 @@ export default function Home() {
     });
   }, []);
 
-  const handleSendUsdt = useCallback(async (recipient: string, amount: number) => {
-    if (!address || !publicClient) {
+  const handleSendUsdt = useCallback(async (recipient: string, amount: number): Promise<string> => {
+    if (!payoutAddress || !publicClient) {
       throw new Error('Wallet not connected');
     }
-    const toastId = toast.loading('Sending USDT…');
     try {
-      await sendUsdtToAddress({
+      const txHash = await sendUsdtToAddress({
         recipient: recipient as `0x${string}`,
         amount,
         smartWalletClient,
         writeContractAsync,
         publicClient,
       });
-      toast.success('USDT sent!', {
-        id: toastId,
-        description: `${amount.toFixed(2)} USDT sent on Celo.`,
-      });
       void refetchUsdtBalance();
+      return txHash;
     } catch (err) {
-      toast.error('Send failed', { id: toastId, description: getErrorMessage(err) });
       throw err;
     }
-  }, [address, publicClient, smartWalletClient, writeContractAsync, refetchUsdtBalance]);
+  }, [payoutAddress, publicClient, smartWalletClient, writeContractAsync, refetchUsdtBalance]);
 
   const renderHomeContent = () => {
     return gs.phase === 'lobby' || gs.phase === 'matchmaking' ? (
@@ -1693,6 +1727,8 @@ export default function Home() {
           pointsLoading={pointsLoading}
           isMatchmaking={gs.phase === 'matchmaking'}
           opponentName={gs.opponentName}
+          isSignedIn={isSignedIn}
+          payoutAddress={payoutAddress}
           onFindMatch={handleFindMatch}
           onMatchFound={handleMatchFound}
           onWalletClick={() => setActiveTab('wallet')}
@@ -1832,6 +1868,7 @@ export default function Home() {
               playerRating={resultStats?.pointsAfter ?? gs.playerPoints}
               statsLoading={resultStats?.loading ?? false}
               guessCount={gs.playerGuesses.length}
+              cipherReward={lastCipherReward}
               onPlayAgain={handlePlayAgain}
               onHome={handleHome}
               rematchStatus={rematchStatus}
@@ -1847,7 +1884,7 @@ export default function Home() {
 
   const renderOpenGames = () => (
     <motion.div key="games" className="page-tab flex w-full flex-col gap-6 text-left" {...screenVariants}>
-      {!address ? (
+      {!isSignedIn || !payoutAddress ? (
         <div className="theme-sky-readout flex flex-col items-center justify-center gap-4 py-16 text-center">
           <span className="text-4xl" aria-hidden>🛡️</span>
           <p className="font-body text-sm text-[var(--text-dim)]">Connect wallet to view your open challenges</p>
@@ -1894,7 +1931,7 @@ export default function Home() {
               isCancellingId={isCancelling}
             />
           ) : (
-            <MatchHistoryList games={gameHistory} address={address} />
+            <MatchHistoryList games={gameHistory} address={payoutAddress} walletAliases={walletAliases} />
           )}
         </>
       )}

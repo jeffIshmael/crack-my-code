@@ -9,7 +9,10 @@ export function normalizeWalletAddress(address: string): string {
 export function findUserByAddressWhere(address: string) {
   const normalized = normalizeWalletAddress(address);
   return {
-    address: { equals: normalized, mode: 'insensitive' as const },
+    OR: [
+      { address: { equals: normalized, mode: 'insensitive' as const } },
+      { smartWalletAddress: { equals: normalized, mode: 'insensitive' as const } },
+    ],
   };
 }
 
@@ -20,8 +23,14 @@ export async function findUserByAddress(address: string) {
 }
 
 /** Find or create a registered player; always stores lowercase address. */
-export async function ensureRegisteredUser(address: string) {
+export async function ensureRegisteredUser(
+  address: string,
+  smartWalletAddress?: string | null,
+) {
   const normalized = normalizeWalletAddress(address);
+  const normalizedSmart = smartWalletAddress
+    ? normalizeWalletAddress(smartWalletAddress)
+    : undefined;
 
   if (isGuestAddress(normalized)) {
     throw new Error('Guest accounts cannot be registered as players');
@@ -29,10 +38,18 @@ export async function ensureRegisteredUser(address: string) {
 
   const existing = await findUserByAddress(normalized);
   if (existing) {
-    if (existing.address !== normalized) {
+    const updates: { address?: string; smartWalletAddress?: string } = {};
+    if (existing.address !== normalized && !normalizedSmart) updates.address = normalized;
+    if (normalizedSmart && existing.smartWalletAddress !== normalizedSmart) {
+      updates.smartWalletAddress = normalizedSmart;
+    }
+    if (normalizedSmart && existing.address !== normalizedSmart) {
+      updates.address = normalizedSmart;
+    }
+    if (Object.keys(updates).length > 0) {
       return prisma.user.update({
         where: { id: existing.id },
-        data: { address: normalized },
+        data: updates,
       });
     }
     return existing;
@@ -40,8 +57,9 @@ export async function ensureRegisteredUser(address: string) {
 
   return prisma.user.create({
     data: {
-      address: normalized,
-      name: `Player_${normalized.slice(2, 6)}`,
+      address: normalizedSmart || normalized,
+      smartWalletAddress: normalizedSmart,
+      name: `Player_${(normalizedSmart || normalized).slice(2, 6)}`,
       points: 1000,
     },
   });
