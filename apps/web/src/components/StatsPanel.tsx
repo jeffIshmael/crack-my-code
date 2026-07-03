@@ -46,7 +46,7 @@ function StatCard({
   breakdown?: { cipher: number; opponent: number };
 }) {
   return (
-    <div className="theme-card flex h-full flex-col gap-2.5 p-3.5">
+    <div className="theme-sky-readout flex h-full flex-col gap-2.5 p-3.5">
       <div className="flex items-start gap-2">
         <span className="text-lg leading-none" aria-hidden>
           {emoji}
@@ -125,7 +125,7 @@ export function StatsPanel({ address, onBack }: StatsPanelProps) {
         <button
           type="button"
           onClick={onBack}
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border-2 border-[var(--border-mid)] bg-white text-[var(--text-dim)] transition-colors hover:brightness-[0.98]"
+          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] text-[var(--text-dim)] transition-colors hover:brightness-[0.98]"
           aria-label="Back to settings"
         >
           <ArrowLeft size={18} />
@@ -136,7 +136,7 @@ export function StatsPanel({ address, onBack }: StatsPanelProps) {
         </div>
       </div>
 
-      <div className="theme-card flex gap-1 p-1">
+      <div className="theme-tab-switcher">
         {([
           { id: 'me' as const, label: 'My stats' },
           { id: 'all' as const, label: 'All stats' },
@@ -147,10 +147,8 @@ export function StatsPanel({ address, onBack }: StatsPanelProps) {
               key={tab.id}
               type="button"
               onClick={() => setView(tab.id)}
-              className={`flex-1 rounded-xl px-3 py-2.5 font-ui text-sm font-bold transition-colors ${
-                active
-                  ? 'bg-[var(--accent)] text-white shadow-sm'
-                  : 'text-[var(--text-dim)] hover:text-[var(--text)]'
+              className={`theme-tab-switcher__btn ${
+                active ? 'theme-tab-switcher__btn--active' : 'theme-tab-switcher__btn--inactive'
               }`}
             >
               {tab.label}
@@ -168,7 +166,7 @@ export function StatsPanel({ address, onBack }: StatsPanelProps) {
         <p className="py-12 text-center font-body text-sm text-[var(--text-dim)]">{error}</p>
       ) : view === 'me' ? (
         !address ? (
-          <div className="theme-card flex flex-col items-center gap-3 p-8 text-center">
+          <div className="theme-sky-readout flex flex-col items-center gap-3 p-8 text-center">
             <span className="text-4xl" aria-hidden>
               👛
             </span>

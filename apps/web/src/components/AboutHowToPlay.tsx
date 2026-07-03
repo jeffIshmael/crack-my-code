@@ -5,14 +5,14 @@ type TileVariant = 'green' | 'yellow' | 'gray';
 function DemoTile({ digit, variant }: { digit: string; variant: TileVariant }) {
   const className =
     variant === 'green'
-      ? 'theme-playful-mini-tile--green'
+      ? 'number-pad-key--hint-green'
       : variant === 'yellow'
-        ? 'theme-playful-mini-tile--orange'
-        : 'theme-playful-mini-tile--gray';
+        ? 'number-pad-key--hint-yellow'
+        : 'number-pad-key--hint-absent';
 
   return (
     <span
-      className={`theme-playful-mini-tile ${className}`}
+      className={`scoreboard-tile number-pad-key ${className}`}
       style={{ width: '2.125rem', height: '2.125rem', fontSize: '0.9375rem' }}
     >
       {digit}
@@ -22,9 +22,11 @@ function DemoTile({ digit, variant }: { digit: string; variant: TileVariant }) {
 
 function WordRow({ tiles }: { tiles: { digit: string; variant: TileVariant }[] }) {
   return (
-    <div className="flex gap-1.5">
+    <div className="about-scoreboard-row">
       {tiles.map((tile, i) => (
-        <DemoTile key={i} digit={tile.digit} variant={tile.variant} />
+        <div key={i} className="scoreboard-slot" style={{ width: '2.125rem', height: '2.125rem' }}>
+          <DemoTile digit={tile.digit} variant={tile.variant} />
+        </div>
       ))}
     </div>
   );
@@ -38,29 +40,29 @@ function ExampleBlock({
   tiles: { digit: string; variant: TileVariant }[];
 }) {
   return (
-    <div className="flex flex-col gap-3">
-      <p className="font-body text-sm leading-relaxed text-[var(--text-2)]">{description}</p>
-      <WordRow tiles={tiles} />
+    <div className="flex flex-col gap-2.5">
+      <p className="font-body text-sm leading-relaxed">{description}</p>
+      <div className="about-scoreboard-frame">
+        <WordRow tiles={tiles} />
+      </div>
     </div>
   );
 }
 
 export function AboutHowToPlay() {
   return (
-    <div className="flex w-full flex-col gap-8">
-      <div className="flex flex-col gap-4">
-        <h2 className="font-ui text-xl font-bold text-[var(--text)]">
-          How to play Crack My Code?
-        </h2>
-        <p className="font-body text-sm leading-relaxed text-[var(--text-2)]">
+    <div className="flex w-full flex-col gap-6">
+      <div className="theme-sky-readout flex flex-col gap-3">
+        <h2 className="font-ui text-xl font-bold">How to play Crack My Code?</h2>
+        <p className="font-body text-sm leading-relaxed">
           Each player sets a secret 4-digit code. Take turns guessing your opponent&apos;s code —
-          keep playing until someone cracks it. After each guess, colored tiles show how close you
-          are. Codes can repeat digits (like 1122).
+          keep playing until someone cracks it. After each guess, colored tiles on the wooden board
+          show how close you are — check the scoreboard to track your hints.
         </p>
       </div>
 
-      <div className="flex flex-col gap-5">
-        <h3 className="font-ui text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-dim)]">
+      <div className="theme-sky-readout flex flex-col gap-4">
+        <h3 className="font-ui text-xs font-bold uppercase tracking-[0.2em] opacity-80">
           Tile colors
         </h3>
 
@@ -95,59 +97,47 @@ export function AboutHowToPlay() {
         />
       </div>
 
-      <div className="flex flex-col gap-4">
-        <h3 className="font-ui text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-dim)]">
+      <div className="theme-sky-readout flex flex-col gap-3">
+        <h3 className="font-ui text-xs font-bold uppercase tracking-[0.2em] opacity-80">
           Ways to play
         </h3>
 
-        <div className="flex flex-col gap-3">
-          <p className="font-body text-sm leading-relaxed text-[var(--text-2)]">
-            <strong className="text-[var(--text)]">🤖 Cipher AI</strong> — Play instantly against
-            the computer. Free, no setup required.
-          </p>
-          <p className="font-body text-sm leading-relaxed text-[var(--text-2)]">
-            <strong className="text-[var(--text)]">👥 Player vs Player</strong> — Challenge another
-            human. Choose a friendly free match, then pick who can join:
-          </p>
-          <ul className="flex flex-col gap-2 pl-1 font-body text-sm text-[var(--text-2)]">
-            <li>
-              <strong className="text-[var(--text)]">Open match</strong> — anyone can find and join
-              your game.
-            </li>
-            <li>
-              <strong className="text-[var(--text)]">Invite only</strong> — share a Game ID so only
-              your friend can join.
-            </li>
-          </ul>
-          <p className="font-body text-sm leading-relaxed text-[var(--text-dim)]">
-            USDT staking matches are coming soon.
-          </p>
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-4">
-        <h3 className="font-ui text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-dim)]">
-          Earning CMC Points
-        </h3>
-        <div className="flex flex-col gap-3 font-body text-sm leading-relaxed text-[var(--text-2)]">
-          <p>
-            <strong className="text-[var(--text)]">🤖 Cipher AI</strong> — Play without signing in. Sign in to
-            earn <strong className="text-[var(--text)]">+10 CMC</strong> when you win; losses do not reduce your
-            points.
-          </p>
-          <p>
-            <strong className="text-[var(--text)]">👥 Player vs Player</strong> — The winner gains{' '}
-            <strong className="text-[var(--text)]">+15 CMC</strong> and the loser loses{' '}
-            <strong className="text-[var(--text)]">15 CMC</strong> (points move from loser to winner).
-          </p>
-        </div>
-      </div>
-
-      <div className="rounded-2xl bg-[#D6EEF9]/80 px-4 py-4">
-        <p className="font-body text-sm leading-relaxed text-[var(--text-2)]">
-          🏆 Stack CMC points to climb the leaderboard!
+        <p className="font-body text-sm leading-relaxed">
+          <strong>🤖 Cipher AI</strong> — Play instantly against the computer. Free, no setup required.
+        </p>
+        <p className="font-body text-sm leading-relaxed">
+          <strong>👥 Player vs Player</strong> — Challenge another human. Choose a friendly free match, then pick who can join:
+        </p>
+        <ul className="flex flex-col gap-2 pl-1 font-body text-sm">
+          <li>
+            <strong>Open match</strong> — anyone can find and join your game.
+          </li>
+          <li>
+            <strong>Invite only</strong> — share a Game ID so only your friend can join.
+          </li>
+        </ul>
+        <p className="font-body text-sm opacity-80">
+          USDT staking matches are coming soon.
         </p>
       </div>
+
+      <div className="theme-sky-readout flex flex-col gap-3">
+        <h3 className="font-ui text-xs font-bold uppercase tracking-[0.2em] opacity-80">
+          Earning CMC Points
+        </h3>
+        <p className="font-body text-sm leading-relaxed">
+          <strong>🤖 Cipher AI</strong> — Play without signing in. Sign in to earn{' '}
+          <strong>+10 CMC</strong> when you win; losses do not reduce your points.
+        </p>
+        <p className="font-body text-sm leading-relaxed">
+          <strong>👥 Player vs Player</strong> — The winner gains <strong>+15 CMC</strong> and the loser loses{' '}
+          <strong>15 CMC</strong> (points move from loser to winner).
+        </p>
+      </div>
+
+      <p className="theme-sky-footnote">
+        🏆 Stack CMC points to climb the leaderboard!
+      </p>
     </div>
   );
 }

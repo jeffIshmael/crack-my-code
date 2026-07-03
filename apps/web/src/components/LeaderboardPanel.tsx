@@ -266,6 +266,10 @@ export function LeaderboardPanel({ currentAddress }: LeaderboardPanelProps) {
               Win more matches to fill the board!
             </p>
           )}
+
+          <p className="theme-sky-footnote mt-4">
+            🏆 Stack CMC points to climb the leaderboard!
+          </p>
         </>
       )}
     </div>

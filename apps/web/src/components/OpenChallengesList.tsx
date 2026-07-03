@@ -47,7 +47,7 @@ export default function OpenChallengesList({
           key={game.id}
           initial={{ opacity: 0, y: 6 }}
           animate={{ opacity: 1, y: 0 }}
-          className="theme-card flex flex-col gap-3 p-4"
+          className="theme-sky-readout flex flex-col gap-3 p-4"
         >
           <div className="flex items-center justify-between">
             <span className="font-body text-xs font-bold uppercase tracking-wider text-[var(--text-dim)]">

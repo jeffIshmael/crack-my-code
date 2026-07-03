@@ -1803,7 +1803,7 @@ export default function Home() {
   const renderOpenGames = () => (
     <motion.div key="games" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       {!address ? (
-        <div className="theme-card flex flex-col items-center justify-center gap-4 py-16 text-center">
+        <div className="theme-sky-readout flex flex-col items-center justify-center gap-4 py-16 text-center">
           <span className="text-4xl" aria-hidden>🛡️</span>
           <p className="font-body text-sm text-[var(--text-dim)]">Connect wallet to view your open challenges</p>
           <button
@@ -1816,14 +1816,14 @@ export default function Home() {
         </div>
       ) : (
         <>
-          <div className="flex rounded-2xl border-2 border-[var(--border-mid)] bg-white p-1">
+          <div className="theme-tab-switcher">
             <button
               type="button"
               onClick={() => setOpenGamesTab('active')}
-              className={`flex-1 rounded-xl py-2.5 font-ui text-xs font-bold transition-all ${
+              className={`theme-tab-switcher__btn ${
                 openGamesTab === 'active'
-                  ? 'bg-[var(--accent-dim)] text-[var(--accent)] shadow-[var(--pop-shadow)]'
-                  : 'text-[var(--text-dim)] hover:text-[var(--text)]'
+                  ? 'theme-tab-switcher__btn--active'
+                  : 'theme-tab-switcher__btn--inactive'
               }`}
             >
               My Active
@@ -1831,10 +1831,10 @@ export default function Home() {
             <button
               type="button"
               onClick={() => setOpenGamesTab('history')}
-              className={`flex-1 rounded-xl py-2.5 font-ui text-xs font-bold transition-all ${
+              className={`theme-tab-switcher__btn ${
                 openGamesTab === 'history'
-                  ? 'bg-[var(--accent-dim)] text-[var(--accent)] shadow-[var(--pop-shadow)]'
-                  : 'text-[var(--text-dim)] hover:text-[var(--text)]'
+                  ? 'theme-tab-switcher__btn--active'
+                  : 'theme-tab-switcher__btn--inactive'
               }`}
             >
               History
@@ -1890,7 +1890,7 @@ export default function Home() {
         <button
           type="button"
           onClick={() => void handleSignOut()}
-          className="flex w-full items-center justify-center gap-2 rounded-2xl border border-red-200 bg-red-100/80 py-3.5 font-ui text-sm font-bold text-red-600 transition-colors hover:bg-red-100"
+          className="sign-out-btn flex w-full items-center justify-center gap-2 py-3.5 font-ui text-sm font-bold transition-colors"
         >
           <LogOut size={16} />
           Sign Out
@@ -1908,12 +1908,12 @@ export default function Home() {
   const renderTerms = () => (
     <motion.div key="terms" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
-        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
+        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border-bright)] transition-colors">
           <ArrowLeft size={16} />
         </button>
         <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Terms</h2>
       </div>
-      <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 text-sm leading-relaxed text-black/70">
+      <div className="theme-card flex flex-col gap-6 p-6 text-sm leading-relaxed text-[var(--text-2)]">
         <p>Welcome to Crack My Code. By using our Mini App, you agree to these terms.</p>
         <div>
           <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">1. Acceptance of Terms</h3>
@@ -1938,12 +1938,12 @@ export default function Home() {
   const renderPrivacy = () => (
     <motion.div key="privacy" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
-        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
+        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border-bright)] transition-colors">
           <ArrowLeft size={16} />
         </button>
         <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Privacy</h2>
       </div>
-      <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 text-sm leading-relaxed text-black/70">
+      <div className="theme-card flex flex-col gap-6 p-6 text-sm leading-relaxed text-[var(--text-2)]">
         <p>At Crack My Code, we prioritize your privacy and decentralized identity.</p>
         <div>
           <h3 className="text-[10px] font-black uppercase tracking-widest text-[var(--accent)] mb-2">1. Data We Collect</h3>
@@ -1964,12 +1964,12 @@ export default function Home() {
   const renderContact = () => (
     <motion.div key="contact" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
-        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl bg-black/5 text-black/60 hover:bg-black/10 transition-colors">
+        <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border-bright)] transition-colors">
           <ArrowLeft size={16} />
         </button>
         <h2 className="font-orbitron text-xl font-black tracking-widest text-[var(--text)] uppercase">Contact Us</h2>
       </div>
-      <div className="flex flex-col gap-6 rounded-3xl border-2 border-black/10 bg-[var(--bg-elevated)] p-6 text-sm leading-relaxed text-black/70">
+      <div className="theme-card flex flex-col gap-6 p-6 text-sm leading-relaxed text-[var(--text-2)]">
         <p>If you have any questions, encounter a bug, or need help with a transaction, our support team is available on Telegram.</p>
         <a href="https://t.me/crackmycode" target="_blank" rel="noopener noreferrer" className="flex w-full items-center justify-center gap-3 rounded-2xl bg-[#0088cc] px-6 py-4 shadow-sm hover:scale-105 transition-all text-white mt-4">
           <ExternalLink size={20} />

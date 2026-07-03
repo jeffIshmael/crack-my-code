@@ -11,7 +11,7 @@ import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { ChevronRight, X } from 'lucide-react';
+import { X } from 'lucide-react';
 import { ThemeLogo } from '@/components/ThemeLogo';
 import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
 import JoinChallenge from '@/components/JoinChallenge';
@@ -172,12 +172,13 @@ export default function Lobby({
   };
 
   return (
-    <div className="relative flex min-h-[calc(100dvh-var(--nav-clearance-with-safe))] flex-col items-center justify-between px-4 pt-6 text-[var(--text)] overflow-hidden">
-
-      {/* ── Top row with Sign Up ── */}
-      {/* ── Top Header Row ── */}
-      {/* ── Top Header Section ── */}
-      <div className="flex w-full flex-col">
+    <motion.div
+      className="relative flex min-h-[calc(100dvh-var(--nav-clearance-with-safe))] flex-col items-center justify-between px-4 pt-6 text-[var(--text-on-sky)] overflow-hidden"
+      variants={stagger}
+      initial="initial"
+      animate="animate"
+    >
+      <motion.div className="flex w-full flex-col" variants={fadeUp}>
         <div className="mb-5 flex w-full justify-center">
           <ThemeLogo />
         </div>
@@ -192,16 +193,15 @@ export default function Lobby({
           <div className="mt-1 flex w-full justify-center">
             <button
               onClick={() => login()}
-              className="theme-card flex items-center gap-2 px-6 py-2 transition-transform hover:scale-105"
+              className="theme-card flex items-center gap-2 px-6 py-2 transition-transform hover:scale-105 active:scale-95"
               type="button"
             >
               <span className="font-ui text-[10px] uppercase tracking-widest text-[var(--text)]">Sign In</span>
             </button>
           </div>
         )}
-      </div>
+      </motion.div>
 
-      {/* ── Center: Play actions ── */}
       <div className="relative flex w-full flex-1 flex-col items-center justify-center py-2">
         <div className="z-10 flex w-full flex-col">
           {isMatchmaking ? (
@@ -225,7 +225,7 @@ export default function Lobby({
                       <button
                         type="button"
                         onClick={onCancelMatchmaking}
-                        className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-red-300 hover:bg-red-50 hover:text-red-500 active:scale-[0.98]"
+                        className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-red-400/50 hover:bg-red-500/15 hover:text-red-300 active:scale-[0.98]"
                       >
                         Cancel
                       </button>
@@ -243,57 +243,54 @@ export default function Lobby({
               )}
             </div>
           ) : (
-            <div className="theme-play-zone">
-              <div className="flex flex-col gap-[1.25rem]">
+            <motion.div
+              className="theme-play-zone arena-play-panel"
+              variants={fadeUp}
+              initial="initial"
+              animate="animate"
+            >
+              <p className="arena-section-label">⚔️ Choose your mode</p>
+              <motion.div variants={fadeUp} className="flex flex-col gap-4">
                 <button
                   onClick={handleStartAI}
                   disabled={isCreating}
-                  className="theme-game-btn theme-game-btn--ai group"
+                  className="theme-game-btn theme-game-btn--ai theme-game-btn--lively group"
                 >
                   <div className="theme-game-btn__inner">
-                    <span className="theme-game-btn__emoji" aria-hidden>🤖</span>
-                    <div className="theme-game-btn__content flex-1">
-                      <span className="theme-game-btn__title">Play Against Cipher AI</span>
-                      <span className="theme-game-btn__subtitle">Computer Match</span>
+                    <span className="theme-game-btn__emoji-badge" aria-hidden>🤖</span>
+                    <div className="theme-game-btn__content">
+                      <span className="theme-game-btn__title">Cipher AI</span>
+                      <span className="theme-game-btn__subtitle">Crack the code · win rewards 🏆</span>
                     </div>
-                    <ChevronRight
-                      size={20}
-                      className="theme-game-btn__chevron flex-shrink-0 text-[var(--text-dim)]"
-                      aria-hidden
-                    />
+                    <span className="theme-game-btn__go">PLAY</span>
                   </div>
                 </button>
 
                 <button
                   type="button"
                   onClick={isConnected ? openPvPModal : () => login()}
-                  className={`theme-game-btn theme-game-btn--pvp group ${!isConnected ? 'opacity-60' : ''}`}
+                  className={`theme-game-btn theme-game-btn--pvp theme-game-btn--lively group ${!isConnected ? 'opacity-60' : ''}`}
                   aria-disabled={!isConnected}
                 >
                   <div className="theme-game-btn__inner">
-                    <span className="theme-game-btn__emoji" aria-hidden>👥</span>
-                    <div className="theme-game-btn__content flex-1">
-                      <span className="theme-game-btn__title">Play Against Opponent</span>
+                    <span className="theme-game-btn__emoji-badge" aria-hidden>⚔️</span>
+                    <div className="theme-game-btn__content">
+                      <span className="theme-game-btn__title">Vs Opponent</span>
                       <span
                         className={`theme-game-btn__subtitle ${
-                          !isConnected ? '!text-[var(--orange)] font-bold' : ''
+                          !isConnected ? '!text-yellow-100' : ''
                         }`}
                       >
-                        {!isConnected ? 'Sign in required' : 'Human Opponent'}
+                        {!isConnected ? '🔒 Sign in to duel' : 'Public or invite-only match'}
                       </span>
                     </div>
-                    <ChevronRight
-                      size={20}
-                      className="theme-game-btn__chevron theme-game-btn__chevron--light flex-shrink-0"
-                      aria-hidden
-                    />
+                    <span className="theme-game-btn__go">DUEL</span>
                   </div>
                 </button>
-              </div>
+              </motion.div>
 
               {onJoinByGameId && onJoinGameIdInputChange && (
-                <>
-                  <div className="border-t border-[var(--border-mid)]" aria-hidden />
+                <motion.div variants={fadeUp} className="mt-3 border-t border-[var(--border-mid)] pt-4">
                   <JoinChallenge
                     value={joinGameIdInput}
                     onChange={onJoinGameIdInputChange}
@@ -303,9 +300,9 @@ export default function Lobby({
                     onSignInRequired={() => login()}
                     collapsible
                   />
-                </>
+                </motion.div>
               )}
-            </div>
+            </motion.div>
           )}
         </div>
       </div>
@@ -341,7 +338,7 @@ export default function Lobby({
                 type="button"
                 onClick={() => !isCreating && setShowPvPModal(false)}
                 disabled={isCreating}
-                className="absolute right-4 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--border-mid)] bg-white text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] hover:scale-105 active:scale-95 disabled:opacity-40"
+                className="absolute right-4 top-5 z-20 flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)] hover:scale-105 active:scale-95 disabled:opacity-40"
                 aria-label="Close"
               >
                 <X size={20} />
@@ -385,7 +382,7 @@ export default function Lobby({
                       <button
                         type="button"
                         onClick={() => handleStartPvP('fun')}
-                        className="theme-card group flex flex-col gap-2 p-5 text-left transition-all hover:translate-y-[-2px] active:translate-y-[1px]"
+                        className="theme-sky-readout group flex flex-col gap-2 p-5 text-left transition-all hover:translate-y-[-2px] active:translate-y-[1px]"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-ui text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">Friendly match</span>
@@ -394,7 +391,7 @@ export default function Lobby({
                         <p className="font-body text-[11px] text-[var(--text-dim)]">Free match · climb the global ranking</p>
                       </button>
 
-                      <div className="theme-card relative flex flex-col gap-2 p-5 opacity-60">
+                      <div className="theme-sky-readout relative flex flex-col gap-2 p-5 opacity-60">
                         <div className="absolute top-3 right-3 rounded-full bg-[var(--orange-dim)] px-2.5 py-1">
                           <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--orange)]">
                             Coming soon
@@ -431,7 +428,7 @@ export default function Lobby({
                             type="number"
                             value={stake}
                             onChange={(e) => setStake(e.target.value)}
-                            className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white p-4 pr-16 font-ui text-2xl font-bold text-[var(--orange)] outline-none focus:border-[var(--orange)]"
+                            className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] p-4 pr-16 font-ui text-2xl font-bold text-[var(--orange)] outline-none focus:border-[var(--orange)]"
                             autoFocus
                             placeholder="0.00"
                           />
@@ -454,7 +451,7 @@ export default function Lobby({
                             {((parseFloat(stake) || 0) * 2 * 0.99).toFixed(3)} <span className="text-[10px]">USDT</span>
                           </span>
                         </div>
-                        <div className="theme-card flex flex-col gap-1 p-4 !shadow-none">
+                        <div className="theme-sky-readout flex flex-col gap-1 p-4 !shadow-none">
                           <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--text-dim)]">Platform fee</span>
                           <span className="font-ui text-xl font-bold text-[var(--text)]">
                             1.0 <span className="text-[10px]">%</span>
@@ -476,7 +473,7 @@ export default function Lobby({
                         <button
                           type="button"
                           onClick={() => setPvpStep('selection')}
-                          className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                          className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
                         >
                           Go back
                         </button>
@@ -501,7 +498,7 @@ export default function Lobby({
                         type="button"
                         onClick={() => handleFinalizeChallenge(true)}
                         disabled={isCreating}
-                        className="theme-card group flex flex-col gap-2 p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
+                        className="theme-sky-readout group flex flex-col gap-2 p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-ui text-sm font-bold text-[var(--text)]">Anyone can join</span>
@@ -514,7 +511,7 @@ export default function Lobby({
                         type="button"
                         onClick={() => handleFinalizeChallenge(false)}
                         disabled={isCreating}
-                        className="theme-card flex flex-col gap-2 border-[var(--accent)]/30 bg-[var(--accent-dim)] p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
+                        className="theme-sky-readout flex flex-col gap-2 border-[var(--accent)]/30 bg-[var(--accent-dim)] p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-ui text-sm font-bold text-[var(--accent)]">Invite only</span>
@@ -539,7 +536,7 @@ export default function Lobby({
           </div>
         )}
       </AnimatePresence>
-    </div>
+    </motion.div>
   );
 }
 
@@ -608,7 +605,7 @@ function MatchmakingPulse({
         {/* Live Timer */}
         {!isAI && (
           <div className="mt-4 flex flex-col items-center gap-4">
-            <div className="rounded-full border-2 border-[var(--border-mid)] bg-white px-4 py-1 shadow-[var(--pop-shadow)]">
+            <div className="rounded-full border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] px-4 py-1 shadow-[var(--pop-shadow)]">
               <span className="font-code text-sm font-bold text-[var(--accent)]">
                 {Math.floor(searchTime / 60)}:{(searchTime % 60).toString().padStart(2, '0')}
               </span>
@@ -693,9 +690,9 @@ function InviteWaiting({
       <div className="flex w-full max-w-[300px] flex-col gap-3">
         <div
           onClick={handleCopy}
-          className="relative flex cursor-pointer flex-col gap-2 overflow-hidden rounded-2xl border border-black/10 bg-black/5 p-4 transition-all hover:bg-black/10"
+          className="theme-invite-code relative flex cursor-pointer flex-col gap-2 overflow-hidden rounded-2xl p-4 transition-all"
         >
-          <span className="text-[8px] font-black uppercase tracking-widest text-black/40">Game ID</span>
+          <span className="text-[8px] font-black uppercase tracking-widest text-[var(--text-dim)]">Game ID</span>
           <div className="flex items-center justify-between gap-2">
             <span className="font-code text-lg font-black tracking-[0.25em] text-[var(--accent)]">{joinCode}</span>
             <span className="flex-shrink-0 text-[10px] font-black uppercase tracking-widest text-[var(--accent)]">
@@ -713,7 +710,7 @@ function InviteWaiting({
             void navigator.clipboard.writeText(url);
             toast.success('Share link copied!');
           }}
-          className="w-full rounded-2xl border border-[var(--border-mid)] bg-white py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] transition-all hover:bg-[var(--bg-elevated)]"
+          className="w-full rounded-2xl border border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] transition-all hover:bg-[var(--bg-elevated)]"
         >
           Copy share link
         </button>

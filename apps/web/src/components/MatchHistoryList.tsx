@@ -40,7 +40,7 @@ export default function MatchHistoryList({ games, address }: MatchHistoryListPro
             : game.player1Address;
 
         return (
-          <div key={game.id} className="theme-card flex items-center justify-between p-4">
+          <div key={game.id} className="theme-sky-readout flex items-center justify-between p-4">
             <div className="flex flex-col gap-1">
               <span
                 className={`font-ui text-[10px] font-bold uppercase tracking-wider ${

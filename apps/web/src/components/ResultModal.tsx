@@ -102,7 +102,7 @@ export default function ResultModal({
         {/* Close Button */}
         <button
           onClick={onHome}
-          className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full bg-black/5 text-black/40 transition-all hover:bg-black/10 hover:text-black hover:scale-110 active:scale-90"
+          className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] transition-all hover:border-[var(--border-bright)] hover:text-[var(--text)] hover:scale-110 active:scale-90"
         >
           <X size={24} />
         </button>
@@ -156,7 +156,7 @@ export default function ResultModal({
               style={{ color: isWin ? 'var(--clue-green)' : 'var(--orange)' }}>
               {isWin ? 'CODE CRACKED' : 'DEFEATED'}
             </h2>
-            <p className="text-sm" style={{ color: 'var(--text-2)' }}>
+            <p className="font-body text-sm text-[var(--wood-text-soft)]">
               {isWin
                 ? `You broke ${opponentName}'s code in ${guessCount} guess${guessCount !== 1 ? 'es' : ''}!`
                 : `${opponentName} held their code this time.`}
@@ -194,57 +194,51 @@ export default function ResultModal({
 
           {/* Opponent's secret code */}
           <motion.div
-            className="flex w-full flex-col gap-2 rounded-2xl p-4"
-            style={{ background: 'var(--bg-card)', border: '1px solid var(--border-mid)' }}
+            className="flex w-full flex-col items-center gap-3 rounded-2xl p-4 result-stat-card"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.45 }}
           >
-            <p className="text-center text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
+            <p className="text-center font-ui text-xs font-bold uppercase tracking-widest text-[var(--wood-text-soft)]">
               {isWin ? 'Code You Cracked' : "Code You Couldn't Crack"}
             </p>
-            <div className="flex justify-center gap-2.5">
-              {opponentCode.map((d, i) => (
-                <motion.div
-                  key={i}
-                  className="flex h-12 w-12 items-center justify-center rounded-xl"
-                  style={{
-                    background: 'var(--bg-elevated)',
-                    border: '2px solid var(--border-bright)',
-                    boxShadow: '0 0 12px var(--accent-glow)',
-                  }}
-                  initial={{ rotateY: 90, opacity: 0 }}
-                  animate={{ rotateY: 0, opacity: 1 }}
-                  transition={{ delay: 0.55 + i * 0.1, duration: 0.35 }}
-                >
-                  <span className="font-code text-2xl font-bold" style={{ color: 'var(--accent)' }}>
-                    {d}
-                  </span>
-                </motion.div>
-              ))}
+            <div className="result-code-frame">
+              <div className="flex gap-2">
+                {opponentCode.map((d, i) => (
+                  <motion.div
+                    key={i}
+                    className="scoreboard-slot"
+                    style={{ width: '2.75rem', height: '2.75rem' }}
+                    initial={{ rotateY: 90, opacity: 0 }}
+                    animate={{ rotateY: 0, opacity: 1 }}
+                    transition={{ delay: 0.55 + i * 0.1, duration: 0.35 }}
+                  >
+                    <div className="scoreboard-tile scoreboard-tile--draft">{d}</div>
+                  </motion.div>
+                ))}
+              </div>
             </div>
           </motion.div>
 
           {/* Rating delta */}
           <motion.div
-            className="flex w-full items-center justify-between rounded-xl px-4 py-3"
-            style={{ background: 'var(--bg-elevated)', border: '1px solid var(--border)' }}
+            className="flex w-full items-center justify-between rounded-xl px-4 py-3 result-stat-card"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
           >
             <div className="flex flex-col">
-              <span className="text-xs" style={{ color: 'var(--text-2)' }}>CMC Points</span>
-              <span className="font-orbitron text-xl font-bold" style={{ color: 'var(--text)' }}>
+              <span className="font-body text-xs text-[var(--wood-text-soft)]">CMC Points</span>
+              <span className="font-ui text-xl font-bold text-[var(--wood-text)]">
                 {statsLoading ? '…' : pointsBefore}
               </span>
             </div>
             {ratingDelta !== 0 && (
               <motion.div
-                className="flex items-center gap-1 rounded-lg px-3 py-1.5 font-orbitron text-lg font-bold"
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 font-ui text-lg font-bold"
                 style={{
-                  background: ratingDelta >= 0 ? 'var(--clue-green-bg)' : 'var(--orange-dim)',
-                  color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)',
+                  background: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)',
+                  color: '#fff',
                 }}
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
@@ -254,9 +248,11 @@ export default function ResultModal({
               </motion.div>
             )}
             <div className="flex flex-col items-end">
-              <span className="text-xs" style={{ color: 'var(--text-2)' }}>Updated CMC</span>
-              <span className="font-orbitron text-xl font-bold"
-                style={{ color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)' }}>
+              <span className="font-body text-xs text-[var(--wood-text-soft)]">Updated CMC</span>
+              <span
+                className="font-ui text-xl font-bold"
+                style={{ color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)' }}
+              >
                 {statsLoading ? '…' : pointsAfter}
               </span>
             </div>
@@ -276,13 +272,12 @@ export default function ResultModal({
             ].map((s) => (
               <div
                 key={s.label}
-                className="flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3"
-                style={{ background: 'var(--bg-card)', border: '1px solid var(--border)' }}
+                className="result-stat-card flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3"
               >
-                <span className="font-code text-lg font-bold" style={{ color: 'var(--text)' }}>
+                <span className="font-ui text-lg font-bold text-[var(--wood-text)]">
                   {s.value}
                 </span>
-                <span className="text-xs" style={{ color: 'var(--text-2)' }}>
+                <span className="font-body text-xs text-[var(--wood-text-soft)]">
                   {s.label}
                 </span>
               </div>
@@ -292,19 +287,13 @@ export default function ResultModal({
           {gameMode === 'ai' && (
             <motion.button
               onClick={onPlayAgain}
-              className="group relative w-full overflow-hidden rounded-2xl py-5 font-orbitron text-base font-black tracking-[0.25em] transition-all hover:translate-y-[-2px] active:translate-y-[1px]"
-              style={{
-                background: isWin ? 'var(--clue-green)' : 'var(--accent)',
-                color: 'var(--bg-base)',
-                boxShadow: isWin
-                  ? '0 12px 24px rgba(5,150,105,0.25), 0 0 0 1px rgba(0,0,0,0.1) inset'
-                  : '0 12px 24px rgba(37,99,235,0.25), 0 0 0 1px rgba(0,0,0,0.1) inset',
-              }}
+              className={`group relative w-full overflow-hidden rounded-2xl py-5 font-ui text-base font-black tracking-[0.25em] transition-all hover:translate-y-[-2px] active:translate-y-[1px] ${
+                isWin ? 'result-play-btn result-play-btn--win' : 'result-play-btn'
+              }`}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.75 }}
             >
-              <div className="absolute inset-0 bg-white/10 opacity-0 transition-opacity group-hover:opacity-100" />
               <span className="relative z-10 inline-flex items-center justify-center gap-2">
                 <span aria-hidden>🔄</span> PLAY AGAIN
               </span>
@@ -337,7 +326,7 @@ export default function ResultModal({
                     type="button"
                     onClick={onDeclineRematch ?? onHome}
                     disabled={rematchLoading}
-                    className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-red-300 hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
+                    className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-red-400/50 hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
                   >
                     Decline
                   </button>
@@ -365,7 +354,7 @@ export default function ResultModal({
                   <button
                     type="button"
                     onClick={onHome}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3.5 font-ui text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3.5 font-ui text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
                   >
                     <span aria-hidden>🏠</span> Go home
                   </button>
@@ -385,7 +374,7 @@ export default function ResultModal({
                   <button
                     type="button"
                     onClick={onHome}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 border-[var(--border-mid)] bg-white py-3 font-ui text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 font-ui text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
                   >
                     <span aria-hidden>🏠</span> Go home
                   </button>
