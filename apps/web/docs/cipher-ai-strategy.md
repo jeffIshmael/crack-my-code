@@ -56,10 +56,16 @@ pool.filter(secret =>
 
 ## Step 2 — Opening book (turns 0 and 1)
 
-| Turn index | Guess | Intent |
-|------------|-------|--------|
-| 0 | `0123` | Four unique digits |
-| 1 | `4567` | Four more unique digits |
+Human-style **digit sweep**: test eight different digits in the first two guesses, then solve placement.
+
+| Turn index | Strategy | Intent |
+|------------|----------|--------|
+| 0 | **Random** 4 unique digits (shuffled) | Unpredictable opener — not always `0123` |
+| 1 | Best of **C(6,4)** combos from digits *not* in guess 1 | Completes 8-digit coverage; 2 digits still untested |
+
+Example human line: `1254` then `3698` — after two turns, greens/yellows/grays tell Cipher which of those eight digits are in the code and which two (e.g. `0`, `7`) can be deprioritized.
+
+Turn 2+ uses entropy / minimax on the filtered candidate pool.
 
 ---
 

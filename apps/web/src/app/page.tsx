@@ -25,6 +25,7 @@ import {
   toTileClues,
   isWinningClues,
   MAX_GUESSES,
+  // maxGuessesForMode, // Cipher 5-try cap — uncomment with game.ts when ready
   PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
 import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
@@ -37,6 +38,7 @@ import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
+import { sendUsdtToAddress } from '@/lib/send-usdt';
 import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, ArrowLeft, ChevronRight } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
@@ -78,7 +80,7 @@ export default function Home() {
   const { writeContractAsync } = useWriteContract();
   const { client: smartWalletClient } = useSmartWallets();
 
-  const { data: usdtData } = useBalance({
+  const { data: usdtData, refetch: refetchUsdtBalance } = useBalance({
     address: address as `0x${string}` | undefined,
     token: USDT_ADDRESS as `0x${string}`,
   });
@@ -1283,7 +1285,8 @@ export default function Home() {
               id: `${Date.now()}`,
             };
             const newGuesses = [...prev.playerGuesses, entry];
-            const reachedMax = newGuesses.length >= MAX_GUESSES;
+            // const guessLimit = maxGuessesForMode(prev.gameMode);
+            const reachedMax = newGuesses.length >= MAX_GUESSES; // use guessLimit when Cipher 5-try cap is enabled
 
             if (won) {
               clearOppTimer();
@@ -1319,6 +1322,7 @@ export default function Home() {
               await syncResultStats(scoreDeltaForMode(mode, true));
             }
           } else if (gs.playerGuesses.length + 1 >= MAX_GUESSES) {
+            // } else if (gs.playerGuesses.length + 1 >= maxGuessesForMode(gs.gameMode)) {
             const loss = scoreDeltaForMode(mode, false);
             try {
               const revealRes = await fetch('/api/games/reveal', {
@@ -1639,6 +1643,36 @@ export default function Home() {
 
   const pointsLoading = !!address && !playerStatsLoaded;
 
+  const handleWithdrawMpesa = useCallback(async (_phone: string, _amount: number) => {
+    toast.info('Coming soon', {
+      description: 'M-Pesa cash-out on Celo is on the way — you\'ll wire this up next.',
+    });
+  }, []);
+
+  const handleSendUsdt = useCallback(async (recipient: string, amount: number) => {
+    if (!address || !publicClient) {
+      throw new Error('Wallet not connected');
+    }
+    const toastId = toast.loading('Sending USDT…');
+    try {
+      await sendUsdtToAddress({
+        recipient: recipient as `0x${string}`,
+        amount,
+        smartWalletClient,
+        writeContractAsync,
+        publicClient,
+      });
+      toast.success('USDT sent!', {
+        id: toastId,
+        description: `${amount.toFixed(2)} USDT sent on Celo.`,
+      });
+      void refetchUsdtBalance();
+    } catch (err) {
+      toast.error('Send failed', { id: toastId, description: getErrorMessage(err) });
+      throw err;
+    }
+  }, [address, publicClient, smartWalletClient, writeContractAsync, refetchUsdtBalance]);
+
   const renderHomeContent = () => {
     return gs.phase === 'lobby' || gs.phase === 'matchmaking' ? (
       <motion.div key="lobby" className="w-full relative flex flex-col gap-4" {...screenVariants}>
@@ -1801,7 +1835,7 @@ export default function Home() {
   };
 
   const renderOpenGames = () => (
-    <motion.div key="games" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
+    <motion.div key="games" className="page-tab flex w-full flex-col gap-6 text-left" {...screenVariants}>
       {!address ? (
         <div className="theme-sky-readout flex flex-col items-center justify-center gap-4 py-16 text-center">
           <span className="text-4xl" aria-hidden>🛡️</span>
@@ -1857,19 +1891,19 @@ export default function Home() {
   );
 
   const renderLeaderboard = () => (
-    <motion.div key="leaderboard" className="page-tab flex w-full flex-col gap-4 px-5" {...screenVariants}>
+    <motion.div key="leaderboard" className="page-tab flex w-full flex-col gap-4" {...screenVariants}>
       <LeaderboardPanel currentAddress={address} />
     </motion.div>
   );
 
   const renderAbout = () => (
-    <motion.div key="about" className="page-tab flex w-full flex-col gap-6 px-5" {...screenVariants}>
+    <motion.div key="about" className="page-tab flex w-full flex-col gap-6" {...screenVariants}>
       <AboutHowToPlay />
     </motion.div>
   );
 
   const renderWalletContent = () => (
-    <motion.div key="wallet" className="page-tab flex w-full flex-col gap-5 px-5 text-left" {...screenVariants}>
+    <motion.div key="wallet" className="page-tab flex w-full flex-col gap-5 text-left" {...screenVariants}>
       <SettingsPanel
         address={address}
         points={gs.playerPoints}
@@ -1885,6 +1919,8 @@ export default function Home() {
           }
         }}
         onTabChange={setActiveTab}
+        onWithdrawMpesa={handleWithdrawMpesa}
+        onSendUsdt={handleSendUsdt}
       />
       {address && !isMiniPay && !isFarcaster && (
         <button
@@ -1900,13 +1936,13 @@ export default function Home() {
   );
 
   const renderStats = () => (
-    <motion.div key="stats" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
+    <motion.div key="stats" className="page-tab flex w-full flex-col gap-6 text-left" {...screenVariants}>
       <StatsPanel address={address} onBack={() => setActiveTab('wallet')} />
     </motion.div>
   );
 
   const renderTerms = () => (
-    <motion.div key="terms" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
+    <motion.div key="terms" className="page-tab flex w-full flex-col gap-6 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
         <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border-bright)] transition-colors">
           <ArrowLeft size={16} />
@@ -1936,7 +1972,7 @@ export default function Home() {
   );
 
   const renderPrivacy = () => (
-    <motion.div key="privacy" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
+    <motion.div key="privacy" className="page-tab flex w-full flex-col gap-6 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
         <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border-bright)] transition-colors">
           <ArrowLeft size={16} />
@@ -1962,7 +1998,7 @@ export default function Home() {
   );
 
   const renderContact = () => (
-    <motion.div key="contact" className="page-tab flex w-full flex-col gap-6 px-5 text-left" {...screenVariants}>
+    <motion.div key="contact" className="page-tab flex w-full flex-col gap-6 text-left" {...screenVariants}>
       <div className="flex items-center gap-4 mb-4">
         <button onClick={() => setActiveTab('wallet' as any)} className="flex h-10 w-10 items-center justify-center rounded-xl border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border-bright)] transition-colors">
           <ArrowLeft size={16} />
@@ -1996,7 +2032,7 @@ export default function Home() {
       <div
         className={`app-page-scroll w-full ${showBottomNav ? 'app-page-scroll--with-nav' : ''}`}
       >
-        <div className="relative mx-auto w-full max-w-xl px-4">
+        <div className="relative mx-auto w-full max-w-xl app-page-gutter">
           {activeTab === 'home' ? renderHomeContent() :
             activeTab === 'games' ? renderOpenGames() :
               activeTab === 'leaderboard' ? renderLeaderboard() :

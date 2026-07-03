@@ -90,7 +90,7 @@ export default function GameBoard({
   }, [isAI, phase, isPlayerTurn]);
 
   return (
-    <div className="mx-auto flex h-dvh max-h-dvh w-full max-w-[420px] flex-col overflow-hidden px-4">
+    <div className="mx-auto flex h-dvh max-h-dvh w-full flex-col overflow-hidden app-page-gutter">
       <AnimatePresence>
         {turnNotification && (
           <motion.div

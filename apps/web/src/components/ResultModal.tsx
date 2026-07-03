@@ -72,14 +72,11 @@ export default function ResultModal({
 
       {/* Modal card */}
       <motion.div
-        className="relative z-10 w-full max-w-[440px] overflow-hidden rounded-t-[2.5rem] pb-10 pointer-events-auto"
+        className="result-modal-card relative z-10 w-full max-w-[440px] overflow-hidden rounded-t-[2.5rem] pb-10 pointer-events-auto"
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-mid)',
           borderBottom: 'none',
-          boxShadow: isWin
-            ? '0 -12px 60px rgba(16,185,129,0.2)'
-            : '0 -12px 60px rgba(255,107,43,0.15)',
         }}
         initial={{ y: '100%' }}
         animate={{ y: 0 }}
@@ -115,7 +112,6 @@ export default function ResultModal({
             style={{
               background: isWin ? 'var(--clue-green-bg)' : 'var(--orange-dim)',
               border: `2px solid ${isWin ? 'var(--clue-green)' : 'var(--orange)'}`,
-              boxShadow: isWin ? '0 0 28px rgba(16,185,129,0.4)' : '0 0 28px rgba(255,107,43,0.35)',
             }}
             initial={{ scale: 0, rotate: -30 }}
             animate={{ scale: 1, rotate: 0 }}
