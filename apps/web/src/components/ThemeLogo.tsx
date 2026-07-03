@@ -2,7 +2,11 @@
 
 import { motion } from 'framer-motion';
 
-export function ThemeLogo({ className = '' }: { className?: string }) {
+interface ThemeLogoProps {
+  className?: string;
+}
+
+function ClassicLogo({ className = '' }: { className?: string }) {
   return (
     <div className={`theme-logo theme-logo--playful ${className}`} aria-label="Crack My Code">
       <div className="theme-logo__sparkles" aria-hidden>
@@ -21,4 +25,8 @@ export function ThemeLogo({ className = '' }: { className?: string }) {
       </motion.h1>
     </div>
   );
+}
+
+export function ThemeLogo({ className = '' }: ThemeLogoProps) {
+  return <ClassicLogo className={className} />;
 }

@@ -8,9 +8,8 @@
  * guess 2 uses 4 more from the 6 not yet tried (8 digits tested, 2 held
  * back). Then switch to information-maximizing probes.
  *
- * Defense: `generateCipherSecretCode()` picks all-unique codes or exactly one
- * digit repeated twice with two other distinct digits (e.g. `8786`). No double-
- * pairs (`1122`) or triples (`1112`).
+ * Defense: `generateCipherSecretCode()` picks a duplicate digit ~80% of the time
+ * (one digit twice + two others), otherwise all-unique. No double-pairs or triples.
  */
 
 import {
@@ -308,7 +307,11 @@ function isValidCipherSecret(code: number[]): boolean {
   return repeated.length === 1 && repeated[0] === 2;
 }
 
-const SECRET_CODE_PROFILES: DuplicateProfile[] = ['none', 'one'];
+const CIPHER_DUPLICATE_SECRET_RATE = 0.8;
+
+function pickCipherSecretProfile(): DuplicateProfile {
+  return Math.random() < CIPHER_DUPLICATE_SECRET_RATE ? 'one' : 'none';
+}
 
 function shuffleDigits<T>(items: T[]): T[] {
   const arr = [...items];
@@ -336,12 +339,12 @@ function buildRandomCodeForProfile(profile: DuplicateProfile): number[] {
 }
 
 /**
- * Pick a Cipher secret: all-unique, or one digit twice plus two random others.
+ * Pick a Cipher secret: ~80% with one duplicate digit, else all-unique.
  * Repeats can sit anywhere (`8786` and `8876` both valid).
  */
 export function generateCipherSecretCode(): number[] {
   for (let attempt = 0; attempt < 50; attempt++) {
-    const profile = SECRET_CODE_PROFILES[Math.floor(Math.random() * SECRET_CODE_PROFILES.length)];
+    const profile = pickCipherSecretProfile();
     const code = buildRandomCodeForProfile(profile);
     if (isValidCipherSecret(code)) return [...code];
   }

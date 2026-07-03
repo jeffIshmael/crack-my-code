@@ -6,9 +6,9 @@ import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTr
 import { usePrivy } from "@privy-io/react-auth";
 import { ConnectButton } from "@/components/connect-button";
 import type { GameMode } from '@/lib/game';
-import { PROFESSIONAL_MODE_ENABLED } from '@/lib/game';
+import { PROFESSIONAL_MODE_ENABLED, MAX_CIPHER_GUESSES, CIPHER_DAILY_WIN_CAP } from '@/lib/game';
 import { parseUnits } from 'viem';
-import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
+import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI, CIPHER_STATS_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
 import { X } from 'lucide-react';
@@ -87,6 +87,19 @@ export default function Lobby({
   });
 
   const allowance = (allowanceData as bigint) ?? 0n;
+
+  const { data: cipherRewardsTodayData } = useReadContract({
+    address: CONTRACT_ADDRESS,
+    abi: CIPHER_STATS_ABI,
+    functionName: 'cipherRewardsToday',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const cipherWinsToday = Math.min(
+    Number(cipherRewardsTodayData ?? 0n),
+    CIPHER_DAILY_WIN_CAP,
+  );
 
   const { writeContract: approve, data: approveHash, isPending: isApprovingAction } = useWriteContract();
 
@@ -254,13 +267,41 @@ export default function Lobby({
                 <button
                   onClick={handleStartAI}
                   disabled={isCreating}
-                  className="theme-game-btn theme-game-btn--ai theme-game-btn--lively group"
+                  className="theme-game-btn theme-game-btn--ai theme-game-btn--lively cipher-mode-btn group"
                 >
                   <div className="theme-game-btn__inner">
-                    <span className="theme-game-btn__emoji-badge" aria-hidden>🤖</span>
+                    <div className="cipher-mode-btn__icon-wrap">
+                      <span className="theme-game-btn__emoji-badge" aria-hidden>🤖</span>
+                      <span className="cipher-chances-badge" aria-label={`${MAX_CIPHER_GUESSES} guesses to win`}>
+                        <span className="cipher-chances-badge__num">{MAX_CIPHER_GUESSES}</span>
+                        <span className="cipher-chances-badge__tag">tries</span>
+                      </span>
+                    </div>
                     <div className="theme-game-btn__content">
-                      <span className="theme-game-btn__title">Cipher AI</span>
-                      <span className="theme-game-btn__subtitle">Crack the code · win rewards 🏆</span>
+                      <div className="cipher-mode-btn__title-row">
+                        <span className="theme-game-btn__title">Cipher AI</span>
+                        <div
+                          className="cipher-daily-streak"
+                          aria-label={`${cipherWinsToday} of ${CIPHER_DAILY_WIN_CAP} daily rewarded wins`}
+                        >
+                          <div className="cipher-daily-streak__slots" aria-hidden>
+                            {Array.from({ length: CIPHER_DAILY_WIN_CAP }).map((_, i) => (
+                              <span
+                                key={i}
+                                className={`cipher-daily-streak__slot${
+                                  i < cipherWinsToday ? ' cipher-daily-streak__slot--filled' : ''
+                                }`}
+                                style={{ animationDelay: `${i * 0.12}s` }}
+                              />
+                            ))}
+                          </div>
+                          <span className="cipher-daily-streak__cap">{CIPHER_DAILY_WIN_CAP}/day</span>
+                        </div>
+                      </div>
+                      <span className="theme-game-btn__subtitle">Crack the code to win</span>
+                      <span className="cipher-reward-hint">
+                        Earn <span className="cipher-reward-hint__amount">0.1 USDT</span> when you beat Cipher
+                      </span>
                     </div>
                     <span className="theme-game-btn__go">PLAY</span>
                   </div>

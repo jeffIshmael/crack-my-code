@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
-import { evaluateGuess, toTileClues, MAX_GUESSES } from '@/lib/game';
+import { evaluateGuess, toTileClues, maxGuessesForMode } from '@/lib/game';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { applyScoreDelta } from '@/lib/user-points';
 import { resolveMatchOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
@@ -165,8 +165,9 @@ export async function POST(req: NextRequest) {
       })();
     } else {
       const playerGuessCount = isPlayer1 ? p1GuessCount : p2GuessCount;
+      const guessLimit = maxGuessesForMode(game.mode as 'ai' | 'fun' | 'cash');
 
-      if (playerGuessCount >= MAX_GUESSES && game.status === 'ACTIVE') {
+      if (playerGuessCount >= guessLimit && game.status === 'ACTIVE') {
         const isAI = game.mode === 'ai';
         revealCode = opponentCode;
 

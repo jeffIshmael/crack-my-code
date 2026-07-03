@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import NumberPad from '@/components/NumberPad';
 import { Scoreboard } from '@/components/Scoreboard';
 import type { GuessEntry } from '@/lib/game';
-import { CODE_LENGTH } from '@/lib/game';
+import { CODE_LENGTH, MAX_CIPHER_GUESSES, MAX_GUESSES } from '@/lib/game';
 import type { GamePhase, TileClue } from '@/lib/game';
 
 interface GameBoardProps {
@@ -181,6 +181,9 @@ export default function GameBoard({
           opponentCurrentInput={view === 'opponent' ? opponentCurrentInput : []}
           pendingOpponentTileClues={view === 'opponent' ? pendingOpponentTileClues : null}
           phase={phase}
+          maxGuesses={
+            isAI && view === 'player' ? MAX_CIPHER_GUESSES : MAX_GUESSES
+          }
         />
       </div>
 

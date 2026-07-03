@@ -25,10 +25,11 @@ import {
   toTileClues,
   isWinningClues,
   MAX_GUESSES,
-  // maxGuessesForMode, // Cipher 5-try cap — uncomment with game.ts when ready
+  maxGuessesForMode,
   PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
 import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
+import { SplashScreen } from '@/components/SplashScreen';
 import { cipherNextGuessAsync, prefetchCipherGuess, warmCipherWorker } from '@/lib/cipher-async';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useDisconnect } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
@@ -117,15 +118,26 @@ export default function Home() {
     }
     return 'home';
   });
+  const [showSplash, setShowSplash] = useState(true);
+
+  const handleSplashComplete = useCallback(() => {
+    setShowSplash(false);
+    setActiveTab('home');
+  }, []);
 
   useEffect(() => {
+    warmCipherWorker();
+  }, []);
+
+  useEffect(() => {
+    if (showSplash) return;
     if (typeof window !== 'undefined') {
       const path = activeTab === 'home' ? '/' : `/${activeTab}`;
       if (window.location.pathname !== path) {
         window.history.pushState(null, '', path);
       }
     }
-  }, [activeTab]);
+  }, [activeTab, showSplash]);
   const [isJoining, setIsJoining] = useState<string | null>(null);
   const oppTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
@@ -1285,8 +1297,8 @@ export default function Home() {
               id: `${Date.now()}`,
             };
             const newGuesses = [...prev.playerGuesses, entry];
-            // const guessLimit = maxGuessesForMode(prev.gameMode);
-            const reachedMax = newGuesses.length >= MAX_GUESSES; // use guessLimit when Cipher 5-try cap is enabled
+            const guessLimit = maxGuessesForMode(prev.gameMode);
+            const reachedMax = newGuesses.length >= guessLimit;
 
             if (won) {
               clearOppTimer();
@@ -1321,8 +1333,7 @@ export default function Home() {
             if (isRegisteredPlayer(address)) {
               await syncResultStats(scoreDeltaForMode(mode, true));
             }
-          } else if (gs.playerGuesses.length + 1 >= MAX_GUESSES) {
-            // } else if (gs.playerGuesses.length + 1 >= maxGuessesForMode(gs.gameMode)) {
+          } else if (gs.playerGuesses.length + 1 >= maxGuessesForMode(gs.gameMode)) {
             const loss = scoreDeltaForMode(mode, false);
             try {
               const revealRes = await fetch('/api/games/reveal', {
@@ -2015,10 +2026,15 @@ export default function Home() {
     </motion.div>
   );
 
-  const showBottomNav = gs.phase === 'lobby' || gs.phase === 'matchmaking';
+  const showBottomNav = !showSplash && (gs.phase === 'lobby' || gs.phase === 'matchmaking');
 
   return (
     <main className="relative flex h-full min-h-0 flex-col overflow-hidden">
+      <AnimatePresence mode="wait">
+        {showSplash && (
+          <SplashScreen key="splash" onComplete={handleSplashComplete} />
+        )}
+      </AnimatePresence>
       <JoinStakeModal
         open={!!pendingJoinStake}
         stake={pendingJoinStake?.stake ?? 0}
@@ -2030,7 +2046,7 @@ export default function Home() {
         }}
       />
       <div
-        className={`app-page-scroll w-full ${showBottomNav ? 'app-page-scroll--with-nav' : ''}`}
+        className={`app-page-scroll w-full ${showBottomNav ? 'app-page-scroll--with-nav' : ''} ${showSplash ? 'invisible pointer-events-none' : ''}`}
       >
         <div className="relative mx-auto w-full max-w-xl app-page-gutter">
           {activeTab === 'home' ? renderHomeContent() :

@@ -4,7 +4,6 @@ import { motion } from 'framer-motion';
 import { ClueDigitTile } from '@/components/GuessRow';
 import type { GuessEntry, TileClue } from '@/lib/game';
 import { CODE_LENGTH, MAX_GUESSES, tileCluesForGuess } from '@/lib/game';
-// import { maxGuessesForMode } from '@/lib/game'; // Cipher 5-try cap — enable with game.ts
 
 interface ScoreboardProps {
   view: 'player' | 'opponent';
@@ -15,7 +14,7 @@ interface ScoreboardProps {
   opponentCurrentInput?: number[];
   pendingOpponentTileClues?: TileClue[] | null;
   phase: 'playing' | 'countdown' | 'result' | string;
-  // maxGuesses?: number; // Cipher 5-try cap — pass maxGuessesForMode('ai') from GameBoard when enabled
+  maxGuesses?: number;
 }
 
 function EmptySlots({ active }: { active?: boolean }) {
@@ -58,6 +57,7 @@ export function Scoreboard({
   opponentCurrentInput = [],
   pendingOpponentTileClues = null,
   phase,
+  maxGuesses = MAX_GUESSES,
 }: ScoreboardProps) {
   const boardLabel = view === 'player' ? 'My Board' : `${opponentName}'s Board`;
   const showOpponentLive =
@@ -71,13 +71,12 @@ export function Scoreboard({
       <div className="scoreboard-plaque__header">
         <span>{boardLabel}</span>
         <span className="scoreboard-plaque__header-count">
-          {guesses.length}/{MAX_GUESSES}
-          {/* {guesses.length}/{maxGuesses ?? MAX_GUESSES} — Cipher 5-try cap */}
+          {guesses.length}/{maxGuesses}
         </span>
       </div>
       <div className="scoreboard-frame">
         <div className="scoreboard-grid">
-          {Array.from({ length: MAX_GUESSES }).map((_, rowIdx) => {
+          {Array.from({ length: maxGuesses }).map((_, rowIdx) => {
             const guess = guesses[rowIdx];
             const isPlayerDraftRow =
               view === 'player' && rowIdx === guesses.length && isPlayerTurn && phase === 'playing';
