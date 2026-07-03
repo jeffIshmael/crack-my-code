@@ -1947,6 +1947,15 @@ html, body {
   color: var(--wood-text);
 }
 
+.home-sign-in-btn {
+  box-shadow: var(--pop-shadow);
+}
+
+.home-sign-in-btn:active {
+  box-shadow: var(--pop-shadow-pressed);
+  transform: translateY(2px) scale(0.98);
+}
+
 .theme-tab-switcher {
   display: flex;
   gap: 0.25rem;

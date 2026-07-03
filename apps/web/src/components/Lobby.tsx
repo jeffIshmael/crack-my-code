@@ -272,7 +272,7 @@ export default function Lobby({
           <div className="mt-1 flex w-full justify-center">
             <button
               onClick={() => login()}
-              className="theme-sky-readout flex items-center gap-2 px-6 py-2 transition-transform hover:scale-105 active:scale-95"
+              className="home-sign-in-btn theme-sky-readout flex items-center gap-2 px-6 py-2 transition-transform hover:scale-105 active:scale-95"
               type="button"
             >
               <span className="font-ui text-[10px] uppercase tracking-widest text-[var(--text)]">Sign In</span>
