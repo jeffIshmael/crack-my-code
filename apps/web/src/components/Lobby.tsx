@@ -6,7 +6,7 @@ import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTr
 import { usePrivy } from "@privy-io/react-auth";
 import { ConnectButton } from "@/components/connect-button";
 import type { GameMode } from '@/lib/game';
-import { PROFESSIONAL_MODE_ENABLED, MAX_CIPHER_GUESSES, CIPHER_DAILY_WIN_CAP } from '@/lib/game';
+import { PROFESSIONAL_MODE_ENABLED, CIPHER_DAILY_WIN_CAP } from '@/lib/game';
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
@@ -22,15 +22,7 @@ import {
   dismissCipherSignInModal,
   isCipherSignInModalDismissed,
 } from '@/components/CipherSignInModal';
-
-interface CipherDailyStatus {
-  gamesPlayedToday: number;
-  gamesRemaining: number;
-  dailyCap: number;
-  atDailyCap: boolean;
-  rewardWinsToday: number;
-  signedIn: boolean;
-}
+import type { CipherDailyStatus } from '@/hooks/use-cipher-daily-status';
 
 interface LobbyProps {
   rating: number;
@@ -38,6 +30,8 @@ interface LobbyProps {
   pointsLoading?: boolean;
   isSignedIn?: boolean;
   payoutAddress?: string;
+  cipherStatus?: CipherDailyStatus | null;
+  cipherStatusLoaded?: boolean;
   isMatchmaking: boolean;
   opponentName: string;
   onFindMatch: (mode: GameMode, stake: number, isPublic?: boolean, userBalance?: number) => Promise<void>;
@@ -67,6 +61,8 @@ export default function Lobby({
   pointsLoading = false,
   isSignedIn = false,
   payoutAddress,
+  cipherStatus = null,
+  cipherStatusLoaded = true,
   isMatchmaking,
   opponentName,
   onFindMatch,
@@ -92,8 +88,6 @@ export default function Lobby({
 
   const [showPvPModal, setShowPvPModal] = useState(false);
   const [showCipherSignInModal, setShowCipherSignInModal] = useState(false);
-  const [cipherStatus, setCipherStatus] = useState<CipherDailyStatus | null>(null);
-  const [cipherStatusLoaded, setCipherStatusLoaded] = useState(() => !isSignedIn);
   const [pvpStep, setPvpStep] = useState<'selection' | 'config' | 'visibility'>('selection');
   const [selectedMode, setSelectedMode] = useState<GameMode>('fun');
   const [stake, setStake] = useState<string>('5');
@@ -111,35 +105,9 @@ export default function Lobby({
 
   const allowance = (allowanceData as bigint) ?? 0n;
 
-  useEffect(() => {
-    if (!isSignedIn || !payoutAddress) {
-      setCipherStatus(null);
-      setCipherStatusLoaded(true);
-      return;
-    }
-
-    if (isMatchmaking) return;
-
-    let cancelled = false;
-    setCipherStatusLoaded(false);
-
-    fetch(`/api/games/cipher-status?address=${encodeURIComponent(payoutAddress)}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (!cancelled) setCipherStatus(data);
-      })
-      .catch((err) => console.error('Cipher status fetch failed', err))
-      .finally(() => {
-        if (!cancelled) setCipherStatusLoaded(true);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [isSignedIn, payoutAddress, isMatchmaking]);
-
   const cipherStatusPending = isSignedIn && !!payoutAddress && !cipherStatusLoaded;
   const cipherGamesToday = cipherStatus?.gamesPlayedToday ?? 0;
+  const cipherGamesRemaining = cipherStatus?.gamesRemaining ?? CIPHER_DAILY_WIN_CAP;
   const cipherAtDailyCap = cipherStatusLoaded && Boolean(cipherStatus?.atDailyCap);
   const cipherButtonDisabled = isCreating || cipherAtDailyCap || cipherStatusPending;
 
@@ -354,10 +322,18 @@ export default function Lobby({
                       <span className="theme-game-btn__emoji-badge" aria-hidden>🤖</span>
                       <span
                         className={`cipher-chances-badge${isSignedIn ? ' cipher-chances-badge--live' : ''}`}
-                        aria-label={`${MAX_CIPHER_GUESSES} guesses to win`}
+                        aria-label={
+                          isSignedIn && cipherStatusLoaded
+                            ? `${cipherGamesRemaining} Cipher games left today`
+                            : `${CIPHER_DAILY_WIN_CAP} Cipher games per day`
+                        }
                       >
-                        <span className="cipher-chances-badge__num">{MAX_CIPHER_GUESSES}</span>
-                        <span className="cipher-chances-badge__tag">tries</span>
+                        <span className="cipher-chances-badge__num">
+                          {isSignedIn && cipherStatusLoaded ? cipherGamesRemaining : CIPHER_DAILY_WIN_CAP}
+                        </span>
+                        <span className="cipher-chances-badge__tag">
+                          {isSignedIn && cipherStatusLoaded ? 'left' : 'games'}
+                        </span>
                       </span>
                     </div>
                     <div className="theme-game-btn__content">
