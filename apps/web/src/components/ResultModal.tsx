@@ -35,6 +35,21 @@ interface ResultModalProps {
 
 const CONFETTI_COLORS = ['#00CFFF', '#10B981', '#F59E0B', '#FF6B2B', '#A78BFA'];
 
+function cipherRewardMessage(reason?: string): string {
+  switch (reason) {
+    case 'disabled':
+      return 'On-chain reward is not enabled yet. Contact support if this persists.';
+    case 'insufficient_pool':
+      return 'Reward pool is empty — payout will resume once funded.';
+    case 'daily_cap':
+      return 'You reached the on-chain daily reward cap.';
+    case 'simulation_failed':
+      return 'Payout could not be sent. Please try again or contact support.';
+    default:
+      return 'Reward could not be sent this time.';
+  }
+}
+
 export default function ResultModal({
   result,
   gameMode,
@@ -215,7 +230,42 @@ export default function ResultModal({
                 </span>
               </div>
               <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wide">
-                Sent to your smart wallet
+                Sent to your wallet
+              </p>
+              {cipherReward.txHash && (
+                <a
+                  href={`https://celoscan.io/tx/${cipherReward.txHash}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] font-bold uppercase tracking-wide text-[var(--accent)] underline"
+                >
+                  View on Celoscan
+                </a>
+              )}
+            </motion.div>
+          )}
+
+          {gameMode === 'ai' && isWin && cipherReward && !cipherReward.paid && (
+            <motion.div
+              className="flex w-full flex-col gap-2 rounded-2xl p-4"
+              style={{
+                background: 'rgba(245,158,11,0.08)',
+                border: '1px solid rgba(245,158,11,0.25)',
+              }}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.5 }}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-2)]">
+                  Cipher Reward
+                </span>
+                <span className="font-orbitron text-sm font-black text-[var(--orange)]">
+                  Not paid
+                </span>
+              </div>
+              <p className="text-[11px] leading-relaxed text-[var(--wood-text-soft)]">
+                {cipherRewardMessage(cipherReward.reason)}
               </p>
             </motion.div>
           )}

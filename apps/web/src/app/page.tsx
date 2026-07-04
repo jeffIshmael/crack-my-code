@@ -101,7 +101,7 @@ export default function Home() {
   const bumpCipherDaily = useCallback(() => {
     setCipherRefreshKey((key) => key + 1);
   }, []);
-  const markCipherGameFinished = useCallback(() => {
+  const markCipherSessionStarted = useCallback(() => {
     bumpCipherDaily();
   }, [bumpCipherDaily]);
   const { cipherStatus, cipherStatusLoaded } = useCipherDailyStatus(
@@ -495,15 +495,11 @@ export default function Home() {
       opponentCode?: number[] | null;
     }) => {
       let pendingStatsSync: number | null = null;
-      let finishedCipherGame = false;
 
       setGs((prev: GameState) => {
         if (prev.phase !== 'playing' && prev.phase !== 'result') return prev;
 
         if (data.status === 'COMPLETED' && data.result) {
-          if (prev.gameMode === 'ai') {
-            finishedCipherGame = true;
-          }
           const mode = prev.gameMode === 'ai' ? 'ai' : prev.gameMode;
           const delta =
             data.result === 'win'
@@ -564,11 +560,8 @@ export default function Home() {
       if (pendingStatsSync !== null) {
         void syncResultStats(pendingStatsSync);
       }
-      if (finishedCipherGame) {
-        markCipherGameFinished();
-      }
     },
-    [syncResultStats, markCipherGameFinished],
+    [syncResultStats],
   );
 
   const syncGameState = useCallback(async () => {
@@ -652,9 +645,6 @@ export default function Home() {
               }));
               if (isRegisteredPlayer(addressRef.current)) {
                 await syncResultStats(loss);
-              }
-              if (gsRef.current.gameMode === 'ai') {
-                markCipherGameFinished();
               }
             } catch (err) {
               console.error('Opponent win reveal failed', err);
@@ -871,7 +861,6 @@ export default function Home() {
                   if (isRegisteredPlayer(address)) {
                     await syncResultStats(loss);
                   }
-                  markCipherGameFinished();
                 } catch (err) {
                   console.error('AI reveal sync failed', err);
                   setGs((prev: GameState) => ({
@@ -1289,10 +1278,6 @@ export default function Home() {
         throw new Error(data.error || 'Failed to quit game');
       }
 
-      if (gs.gameMode === 'ai') {
-        markCipherGameFinished();
-      }
-
       if (data.cancelled) {
         setGs(initialGameState(gs.playerPoints));
         setCurrentGameId(null);
@@ -1328,8 +1313,6 @@ export default function Home() {
     payoutAddress,
     currentGameId,
     clearTurnHandover,
-    bumpCipherDaily,
-    markCipherGameFinished,
     syncResultStats,
   ]);
 
@@ -1343,16 +1326,30 @@ export default function Home() {
 
     setGs((prev: GameState) => ({ ...prev, playerCode: code }));
 
-    // For AI games, skip the synchronizing modal and go straight to playing
     if (gs.gameMode === 'ai') {
       warmCipherWorker();
-      setGs((prev: GameState): GameState => ({ ...prev, phase: 'playing' }));
-      // Do the server lock-code in the background without blocking
-      fetch('/api/games/lock-code', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameId: currentGameId, address: effectiveAddress, code: code.join('') })
-      }).catch(err => console.error('Failed to lock AI code', err));
+      try {
+        const res = await fetch('/api/games/lock-code', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            gameId: currentGameId,
+            address: effectiveAddress,
+            code: code.join(''),
+          }),
+        });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || 'Failed to lock your code');
+        }
+        if (isSignedIn) {
+          markCipherSessionStarted();
+        }
+        setGs((prev: GameState): GameState => ({ ...prev, phase: 'playing' }));
+      } catch (err) {
+        console.error('Failed to lock AI code', err);
+        toast.error('System Error', { description: getErrorMessage(err) });
+      }
       return;
     }
 
@@ -1370,7 +1367,7 @@ export default function Home() {
       toast.error('System Error', { description: 'Failed to lock your code. Please try again.' });
       setIsWaiting(false);
     }
-  }, [currentGameId, address, gs.gameMode]);
+  }, [currentGameId, address, gs.gameMode, isSignedIn, markCipherSessionStarted]);
 
   // ─── Phase: Playing — submit guess ────────────────────────────────────────
 
@@ -1453,9 +1450,6 @@ export default function Home() {
             if (isRegisteredPlayer(playerAddress)) {
               await syncResultStats(scoreDeltaForMode(mode, true));
             }
-            if (mode === 'ai') {
-              markCipherGameFinished();
-            }
           } else if (gs.playerGuesses.length + 1 >= maxGuessesForMode(gs.gameMode)) {
             const loss = scoreDeltaForMode(mode, false);
             try {
@@ -1476,9 +1470,6 @@ export default function Home() {
               if (isRegisteredPlayer(playerAddress)) {
                 await syncResultStats(loss);
               }
-              if (gs.gameMode === 'ai') {
-                markCipherGameFinished();
-              }
             } catch (revealErr) {
               console.error('Reveal after max guesses failed', revealErr);
             }
@@ -1495,7 +1486,7 @@ export default function Home() {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
     }
-  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, refetchUsdtBalance, markCipherGameFinished]);
+  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, refetchUsdtBalance]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
@@ -1758,6 +1749,36 @@ export default function Home() {
     await handleJoinChallenge(code);
   }, [joinGameIdInput, isConnected, address, login, handleJoinChallenge]);
 
+  const abandonCipherGame = useCallback(async () => {
+    const gameId = currentGameId;
+    const playerAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
+    clearOppTimer();
+    clearTurnHandover();
+    setGs(initialGameState(gs.playerPoints));
+    setCurrentGameId(null);
+    setShareableJoinCode(null);
+    setCurrentOnChainMatchId(null);
+
+    if (!gameId || gs.gameMode !== 'ai') return;
+
+    try {
+      await fetch('/api/games/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId, address: playerAddress }),
+      });
+    } catch (err) {
+      console.error('Failed to abandon Cipher game', err);
+    }
+  }, [
+    currentGameId,
+    gs.gameMode,
+    gs.playerPoints,
+    isSignedIn,
+    payoutAddress,
+    clearTurnHandover,
+  ]);
+
   // ─── Sub-views ────────────────────────────────────────────────────────────
 
   const handleCancelOpenChallenge = useCallback(async (gameId: string, onChainMatchId?: string) => {
@@ -1845,12 +1866,7 @@ export default function Home() {
           opponentName={gs.opponentName}
           onLockCode={handleLockCode}
           onBack={() => {
-            clearOppTimer();
-            clearTurnHandover();
-            setGs(initialGameState(gs.playerPoints));
-            setCurrentGameId(null);
-            setShareableJoinCode(null);
-            setCurrentOnChainMatchId(null);
+            void abandonCipherGame();
           }}
           isWaiting={isWaiting}
         />

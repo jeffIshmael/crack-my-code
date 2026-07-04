@@ -6,7 +6,7 @@ export function startOfUtcDay(date = new Date()): Date {
   return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
 }
 
-/** Count Cipher games started today for a registered player. */
+/** Count Cipher games where the player locked their code today (entered the board). */
 export async function countCipherGamesToday(playerAddress: string): Promise<number> {
   const normalized = playerAddress.toLowerCase();
   const todayStart = startOfUtcDay();
@@ -16,6 +16,7 @@ export async function countCipherGamesToday(playerAddress: string): Promise<numb
       player1Address: normalized,
       mode: 'ai',
       createdAt: { gte: todayStart },
+      player1Code: { not: null },
     },
   });
 }
