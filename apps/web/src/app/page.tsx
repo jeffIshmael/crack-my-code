@@ -57,6 +57,7 @@ import { pusherClient } from '@/lib/pusher-client';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { isRegisteredPlayer } from '@/lib/guest';
 import { useMiniAppEnvironment } from '@/hooks/use-mini-app-environment';
+import { useCipherDailyStatus } from '@/hooks/use-cipher-daily-status';
 
 function isDuplicateOfLastGuess(
   guesses: GuessEntry[],
@@ -96,6 +97,18 @@ export default function Home() {
   const isSignedIn = authenticated || isConnected;
   const address = isSignedIn ? payoutAddress : undefined;
   const txAddress = wagmiAddress || user?.wallet?.address;
+  const [cipherRefreshKey, setCipherRefreshKey] = useState(0);
+  const bumpCipherDaily = useCallback(() => {
+    setCipherRefreshKey((key) => key + 1);
+  }, []);
+  const markCipherGameFinished = useCallback(() => {
+    bumpCipherDaily();
+  }, [bumpCipherDaily]);
+  const { cipherStatus, cipherStatusLoaded } = useCipherDailyStatus(
+    payoutAddress,
+    isSignedIn,
+    cipherRefreshKey,
+  );
 
   const { data: usdtData, refetch: refetchUsdtBalance } = useBalance({
     address: payoutAddress as `0x${string}` | undefined,
@@ -482,11 +495,15 @@ export default function Home() {
       opponentCode?: number[] | null;
     }) => {
       let pendingStatsSync: number | null = null;
+      let finishedCipherGame = false;
 
       setGs((prev: GameState) => {
         if (prev.phase !== 'playing' && prev.phase !== 'result') return prev;
 
         if (data.status === 'COMPLETED' && data.result) {
+          if (prev.gameMode === 'ai') {
+            finishedCipherGame = true;
+          }
           const mode = prev.gameMode === 'ai' ? 'ai' : prev.gameMode;
           const delta =
             data.result === 'win'
@@ -547,8 +564,11 @@ export default function Home() {
       if (pendingStatsSync !== null) {
         void syncResultStats(pendingStatsSync);
       }
+      if (finishedCipherGame) {
+        markCipherGameFinished();
+      }
     },
-    [syncResultStats],
+    [syncResultStats, markCipherGameFinished],
   );
 
   const syncGameState = useCallback(async () => {
@@ -632,6 +652,9 @@ export default function Home() {
               }));
               if (isRegisteredPlayer(addressRef.current)) {
                 await syncResultStats(loss);
+              }
+              if (gsRef.current.gameMode === 'ai') {
+                markCipherGameFinished();
               }
             } catch (err) {
               console.error('Opponent win reveal failed', err);
@@ -848,6 +871,7 @@ export default function Home() {
                   if (isRegisteredPlayer(address)) {
                     await syncResultStats(loss);
                   }
+                  markCipherGameFinished();
                 } catch (err) {
                   console.error('AI reveal sync failed', err);
                   setGs((prev: GameState) => ({
@@ -1238,15 +1262,76 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [gs.phase, gs.gameMode, gs.opponentName, handleCancelMatchmaking]);
 
-  const handleQuitGame = useCallback(() => {
-    if (window.confirm("Are you sure you want to quit the game?")) {
-      clearOppTimer();
-      clearTurnHandover();
+  const handleQuitGame = useCallback(async () => {
+    if (!window.confirm('Are you sure you want to quit the game?')) return;
+
+    clearOppTimer();
+    clearTurnHandover();
+
+    const playerAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
+    const gameId = currentGameId;
+
+    if (!gameId) {
       setGs(initialGameState(gs.playerPoints));
       setCurrentGameId(null);
       setCurrentOnChainMatchId(null);
+      return;
     }
-  }, [gs.playerPoints, clearTurnHandover]);
+
+    try {
+      const res = await fetch('/api/games/quit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId, address: playerAddress }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to quit game');
+      }
+
+      if (gs.gameMode === 'ai') {
+        markCipherGameFinished();
+      }
+
+      if (data.cancelled) {
+        setGs(initialGameState(gs.playerPoints));
+        setCurrentGameId(null);
+        setCurrentOnChainMatchId(null);
+        return;
+      }
+
+      const mode = gs.gameMode === 'ai' ? 'ai' : gs.gameMode;
+      const lossDelta = scoreDeltaForMode(mode, false);
+
+      setGs((prev: GameState) => ({
+        ...prev,
+        phase: 'result',
+        result: 'lose',
+        ratingDelta: isRegisteredPlayer(playerAddress) ? lossDelta : 0,
+        currentInput: [],
+        opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
+      }));
+      setCurrentGameId(null);
+      setCurrentOnChainMatchId(null);
+
+      if (isRegisteredPlayer(playerAddress) && gs.gameMode !== 'ai') {
+        await syncResultStats(lossDelta);
+      }
+    } catch (err) {
+      console.error('Quit game failed', err);
+      toast.error('Quit failed', { description: getErrorMessage(err) });
+    }
+  }, [
+    gs.playerPoints,
+    gs.gameMode,
+    isSignedIn,
+    payoutAddress,
+    currentGameId,
+    clearTurnHandover,
+    bumpCipherDaily,
+    markCipherGameFinished,
+    syncResultStats,
+  ]);
 
   // ─── Phase: SetCode → Playing ─────────────────────────────────────────────
 
@@ -1368,6 +1453,9 @@ export default function Home() {
             if (isRegisteredPlayer(playerAddress)) {
               await syncResultStats(scoreDeltaForMode(mode, true));
             }
+            if (mode === 'ai') {
+              markCipherGameFinished();
+            }
           } else if (gs.playerGuesses.length + 1 >= maxGuessesForMode(gs.gameMode)) {
             const loss = scoreDeltaForMode(mode, false);
             try {
@@ -1388,6 +1476,9 @@ export default function Home() {
               if (isRegisteredPlayer(playerAddress)) {
                 await syncResultStats(loss);
               }
+              if (gs.gameMode === 'ai') {
+                markCipherGameFinished();
+              }
             } catch (revealErr) {
               console.error('Reveal after max guesses failed', revealErr);
             }
@@ -1404,7 +1495,7 @@ export default function Home() {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
     }
-  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, refetchUsdtBalance]);
+  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, refetchUsdtBalance, markCipherGameFinished]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
@@ -1441,11 +1532,12 @@ export default function Home() {
     setCurrentGameId(null);
     setShareableJoinCode(null);
     opponentAddressRef.current = null;
+    bumpCipherDaily();
     if (address) {
       void refreshUserStats();
       void fetchMyActive();
     }
-  }, [gs.playerPoints, resultStats, address, refreshUserStats, fetchMyActive, clearTurnHandover]);
+  }, [gs.playerPoints, resultStats, address, refreshUserStats, fetchMyActive, clearTurnHandover, bumpCipherDaily]);
 
   const handlePlayAgain = useCallback(() => {
     if (gs.gameMode !== 'ai') return;
@@ -1729,6 +1821,8 @@ export default function Home() {
           opponentName={gs.opponentName}
           isSignedIn={isSignedIn}
           payoutAddress={payoutAddress}
+          cipherStatus={cipherStatus}
+          cipherStatusLoaded={cipherStatusLoaded}
           onFindMatch={handleFindMatch}
           onMatchFound={handleMatchFound}
           onWalletClick={() => setActiveTab('wallet')}
