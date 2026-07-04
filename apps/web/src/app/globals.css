@@ -733,19 +733,6 @@ html, body {
   object-fit: contain;
 }
 
-.wallet-logo-stack__item--okx {
-  background: #000;
-  border-color: #fff;
-}
-
-.wallet-logo-stack__okx-text {
-  font-family: var(--font-ui);
-  font-size: 0.5rem;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  color: #fff;
-}
-
 .wallet-logo-stack__item--more {
   background: #f4f8f7;
   border-color: #e2ebe8;

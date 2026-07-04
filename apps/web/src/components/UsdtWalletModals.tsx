@@ -69,15 +69,12 @@ function WalletBottomSheet({
 
 function WalletDestinationLogos() {
   return (
-    <div className="wallet-logo-stack" aria-label="Send to Binance, Bitget, OKX, MetaMask and more">
+    <div className="wallet-logo-stack" aria-label="Send to Binance, Bybit, MetaMask and more">
       <div className="wallet-logo-stack__item">
         <Image src="/Binance-Icon-Logo.png" alt="Binance" width={32} height={32} className="wallet-logo-stack__img" />
       </div>
       <div className="wallet-logo-stack__item">
-        <Image src="/bitget_Logo.png" alt="Bitget" width={32} height={32} className="wallet-logo-stack__img" />
-      </div>
-      <div className="wallet-logo-stack__item wallet-logo-stack__item--okx" aria-hidden>
-        <span className="wallet-logo-stack__okx-text">OKX</span>
+        <Image src="/bybit_logo.png" alt="Bybit" width={32} height={32} className="wallet-logo-stack__img" />
       </div>
       <div className="wallet-logo-stack__item">
         <Image src="/metamask_logo.png" alt="MetaMask" width={32} height={32} className="wallet-logo-stack__img" />

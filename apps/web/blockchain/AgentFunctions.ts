@@ -1,6 +1,6 @@
-import { createWalletClient, createPublicClient, http, parseEther } from 'viem';
+import { createWalletClient, createPublicClient, formatEther, formatUnits, http, parseEther } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
-import { celoSepolia, celo } from 'viem/chains';
+import { celo } from 'viem/chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './constants';
 
 const privateKey = process.env.AGENT_PRIVATE_KEY as `0x${string}` | undefined;
@@ -223,6 +223,78 @@ export async function getAgentBalance() {
   if (!account) throw new Error("Agent not initialized");
   const balance = await publicClient.getBalance({ address: account.address });
   return balance; // Returns BigInt in wei
+}
+
+/**
+ * Get the on-chain Cipher reward pool balance (USDT, 6 decimals).
+ */
+export async function getRewardPoolBalance() {
+  return publicClient.readContract({
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'rewardPoolBalance',
+  }) as Promise<bigint>;
+}
+
+export type AgentTreasurySnapshot = {
+  agent: {
+    address: `0x${string}`;
+    celo: { wei: string; formatted: string };
+  };
+  rewardPool: {
+    usdt: { raw: string; formatted: string };
+    cipherWinReward: { raw: string; formatted: string };
+    estimatedCipherWinsRemaining: number | null;
+  };
+  contractAddress: typeof CONTRACT_ADDRESS;
+  chain: 'celo';
+  updatedAt: string;
+};
+
+/**
+ * Agent CELO balance + contract reward pool in one read.
+ */
+export async function getAgentTreasurySnapshot(): Promise<AgentTreasurySnapshot> {
+  if (!account) throw new Error("Agent not initialized");
+
+  const [celoWei, rewardPoolRaw, cipherWinRewardRaw] = await Promise.all([
+    publicClient.getBalance({ address: account.address }),
+    getRewardPoolBalance(),
+    publicClient.readContract({
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'cipherWinReward',
+    }) as Promise<bigint>,
+  ]);
+
+  const estimatedCipherWinsRemaining =
+    cipherWinRewardRaw > 0n
+      ? Number(rewardPoolRaw / cipherWinRewardRaw)
+      : null;
+
+  return {
+    agent: {
+      address: account.address,
+      celo: {
+        wei: celoWei.toString(),
+        formatted: formatEther(celoWei),
+      },
+    },
+    rewardPool: {
+      usdt: {
+        raw: rewardPoolRaw.toString(),
+        formatted: formatUnits(rewardPoolRaw, 6),
+      },
+      cipherWinReward: {
+        raw: cipherWinRewardRaw.toString(),
+        formatted: formatUnits(cipherWinRewardRaw, 6),
+      },
+      estimatedCipherWinsRemaining,
+    },
+    contractAddress: CONTRACT_ADDRESS,
+    chain: 'celo',
+    updatedAt: new Date().toISOString(),
+  };
 }
 
 /**
