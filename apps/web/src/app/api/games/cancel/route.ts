@@ -4,40 +4,58 @@ import { pusherServer } from '@/lib/pusher-server';
 
 export async function POST(req: NextRequest) {
   try {
-    const { gameId } = await req.json();
+    const { gameId, address } = await req.json();
 
     if (!gameId) {
       return NextResponse.json({ error: 'Game ID is required' }, { status: 400 });
     }
 
-    // Find the game first to ensure it exists and maybe get some info for Pusher
     const game = await prisma.game.findUnique({
-      where: { id: gameId }
+      where: { id: gameId },
     });
 
     if (!game) {
       return NextResponse.json({ error: 'Game not found' }, { status: 404 });
     }
 
-    // Delete the game from the backend
+    if (address) {
+      const normalized = address === 'GUEST' ? 'GUEST' : address.toLowerCase();
+      if (game.player1Address.toLowerCase() !== normalized.toLowerCase()) {
+        return NextResponse.json({ error: 'Not your game' }, { status: 403 });
+      }
+    }
+
+    if (game.mode === 'ai' && game.player1Code) {
+      return NextResponse.json(
+        { error: 'Cannot cancel a Cipher game after your code is locked' },
+        { status: 400 },
+      );
+    }
+
+    if (game.mode !== 'ai' && game.status === 'ACTIVE') {
+      return NextResponse.json(
+        { error: 'Cannot cancel an active match' },
+        { status: 400 },
+      );
+    }
+
     await prisma.game.delete({
-      where: { id: gameId }
+      where: { id: gameId },
     });
 
-    // Notify other players via Pusher that the challenge is gone
     await pusherServer.trigger('lobby-channel', 'challenge-joined', {
-      gameId: gameId
+      gameId,
     });
 
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Cancel challenge error:', error);
     return NextResponse.json(
-      { 
-        error: 'Failed to cancel challenge', 
-        details: error instanceof Error ? error.message : String(error)
-      }, 
-      { status: 500 }
+      {
+        error: 'Failed to cancel challenge',
+        details: error instanceof Error ? error.message : String(error),
+      },
+      { status: 500 },
     );
   }
 }

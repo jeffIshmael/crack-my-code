@@ -101,9 +101,12 @@ export async function POST(req: NextRequest) {
           console.error('[Blockchain] Track game on-chain failed:', trackErr);
         }
 
-        const rewardResult = await rewardCipherWinOnChain(
-          normalizedPlayerAddress as `0x${string}`,
-        );
+        const user = await findUserByAddress(normalizedPlayerAddress);
+        const rewardRecipient = (
+          user?.smartWalletAddress?.toLowerCase() ?? normalizedPlayerAddress
+        ) as `0x${string}`;
+
+        const rewardResult = await rewardCipherWinOnChain(rewardRecipient);
 
         if (rewardResult.status === 'paid') {
           const amount = Number(rewardResult.amount) / 1_000_000;
@@ -121,8 +124,18 @@ export async function POST(req: NextRequest) {
             txHash: rewardResult.txHash,
           };
         } else {
+          console.warn('[Cipher reward] skipped:', rewardResult.reason, {
+            gameId,
+            player: rewardRecipient,
+          });
           cipherReward = { paid: false, reason: rewardResult.reason };
         }
+      } else if (isAI && isRegisteredPlayer(normalizedPlayerAddress) && game.cipherRewardPaid) {
+        cipherReward = {
+          paid: true,
+          amount: game.cipherRewardAmount ?? 0.1,
+          txHash: game.cipherRewardTxHash ?? '',
+        };
       }
 
       if (!isAI) {
