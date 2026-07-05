@@ -2131,6 +2131,21 @@ html, body {
 }
 
 /* Result modal panels */
+.result-modal-scroll {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-mid) transparent;
+}
+
+.result-modal-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+.result-modal-scroll::-webkit-scrollbar-thumb {
+  background: var(--border-mid);
+  border-radius: 999px;
+}
+
 .result-stat-card {
   background: rgba(255, 248, 239, 0.95);
   border: 2px solid var(--wood-dark);

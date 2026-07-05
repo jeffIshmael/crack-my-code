@@ -92,9 +92,9 @@ export default function ResultModal({
       {/* Confetti particles (win only) */}
       {isWin && <ConfettiLayer />}
 
-      {/* Modal card */}
+      {/* Modal card — capped height + scroll so close/header stay visible on mobile */}
       <motion.div
-        className="result-modal-card relative z-10 w-full max-w-[440px] overflow-hidden rounded-t-[2.5rem] pb-10 pointer-events-auto"
+        className="result-modal-card relative z-10 flex w-full max-w-[440px] max-h-[min(92dvh,calc(100dvh-env(safe-area-inset-bottom,0px)))] flex-col overflow-hidden rounded-t-[2rem] pointer-events-auto sm:max-h-[min(94dvh,calc(100dvh-env(safe-area-inset-bottom,0px)))] sm:rounded-t-[2.5rem]"
         style={{
           background: 'var(--bg-surface)',
           border: '1px solid var(--border-mid)',
@@ -107,7 +107,7 @@ export default function ResultModal({
       >
         {/* Top accent line */}
         <motion.div
-          className="h-1 w-full"
+          className="h-1 w-full shrink-0"
           style={{
             background: isWin
               ? 'linear-gradient(90deg, transparent, var(--clue-green), transparent)'
@@ -118,19 +118,26 @@ export default function ResultModal({
           transition={{ duration: 0.6, delay: 0.3 }}
         />
 
-        {/* Close Button */}
-        <button
-          onClick={onHome}
-          className="absolute right-4 top-4 z-20 flex h-10 w-10 items-center justify-center rounded-full border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] transition-all hover:border-[var(--border-bright)] hover:text-[var(--text)] hover:scale-110 active:scale-90"
+        {/* Sticky header — close always visible */}
+        <div
+          className="sticky top-0 z-20 flex shrink-0 items-center justify-between px-4 pb-1 pt-[max(0.75rem,env(safe-area-inset-top,0px))]"
+          style={{ background: 'var(--bg-surface)' }}
         >
-          <X size={24} />
-        </button>
+          <div className="h-1.5 w-10 rounded-full bg-[var(--border-mid)]/60" aria-hidden />
+          <button
+            onClick={onHome}
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-[var(--border-mid)] bg-[var(--bg-card)] text-[var(--text-dim)] transition-all hover:border-[var(--border-bright)] hover:text-[var(--text)] active:scale-90 sm:h-10 sm:w-10"
+            aria-label="Close"
+          >
+            <X size={20} className="sm:h-6 sm:w-6" />
+          </button>
+        </div>
 
-        <div className="flex flex-col items-center gap-5 px-6 pt-6">
+        <div className="result-modal-scroll flex min-h-0 flex-1 flex-col items-center gap-3 overflow-y-auto overscroll-contain px-4 pb-[max(1.25rem,env(safe-area-inset-bottom,0px))] sm:gap-5 sm:px-6 sm:pb-6">
 
           {/* Result icon */}
           <motion.div
-            className="relative flex h-20 w-20 items-center justify-center rounded-full"
+            className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full sm:h-20 sm:w-20"
             style={{
               background: isWin ? 'var(--clue-green-bg)' : 'var(--orange-dim)',
               border: `2px solid ${isWin ? 'var(--clue-green)' : 'var(--orange)'}`,
@@ -170,7 +177,7 @@ export default function ResultModal({
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.35 }}
           >
-            <h2 className="font-orbitron text-3xl font-black tracking-widest"
+            <h2 className="font-orbitron text-2xl font-black tracking-widest sm:text-3xl"
               style={{ color: isWin ? 'var(--clue-green)' : 'var(--orange)' }}>
               {isWin ? 'CODE CRACKED' : 'DEFEATED'}
             </h2>
@@ -212,7 +219,7 @@ export default function ResultModal({
 
           {gameMode === 'ai' && isWin && cipherReward?.paid && (
             <motion.div
-              className="flex w-full flex-col gap-2 rounded-2xl p-4"
+              className="flex w-full flex-col gap-1.5 rounded-2xl p-3 sm:gap-2 sm:p-4"
               style={{
                 background: 'rgba(16,185,129,0.08)',
                 border: '1px solid rgba(16,185,129,0.2)',
@@ -221,15 +228,15 @@ export default function ResultModal({
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 }}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold uppercase tracking-widest text-[var(--text-2)]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-[var(--text-2)] sm:text-xs">
                   Cipher Reward
                 </span>
-                <span className="font-orbitron text-xl font-black text-[var(--clue-green)]">
+                <span className="font-orbitron text-lg font-black text-[var(--clue-green)] sm:text-xl">
                   +{(cipherReward.amount ?? 0.1).toFixed(1)} USDT
                 </span>
               </div>
-              <p className="text-[10px] text-[var(--text-dim)] uppercase tracking-wide">
+              <p className="text-[9px] text-[var(--text-dim)] uppercase tracking-wide sm:text-[10px]">
                 Sent to your wallet
               </p>
               {cipherReward.txHash && (
@@ -272,21 +279,21 @@ export default function ResultModal({
 
           {/* Opponent's secret code */}
           <motion.div
-            className="flex w-full flex-col items-center gap-3 rounded-2xl p-4 result-stat-card"
+            className="flex w-full flex-col items-center gap-2 rounded-2xl p-3 result-stat-card sm:gap-3 sm:p-4"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.45 }}
           >
-            <p className="text-center font-ui text-xs font-bold uppercase tracking-widest text-[var(--wood-text-soft)]">
+            <p className="text-center font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--wood-text-soft)] sm:text-xs">
               {isWin ? 'Code You Cracked' : "Code You Couldn't Crack"}
             </p>
             <div className="result-code-frame">
-              <div className="flex gap-2">
+              <div className="flex gap-1.5 sm:gap-2">
                 {opponentCode.map((d, i) => (
                   <motion.div
                     key={i}
                     className="scoreboard-slot"
-                    style={{ width: '2.75rem', height: '2.75rem' }}
+                    style={{ width: '2.35rem', height: '2.35rem' }}
                     initial={{ rotateY: 90, opacity: 0 }}
                     animate={{ rotateY: 0, opacity: 1 }}
                     transition={{ delay: 0.55 + i * 0.1, duration: 0.35 }}
@@ -300,14 +307,14 @@ export default function ResultModal({
 
           {/* Rating delta */}
           <motion.div
-            className="flex w-full items-center justify-between rounded-xl px-4 py-3 result-stat-card"
+            className="flex w-full items-center justify-between rounded-xl px-3 py-2.5 result-stat-card sm:px-4 sm:py-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.6 }}
           >
             <div className="flex flex-col">
               <span className="font-body text-xs text-[var(--wood-text-soft)]">CMC Points</span>
-              <span className="font-ui text-xl font-bold text-[var(--wood-text)]">
+              <span className="font-ui text-lg font-bold text-[var(--wood-text)] sm:text-xl">
                 {statsLoading ? '…' : pointsBefore}
               </span>
             </div>
@@ -328,7 +335,7 @@ export default function ResultModal({
             <div className="flex flex-col items-end">
               <span className="font-body text-xs text-[var(--wood-text-soft)]">Updated CMC</span>
               <span
-                className="font-ui text-xl font-bold"
+                className="font-ui text-lg font-bold sm:text-xl"
                 style={{ color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)' }}
               >
                 {statsLoading ? '…' : pointsAfter}
@@ -350,9 +357,9 @@ export default function ResultModal({
             ].map((s) => (
               <div
                 key={s.label}
-                className="result-stat-card flex flex-1 flex-col items-center gap-0.5 rounded-xl py-3"
+                className="result-stat-card flex flex-1 flex-col items-center gap-0.5 rounded-xl py-2 sm:py-3"
               >
-                <span className="font-ui text-lg font-bold text-[var(--wood-text)]">
+                <span className="font-ui text-base font-bold text-[var(--wood-text)] sm:text-lg">
                   {s.value}
                 </span>
                 <span className="font-body text-xs text-[var(--wood-text-soft)]">
@@ -365,7 +372,7 @@ export default function ResultModal({
           {gameMode === 'ai' && (
             <motion.button
               onClick={onPlayAgain}
-              className={`group relative w-full overflow-hidden rounded-2xl py-5 font-ui text-base font-black tracking-[0.25em] transition-all hover:translate-y-[-2px] active:translate-y-[1px] ${
+              className={`group relative w-full shrink-0 overflow-hidden rounded-2xl py-4 font-ui text-sm font-black tracking-[0.2em] transition-all hover:translate-y-[-2px] active:translate-y-[1px] sm:py-5 sm:text-base sm:tracking-[0.25em] ${
                 isWin ? 'result-play-btn result-play-btn--win' : 'result-play-btn'
               }`}
               initial={{ opacity: 0, y: 12 }}
@@ -462,7 +469,7 @@ export default function ResultModal({
           )}
 
           <motion.p
-            className="text-xs"
+            className="shrink-0 pb-1 text-[10px] sm:text-xs"
             style={{ color: 'var(--text-dim)' }}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
