@@ -46,8 +46,9 @@ export const GAME_DURATION = 60;            // seconds per match
 export const MAX_GUESSES = 8;
 /** Max Cipher AI matches per signed-in wallet per UTC day */
 export const CIPHER_DAILY_WIN_CAP = 5;
-/** USDT paid per rewarded Cipher win */
-export const CIPHER_WIN_REWARD_USDT = 0.1;
+/** USDT paid per rewarded Cipher win (campaign ended — rewards disabled in UI) */
+// export const CIPHER_WIN_REWARD_USDT = 0.1;
+export const CIPHER_REWARDS_ENABLED = false;
 
 export function maxGuessesForMode(_mode: GameMode): number {
   return MAX_GUESSES;

@@ -17,11 +17,6 @@ import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
 import JoinChallenge from '@/components/JoinChallenge';
 import { FarcasterShareGameButton } from '@/components/FarcasterShareGameButton';
 import { buildGameShareUrl } from '@/lib/farcaster-embed';
-import {
-  CipherSignInModal,
-  dismissCipherSignInModal,
-  isCipherSignInModalDismissed,
-} from '@/components/CipherSignInModal';
 import type { CipherDailyStatus } from '@/hooks/use-cipher-daily-status';
 
 interface LobbyProps {
@@ -87,7 +82,7 @@ export default function Lobby({
   });
 
   const [showPvPModal, setShowPvPModal] = useState(false);
-  const [showCipherSignInModal, setShowCipherSignInModal] = useState(false);
+  // const [showCipherSignInModal, setShowCipherSignInModal] = useState(false);
   const [pvpStep, setPvpStep] = useState<'selection' | 'config' | 'visibility'>('selection');
   const [selectedMode, setSelectedMode] = useState<GameMode>('fun');
   const [stake, setStake] = useState<string>('5');
@@ -192,26 +187,28 @@ export default function Lobby({
   const handleStartAI = async () => {
     if (cipherStatusPending || cipherAtDailyCap) return;
 
-    if (!isSignedIn) {
-      if (!isCipherSignInModalDismissed()) {
-        setShowCipherSignInModal(true);
-        return;
-      }
-    }
+    // Cipher USDT reward campaign ended — play without sign-in nag
+    // if (!isSignedIn) {
+    //   if (!isCipherSignInModalDismissed()) {
+    //     setShowCipherSignInModal(true);
+    //     return;
+    //   }
+    // }
 
     await proceedStartAI();
   };
 
-  const handleCipherSignIn = () => {
-    setShowCipherSignInModal(false);
-    login();
-  };
-
-  const handleContinueGuest = () => {
-    dismissCipherSignInModal();
-    setShowCipherSignInModal(false);
-    void proceedStartAI();
-  };
+  // Cipher USDT reward campaign ended
+  // const handleCipherSignIn = () => {
+  //   setShowCipherSignInModal(false);
+  //   login();
+  // };
+  //
+  // const handleContinueGuest = () => {
+  //   dismissCipherSignInModal();
+  //   setShowCipherSignInModal(false);
+  //   void proceedStartAI();
+  // };
 
   const openPvPModal = () => {
     setPvpStep('selection');
@@ -363,6 +360,7 @@ export default function Lobby({
                         )}
                       </div>
                       <span className="theme-game-btn__subtitle">Crack the code to win</span>
+                      {/* Cipher USDT reward campaign ended
                       <span className="cipher-reward-hint">
                         {isSignedIn ? (
                           <>
@@ -372,6 +370,7 @@ export default function Lobby({
                           <>Sign in to earn 0.1 USDT on a win</>
                         )}
                       </span>
+                      */}
                     </div>
                     <span className="theme-game-btn__go">
                       {cipherStatusPending ? '…' : 'PLAY'}
@@ -425,7 +424,7 @@ export default function Lobby({
         </div>
       </div>
 
-      {/* ── Cipher sign-in prompt ── */}
+      {/* Cipher USDT reward campaign ended
       <AnimatePresence>
         {showCipherSignInModal && (
           <CipherSignInModal
@@ -435,6 +434,7 @@ export default function Lobby({
           />
         )}
       </AnimatePresence>
+      */}
 
       {/* ── PvP Mode Selection Bottom Sheet ── */}
       <AnimatePresence>
