@@ -6,7 +6,7 @@ import { pusherServer } from '@/lib/pusher-server';
 import { evaluateGuess, toTileClues, maxGuessesForMode } from '@/lib/game';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { applyScoreDelta } from '@/lib/user-points';
-import { resolveMatchOnChain, trackGameOnChain, rewardCipherWinOnChain } from '../../../../../blockchain/AgentFunctions';
+import { resolveMatchOnChain, trackGameOnChain /*, rewardCipherWinOnChain */ } from '../../../../../blockchain/AgentFunctions';
 import { uploadToIPFS } from '@/lib/pinata';
 import { isRegisteredPlayer } from '@/lib/guest';
 import { findUserByAddress } from '@/lib/user-address';
@@ -94,6 +94,15 @@ export async function POST(req: NextRequest) {
         await applyScoreDelta(normalizedPlayerAddress, winDelta);
       }
 
+      if (isAI && isRegisteredPlayer(normalizedPlayerAddress)) {
+        try {
+          await trackGameOnChain(0, true);
+        } catch (trackErr) {
+          console.error('[Blockchain] Track game on-chain failed:', trackErr);
+        }
+      }
+
+      /* Cipher USDT reward campaign ended
       if (isAI && isRegisteredPlayer(normalizedPlayerAddress) && !game.cipherRewardPaid) {
         try {
           await trackGameOnChain(0, true);
@@ -137,6 +146,7 @@ export async function POST(req: NextRequest) {
           txHash: game.cipherRewardTxHash ?? '',
         };
       }
+      */
 
       if (!isAI) {
         const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;

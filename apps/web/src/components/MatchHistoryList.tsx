@@ -111,10 +111,6 @@ export default function MatchHistoryList({ games, address, walletAliases = [] }:
                 <span className="history-game-card__amount history-game-card__amount--reward">
                   +{(game.cipherRewardAmount ?? 0.1).toFixed(1)} USDT
                 </span>
-              ) : isCipher && isWinner ? (
-                <span className="history-game-card__amount history-game-card__amount--muted">
-                  Win · no reward
-                </span>
               ) : (
                 <span className="history-game-card__amount history-game-card__amount--free">Free</span>
               )}

@@ -1413,12 +1413,13 @@ export default function Home() {
 
             if (won) {
               clearOppTimer();
-              if (data.cipherReward) {
-                setLastCipherReward(data.cipherReward);
-                if (data.cipherReward.paid) {
-                  void refetchUsdtBalance();
-                }
-              }
+              // Cipher USDT reward campaign ended
+              // if (data.cipherReward) {
+              //   setLastCipherReward(data.cipherReward);
+              //   if (data.cipherReward.paid) {
+              //     void refetchUsdtBalance();
+              //   }
+              // }
               return {
                 ...prev,
                 playerGuesses: newGuesses,
@@ -1978,7 +1979,8 @@ export default function Home() {
               playerRating={resultStats?.pointsAfter ?? gs.playerPoints}
               statsLoading={resultStats?.loading ?? false}
               guessCount={gs.playerGuesses.length}
-              cipherReward={lastCipherReward}
+              cipherReward={null}
+              // cipherReward={lastCipherReward}
               onPlayAgain={handlePlayAgain}
               onHome={handleHome}
               rematchStatus={rematchStatus}

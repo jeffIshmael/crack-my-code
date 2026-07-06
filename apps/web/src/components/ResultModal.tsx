@@ -217,6 +217,7 @@ export default function ResultModal({
             </motion.div>
           )}
 
+          {/* Cipher USDT reward campaign ended
           {gameMode === 'ai' && isWin && cipherReward?.paid && (
             <motion.div
               className="flex w-full flex-col gap-1.5 rounded-2xl p-3 sm:gap-2 sm:p-4"
@@ -276,6 +277,7 @@ export default function ResultModal({
               </p>
             </motion.div>
           )}
+          */}
 
           {/* Opponent's secret code */}
           <motion.div
@@ -468,15 +470,17 @@ export default function ResultModal({
             </motion.div>
           )}
 
-          <motion.p
-            className="shrink-0 pb-1 text-[10px] sm:text-xs"
-            style={{ color: 'var(--text-dim)' }}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.85 }}
-          >
-            Reward settlement on Celo
-          </motion.p>
+          {gameMode !== 'ai' && (
+            <motion.p
+              className="shrink-0 pb-1 text-[10px] sm:text-xs"
+              style={{ color: 'var(--text-dim)' }}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.85 }}
+            >
+              Reward settlement on Celo
+            </motion.p>
+          )}
         </div>
       </motion.div>
     </motion.div>
