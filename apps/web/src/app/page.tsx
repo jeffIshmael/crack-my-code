@@ -30,6 +30,10 @@ import {
 } from '@/lib/game';
 import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
 import { SplashScreen } from '@/components/SplashScreen';
+import {
+  HowToPlayModal,
+  isHowToPlayDismissed,
+} from '@/components/HowToPlayModal';
 import { cipherNextGuessAsync, prefetchCipherGuess, warmCipherWorker } from '@/lib/cipher-async';
 import { useAccount, useWriteContract, usePublicClient, useBalance, useDisconnect } from 'wagmi';
 import { usePrivy } from '@privy-io/react-auth';
@@ -76,7 +80,7 @@ export default function Home() {
   const searchParams = useSearchParams();
   const { address: wagmiAddress, isConnected } = useAccount();
   const { login, logout, authenticated, user } = usePrivy();
-  const { isMiniPay, isFarcaster } = useMiniAppEnvironment();
+  const { isMiniPay, isFarcaster, isReady: envReady } = useMiniAppEnvironment();
   const publicClient = usePublicClient();
   const { disconnect } = useDisconnect();
   const { writeContractAsync } = useWriteContract();
@@ -148,12 +152,29 @@ export default function Home() {
     }
     return 'home';
   });
-  const [showSplash, setShowSplash] = useState(true);
+  const [showSplash, setShowSplash] = useState(false);
+  const [splashResolved, setSplashResolved] = useState(false);
+  const [showHowToPlay, setShowHowToPlay] = useState(false);
+
+  useEffect(() => {
+    if (!envReady) return;
+    setShowSplash(isFarcaster);
+    setSplashResolved(true);
+  }, [isFarcaster, envReady]);
 
   const handleSplashComplete = useCallback(() => {
     setShowSplash(false);
     setActiveTab('home');
   }, []);
+
+  useEffect(() => {
+    if (showSplash || !splashResolved) return;
+    if (isHowToPlayDismissed()) return;
+    if (gs.phase !== 'lobby' || activeTab !== 'home') return;
+
+    const timer = window.setTimeout(() => setShowHowToPlay(true), 350);
+    return () => window.clearTimeout(timer);
+  }, [showSplash, splashResolved, gs.phase, activeTab]);
 
   useEffect(() => {
     warmCipherWorker();
@@ -2175,13 +2196,23 @@ export default function Home() {
     </motion.div>
   );
 
-  const showBottomNav = !showSplash && (gs.phase === 'lobby' || gs.phase === 'matchmaking');
+  const showBottomNav = splashResolved && !showSplash && (gs.phase === 'lobby' || gs.phase === 'matchmaking');
+  const contentHidden = !splashResolved || showSplash;
 
   return (
     <main className="relative flex h-full min-h-0 flex-col overflow-hidden">
       <AnimatePresence mode="wait">
         {showSplash && (
-          <SplashScreen key="splash" onComplete={handleSplashComplete} />
+          <SplashScreen
+            key="splash"
+            minDurationMs={4500}
+            onComplete={handleSplashComplete}
+          />
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showHowToPlay && gs.phase === 'lobby' && activeTab === 'home' && (
+          <HowToPlayModal key="how-to-play" onClose={() => setShowHowToPlay(false)} />
         )}
       </AnimatePresence>
       <JoinStakeModal
@@ -2195,7 +2226,7 @@ export default function Home() {
         }}
       />
       <div
-        className={`app-page-scroll w-full ${showBottomNav ? 'app-page-scroll--with-nav' : ''} ${showSplash ? 'invisible pointer-events-none' : ''}`}
+        className={`app-page-scroll w-full ${showBottomNav ? 'app-page-scroll--with-nav' : ''} ${contentHidden ? 'invisible pointer-events-none' : ''}`}
       >
         <div className="relative mx-auto w-full max-w-xl app-page-gutter">
           {activeTab === 'home' ? renderHomeContent() :
