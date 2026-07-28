@@ -7,6 +7,7 @@ import { ChevronRight, Copy, Check, Send } from 'lucide-react';
 // import { ArrowUpFromLine } from 'lucide-react'; // M-Pesa withdraw — enable when payout is ready
 import type { NavTab } from '@/components/BottomNav';
 import { UsdtWalletModals, type WalletModalKind } from '@/components/UsdtWalletModals';
+import { useMiniAppEnvironment } from '@/hooks/use-mini-app-environment';
 
 interface SettingsPanelProps {
   address?: string;
@@ -71,6 +72,7 @@ export function SettingsPanel({
   onSendUsdt,
 }: SettingsPanelProps) {
   const [walletModal, setWalletModal] = useState<WalletModalKind>(null);
+  const { isMiniPay } = useMiniAppEnvironment();
   const usdtBalance = usdtFormatted ? parseFloat(usdtFormatted) : 0;
   if (!address) {
     return (
@@ -127,15 +129,17 @@ export function SettingsPanel({
               <ArrowUpFromLine size={16} strokeWidth={2.25} />
             </button>
             */}
-            <button
-              type="button"
-              onClick={() => setWalletModal('send')}
-              className="account-usdt-action"
-              aria-label="Send USDT on Celo"
-              title="Send"
-            >
-              <Send size={16} strokeWidth={2.25} />
-            </button>
+            {!isMiniPay && (
+              <button
+                type="button"
+                onClick={() => setWalletModal('send')}
+                className="account-usdt-action"
+                aria-label="Send USDT on Celo"
+                title="Send"
+              >
+                <Send size={16} strokeWidth={2.25} />
+              </button>
+            )}
           </div>
         </div>
         <div className="theme-sky-readout flex flex-col gap-2 p-4">
