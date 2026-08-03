@@ -29,35 +29,35 @@ const menuItems: {
   subtitle: string;
   accent: string;
 }[] = [
-  {
-    tab: 'stats',
-    emoji: '📊',
-    label: 'Stats',
-    subtitle: 'Your games and platform totals',
-    accent: 'bg-[#F3EEFF] text-[#9B7FD4]',
-  },
-  {
-    tab: 'terms',
-    emoji: '📜',
-    label: 'Terms of Service',
-    subtitle: 'Rules for playing fair',
-    accent: 'bg-[#E8F4FC] text-[var(--accent)]',
-  },
-  {
-    tab: 'privacy',
-    emoji: '🔒',
-    label: 'Privacy Policy',
-    subtitle: 'How we handle your data',
-    accent: 'bg-[#FFF4E8] text-[#FF9F43]',
-  },
-  {
-    tab: 'contact',
-    emoji: '💬',
-    label: 'Telegram Support',
-    subtitle: 'Get help from the team',
-    accent: 'bg-[#E8FCF4] text-[#58C76E]',
-  },
-];
+    {
+      tab: 'stats',
+      emoji: '📊',
+      label: 'Stats',
+      subtitle: 'Your games and platform totals',
+      accent: 'bg-[#F3EEFF] text-[#9B7FD4]',
+    },
+    {
+      tab: 'terms',
+      emoji: '📜',
+      label: 'Terms of Service',
+      subtitle: 'Rules for playing fair',
+      accent: 'bg-[#E8F4FC] text-[var(--accent)]',
+    },
+    {
+      tab: 'privacy',
+      emoji: '🔒',
+      label: 'Privacy Policy',
+      subtitle: 'How we handle your data',
+      accent: 'bg-[#FFF4E8] text-[#FF9F43]',
+    },
+    {
+      tab: 'contact',
+      emoji: '💬',
+      label: 'Telegram Support',
+      subtitle: 'Get help from the team',
+      accent: 'bg-[#E8FCF4] text-[#58C76E]',
+    },
+  ];
 
 export function SettingsPanel({
   address,
@@ -101,7 +101,7 @@ export function SettingsPanel({
         onClose={() => setWalletModal(null)}
         availableBalance={usdtBalance}
         onSendUsdt={onSendUsdt}
-        // onWithdrawMpesa={onWithdrawMpesa} // M-Pesa — enable when payout is ready
+      // onWithdrawMpesa={onWithdrawMpesa} // M-Pesa — enable when payout is ready
       />
 
       <div className="grid grid-cols-2 gap-3">
@@ -129,17 +129,17 @@ export function SettingsPanel({
               <ArrowUpFromLine size={16} strokeWidth={2.25} />
             </button>
             */}
-            {!isMiniPay && (
-              <button
-                type="button"
-                onClick={() => setWalletModal('send')}
-                className="account-usdt-action"
-                aria-label="Send USDT on Celo"
-                title="Send"
-              >
-                <Send size={16} strokeWidth={2.25} />
-              </button>
-            )}
+
+            <button
+              type="button"
+              onClick={() => setWalletModal('send')}
+              className="account-usdt-action"
+              aria-label="Send USDT on Celo"
+              title="Send"
+            >
+              <Send size={16} strokeWidth={2.25} />
+            </button>
+
           </div>
         </div>
         <div className="theme-sky-readout flex flex-col gap-2 p-4">
