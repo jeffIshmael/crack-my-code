@@ -130,7 +130,7 @@ export function SettingsPanel({
             </button>
             */}
 
-            <button
+            {/* <button
               type="button"
               onClick={() => setWalletModal('send')}
               className="account-usdt-action"
@@ -138,7 +138,7 @@ export function SettingsPanel({
               title="Send"
             >
               <Send size={16} strokeWidth={2.25} />
-            </button>
+            </button> */}
 
           </div>
         </div>
