@@ -18,10 +18,10 @@
     "video:render": "pnpm --filter promo-video render"
   },
   "devDependencies": {
-    "@types/node": "^20.8.0",
-    "sharp": "^0.35.3",
-    "turbo": "^1.10.16",
-    "typescript": "^5.2.2"
+    "@types/node": "20.19.39",
+    "sharp": "0.35.3",
+    "turbo": "1.13.4",
+    "typescript": "5.9.3"
   },
   "packageManager": "pnpm@8.10.0",
   "engines": {

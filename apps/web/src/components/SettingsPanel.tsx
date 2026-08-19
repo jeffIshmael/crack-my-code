@@ -3,20 +3,23 @@
 import { useState } from 'react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { ChevronRight, Copy, Check, Send } from 'lucide-react';
+import { ChevronRight, Copy, Check, Send, Pencil } from 'lucide-react';
 // import { ArrowUpFromLine } from 'lucide-react'; // M-Pesa withdraw — enable when payout is ready
 import type { NavTab } from '@/components/BottomNav';
 import { UsdtWalletModals, type WalletModalKind } from '@/components/UsdtWalletModals';
 import { useMiniAppEnvironment } from '@/hooks/use-mini-app-environment';
+import { SetNameModal } from '@/components/SetNameModal';
 
 interface SettingsPanelProps {
   address?: string;
   points: number;
   pointsLoading?: boolean;
   usdtFormatted?: string;
+  profileName?: string | null;
   copied: boolean;
   onLogin: () => void;
   onCopyAddress: () => void;
+  onNameSaved?: (name: string) => void;
   onTabChange: (tab: NavTab) => void;
   onWithdrawMpesa?: (phone: string, amount: number) => void | Promise<void>;
   onSendUsdt?: (recipient: string, amount: number) => Promise<string | void>;
@@ -64,14 +67,17 @@ export function SettingsPanel({
   points,
   pointsLoading = false,
   usdtFormatted,
+  profileName,
   copied,
   onLogin,
   onCopyAddress,
+  onNameSaved,
   onTabChange,
   onWithdrawMpesa: _onWithdrawMpesa,
   onSendUsdt,
 }: SettingsPanelProps) {
   const [walletModal, setWalletModal] = useState<WalletModalKind>(null);
+  const [nameModalOpen, setNameModalOpen] = useState(false);
   const { isMiniPay } = useMiniAppEnvironment();
   const usdtBalance = usdtFormatted ? parseFloat(usdtFormatted) : 0;
   if (!address) {
@@ -156,22 +162,59 @@ export function SettingsPanel({
       <div className="theme-sky-readout flex flex-col gap-3 p-4">
         <div className="flex items-center gap-2">
           <span className="text-xl" aria-hidden>👤</span>
-          <span className="font-ui text-sm font-bold text-[var(--text)]">Wallet Address</span>
+            <span className="font-ui text-sm font-bold text-[var(--text)]">Account</span>
         </div>
-        <div className="flex items-center gap-2">
-          <div className="min-w-0 flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] px-3 py-2.5 font-ui text-xs font-bold text-[var(--text-2)] truncate">
-            {address}
+
+          <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-1">
+              <span className="font-body text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Username</span>
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] px-3 py-2.5 font-ui text-xs font-bold text-[var(--text-2)]">
+                  {profileName ?? '—'}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setNameModalOpen(true)}
+                  className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] text-[var(--accent)] transition-transform active:scale-95"
+                  aria-label="Edit username"
+                  title="Edit username"
+                >
+                  <Pencil size={16} />
+                </button>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-1">
+              <span className="font-body text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">Wallet address</span>
+              <div className="flex items-center gap-2">
+                <div className="min-w-0 flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] px-3 py-2.5 font-ui text-xs font-bold text-[var(--text-2)] truncate">
+                  {address}
+                </div>
+                <button
+                  type="button"
+                  onClick={onCopyAddress}
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] text-[var(--accent)] transition-transform active:scale-95"
+                  aria-label="Copy address"
+                >
+                  {copied ? <Check size={16} /> : <Copy size={16} />}
+                </button>
+              </div>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={onCopyAddress}
-            className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] text-[var(--accent)] transition-transform active:scale-95"
-            aria-label="Copy address"
-          >
-            {copied ? <Check size={16} /> : <Copy size={16} />}
-          </button>
-        </div>
       </div>
+
+        {nameModalOpen && (
+          <SetNameModal
+            open={nameModalOpen}
+            address={String(address)}
+            initialName={profileName}
+            onClose={() => setNameModalOpen(false)}
+            onSaved={(name) => {
+              onNameSaved?.(name);
+              setNameModalOpen(false);
+            }}
+          />
+        )}
 
       <div className="flex flex-col gap-2">
         {menuItems.map((item) => (
