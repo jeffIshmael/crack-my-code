@@ -71,15 +71,15 @@ export default function MatchHistoryList({ games, address, walletAliases = [] }:
         ) || address?.toLowerCase() || '';
 
         const isExpired = game.status === 'EXPIRED';
-        const isWinner = !isExpired && game.winnerAddress?.toLowerCase() === playerAlias;
-        const isDraw = !isExpired && !game.winnerAddress;
+        const isDraw = !isExpired && game.winnerAddress === 'DRAW';
+        const isWinner = !isExpired && !isDraw && game.winnerAddress?.toLowerCase() === playerAlias;
 
         const resultColor = isExpired
           ? 'text-[var(--text-dim)]'
           : isWinner
             ? 'text-[var(--clue-green)]'
             : isDraw
-              ? 'text-[var(--text-dim)]'
+              ? 'text-amber-500'
               : 'text-red-400';
 
         const resultDot = isExpired
@@ -87,13 +87,13 @@ export default function MatchHistoryList({ games, address, walletAliases = [] }:
           : isWinner
             ? 'bg-[var(--clue-green)]'
             : isDraw
-              ? 'bg-[var(--text-dim)]'
+              ? 'bg-amber-500'
               : 'bg-red-400';
 
         const reward = isExpired
           ? null
           : game.mode === 'cash'
-            ? (isWinner ? `+${(game.stake * 2 * 0.99).toFixed(2)}` : `-${game.stake.toFixed(2)}`)
+            ? (isWinner ? `+${(game.stake * 2 * 0.99).toFixed(2)}` : isDraw ? `±${game.stake.toFixed(2)}` : `-${game.stake.toFixed(2)}`)
             : null;
 
         return (
@@ -121,7 +121,7 @@ export default function MatchHistoryList({ games, address, walletAliases = [] }:
 
             {/* Reward or free */}
             <span className={`flex-shrink-0 min-w-[60px] text-right font-code text-[11px] font-bold ${
-              isExpired ? 'text-[var(--text-dim)]' : reward && isWinner ? 'text-[var(--clue-green)]' : reward ? 'text-red-400' : 'text-[var(--text-dim)]'
+              isExpired ? 'text-[var(--text-dim)]' : isDraw ? 'text-amber-500' : reward && isWinner ? 'text-[var(--clue-green)]' : reward ? 'text-red-400' : 'text-[var(--text-dim)]'
             }`}>
               {isExpired ? 'Expired' : reward ? `${reward}` : 'Free'}
             </span>

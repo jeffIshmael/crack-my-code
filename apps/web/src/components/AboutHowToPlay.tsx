@@ -56,7 +56,7 @@ export function AboutHowToPlay() {
         <h2 className="font-ui text-xl font-bold">How to play Crack My Code?</h2>
         <p className="font-body text-sm leading-relaxed">
           Each player sets a secret 4-digit code. Take turns guessing your opponent&apos;s code —
-          keep playing until someone cracks it. After each guess, colored tiles on the wooden board
+          you have <strong>6 attempts</strong> to crack it. After each guess, colored tiles on the wooden board
           show how close you are — check the scoreboard to track your hints.
         </p>
       </div>
@@ -116,8 +116,8 @@ export function AboutHowToPlay() {
             <strong>Invite only</strong> — share a Game ID so only your friend can join.
           </li>
         </ul>
-        <p className="font-body text-sm opacity-80">
-          USDT staking matches are coming soon.
+        <p className="font-body text-sm leading-relaxed">
+          <strong>💰 Professional</strong> — Stake USDT and play for real. The winner takes the pot (minus a 1% platform fee).
         </p>
       </div>
 
@@ -132,6 +132,10 @@ export function AboutHowToPlay() {
         <p className="font-body text-sm leading-relaxed">
           <strong>👥 Player vs Player</strong> — The winner gains <strong>+15 CMC</strong> and the loser loses{' '}
           <strong>15 CMC</strong> (points move from loser to winner).
+        </p>
+        <p className="font-body text-sm leading-relaxed">
+          <strong>🤝 Draw</strong> — If both players use all 6 guesses without cracking the code, the match ends in a draw.
+          No points change, and in Professional mode, both stakes are fully refunded.
         </p>
       </div>
 

@@ -43,7 +43,7 @@ export interface GameState {
 // ─── Constants ───────────────────────────────────────────────────────────────
 
 export const GAME_DURATION = 60;            // seconds per match
-export const MAX_GUESSES = 8;
+export const MAX_GUESSES = 6;
 /** Max Cipher AI matches per signed-in wallet per UTC day */
 export const CIPHER_DAILY_WIN_CAP = 5;
 /** USDT paid per rewarded Cipher win (campaign ended — rewards disabled in UI) */

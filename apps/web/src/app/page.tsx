@@ -237,6 +237,7 @@ export default function Home() {
   } | null>(null);
   const [rematchStatus, setRematchStatus] = useState<'idle' | 'waiting' | 'opponent_wants' | 'declined'>('idle');
   const [rematchLoading, setRematchLoading] = useState(false);
+  const rematchWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [lastCipherReward, setLastCipherReward] = useState<{
     paid: boolean;
     amount?: number;
@@ -521,7 +522,7 @@ export default function Home() {
       playerGuesses: GuessEntry[];
       opponentGuesses: GuessEntry[];
       opponentGuessCount: number;
-      result?: 'win' | 'lose' | null;
+      result?: 'win' | 'lose' | 'draw' | null;
       opponentCode?: number[] | null;
     }) => {
       let pendingStatsSync: number | null = null;
@@ -534,9 +535,11 @@ export default function Home() {
           const delta =
             data.result === 'win'
               ? scoreDeltaForMode(mode, true)
-              : scoreDeltaForMode(mode, false);
+              : data.result === 'draw'
+                ? 0
+                : scoreDeltaForMode(mode, false);
 
-          if (isRegisteredPlayer(addressRef.current) && prev.phase === 'playing') {
+          if (isRegisteredPlayer(addressRef.current) && prev.phase === 'playing' && data.result !== 'draw') {
             pendingStatsSync = delta;
           }
 
@@ -947,6 +950,10 @@ export default function Home() {
     opponentAddress: string,
     meta?: { mode?: GameMode; stake?: number }
   ) => {
+    if (rematchWaitTimeoutRef.current) {
+      clearTimeout(rematchWaitTimeoutRef.current);
+      rematchWaitTimeoutRef.current = null;
+    }
     setIsSearchHidden(false);
     setCurrentGameId(gameId);
     setResultStats(null);
@@ -994,6 +1001,10 @@ export default function Home() {
     });
 
     channel.bind('rematch-declined', () => {
+      if (rematchWaitTimeoutRef.current) {
+        clearTimeout(rematchWaitTimeoutRef.current);
+        rematchWaitTimeoutRef.current = null;
+      }
       setRematchStatus('declined');
       setRematchLoading(false);
       toast.error('Rematch declined', {
@@ -1002,6 +1013,10 @@ export default function Home() {
     });
 
     channel.bind('rematch-started', (data: { gameId: string; opponentAddress: string; mode?: string; stake?: number }) => {
+      if (rematchWaitTimeoutRef.current) {
+        clearTimeout(rematchWaitTimeoutRef.current);
+        rematchWaitTimeoutRef.current = null;
+      }
       const mode = data.mode === 'cash' ? 'cash' : data.mode === 'ai' ? 'ai' : 'fun';
       handleMatchFound(data.gameId, data.opponentAddress, {
         mode,
@@ -1532,7 +1547,6 @@ export default function Home() {
               await syncResultStats(scoreDeltaForMode(mode, true));
             }
           } else if (gs.playerGuesses.length + 1 >= maxGuessesForMode(gs.gameMode)) {
-            const loss = scoreDeltaForMode(mode, false);
             try {
               const revealRes = await fetch('/api/games/reveal', {
                 method: 'POST',
@@ -1540,16 +1554,20 @@ export default function Home() {
                 body: JSON.stringify({ gameId: currentGameId, address: playerAddress }),
               });
               const revealData = await revealRes.json();
+              const isDraw = revealData.winnerAddress === 'DRAW';
+              const loss = scoreDeltaForMode(mode, false);
               setGs((prev: GameState) => ({
                 ...prev,
                 phase: 'result',
-                result: 'lose',
-                ratingDelta: isRegisteredPlayer(playerAddress) ? loss : 0,
+                result: isDraw ? 'draw' : 'lose',
+                ratingDelta: isDraw ? 0 : (isRegisteredPlayer(playerAddress) ? loss : 0),
                 currentInput: [],
                 opponentCode: revealData.opponentCode || [],
               }));
-              if (isRegisteredPlayer(playerAddress)) {
+              if (!isDraw && isRegisteredPlayer(playerAddress)) {
                 await syncResultStats(loss);
+              } else if (isDraw && isRegisteredPlayer(playerAddress)) {
+                await syncResultStats(0);
               }
             } catch (revealErr) {
               console.error('Reveal after max guesses failed', revealErr);
@@ -1593,6 +1611,10 @@ export default function Home() {
   // ─── Phase: Result → Lobby ────────────────────────────────────────────────
 
   const exitResultScreen = useCallback(() => {
+    if (rematchWaitTimeoutRef.current) {
+      clearTimeout(rematchWaitTimeoutRef.current);
+      rematchWaitTimeoutRef.current = null;
+    }
     clearOppTimer();
     clearTurnHandover();
     const points = resultStats?.pointsAfter ?? gs.playerPoints;
@@ -1641,6 +1663,21 @@ export default function Home() {
         toast.success('Rematch starting!', { description: 'Set your secret code to begin.' });
       } else {
         setRematchStatus('waiting');
+
+        // If opponent is offline, they may never respond — avoid waiting forever.
+        if (rematchWaitTimeoutRef.current) {
+          clearTimeout(rematchWaitTimeoutRef.current);
+          rematchWaitTimeoutRef.current = null;
+        }
+        const WAIT_MS = 20_000;
+        rematchWaitTimeoutRef.current = setTimeout(() => {
+          setRematchStatus('idle');
+          setRematchLoading(false);
+          toast.info('Rematch unavailable', {
+            description: 'Opponent looks offline/logged out. Please try again later.',
+          });
+          exitResultScreen();
+        }, WAIT_MS);
       }
     } catch (err) {
       setRematchStatus('idle');
@@ -1648,7 +1685,7 @@ export default function Home() {
     } finally {
       setRematchLoading(false);
     }
-  }, [currentGameId, address, gs.gameMode, gs.stakeAmount, handleMatchFound]);
+  }, [currentGameId, address, gs.gameMode, gs.stakeAmount, handleMatchFound, exitResultScreen]);
 
   const handleDeclineRematch = useCallback(async () => {
     if (currentGameId && address && gs.gameMode !== 'ai') {

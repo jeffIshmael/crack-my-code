@@ -61,6 +61,40 @@ export async function resolveMatchOnChain(
 }
 
 /**
+ * Resolve a draw match on-chain (backend only).
+ */
+export async function resolveDrawOnChain(
+  matchId: `0x${string}`,
+  player2: `0x${string}`,
+  p1Guesses: number,
+  p2Guesses: number,
+  p1Code: string,
+  p2Code: string,
+  historyHash: string
+) {
+  if (!account || !walletClient) throw new Error("Agent not initialized");
+
+  const { request } = await publicClient.simulateContract({
+    account,
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: "resolveDraw",
+    args: [
+      matchId,
+      player2,
+      BigInt(p1Guesses),
+      BigInt(p2Guesses),
+      p1Code,
+      p2Code,
+      historyHash,
+    ],
+  });
+
+  const hash = await walletClient.writeContract(request);
+  return await publicClient.waitForTransactionReceipt({ hash });
+}
+
+/**
  * Record a player quitting on-chain (backend only)
  */
 export async function recordQuitOnChain(

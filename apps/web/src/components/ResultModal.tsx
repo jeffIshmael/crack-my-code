@@ -71,8 +71,12 @@ export default function ResultModal({
   rematchLoading = false,
 }: ResultModalProps) {
   const isWin = result === 'win';
+  const isDraw = result === 'draw';
   const prizePool = stakeAmount * 2;
   const winnings = prizePool * 0.99;
+
+  const accentColor = isWin ? 'var(--clue-green)' : isDraw ? '#D97706' : 'var(--orange)';
+  const accentBg = isWin ? 'var(--clue-green-bg)' : isDraw ? 'rgba(217,119,6,0.12)' : 'var(--orange-dim)';
 
   return (
     <motion.div
@@ -109,9 +113,7 @@ export default function ResultModal({
         <motion.div
           className="h-1 w-full shrink-0"
           style={{
-            background: isWin
-              ? 'linear-gradient(90deg, transparent, var(--clue-green), transparent)'
-              : 'linear-gradient(90deg, transparent, var(--orange), transparent)',
+            background: `linear-gradient(90deg, transparent, ${accentColor}, transparent)`,
           }}
           initial={{ scaleX: 0 }}
           animate={{ scaleX: 1 }}
@@ -139,8 +141,8 @@ export default function ResultModal({
           <motion.div
             className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full sm:h-20 sm:w-20"
             style={{
-              background: isWin ? 'var(--clue-green-bg)' : 'var(--orange-dim)',
-              border: `2px solid ${isWin ? 'var(--clue-green)' : 'var(--orange)'}`,
+              background: accentBg,
+              border: `2px solid ${accentColor}`,
             }}
             initial={{ scale: 0, rotate: -30 }}
             animate={{ scale: 1, rotate: 0 }}
@@ -156,6 +158,15 @@ export default function ResultModal({
               >
                 <polyline points="20 6 9 17 4 12"/>
               </motion.svg>
+            ) : isDraw ? (
+              <motion.span
+                className="text-2xl sm:text-3xl"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', stiffness: 400, damping: 20, delay: 0.45 }}
+              >
+                🤝
+              </motion.span>
             ) : (
               <motion.svg
                 width="36" height="36" viewBox="0 0 24 24" fill="none"
@@ -178,13 +189,15 @@ export default function ResultModal({
             transition={{ delay: 0.35 }}
           >
             <h2 className="font-orbitron text-2xl font-black tracking-widest sm:text-3xl"
-              style={{ color: isWin ? 'var(--clue-green)' : 'var(--orange)' }}>
-              {isWin ? 'CODE CRACKED' : 'DEFEATED'}
+              style={{ color: accentColor }}>
+              {isWin ? 'CODE CRACKED' : isDraw ? "IT'S A DRAW" : 'DEFEATED'}
             </h2>
             <p className="font-body text-sm text-[var(--wood-text-soft)]">
               {isWin
                 ? `You broke ${opponentName}'s code in ${guessCount} guess${guessCount !== 1 ? 'es' : ''}!`
-                : `${opponentName} held their code this time.`}
+                : isDraw
+                  ? `Neither you nor ${opponentName} cracked the code. Well played!`
+                  : `${opponentName} held their code this time.`}
             </p>
           </motion.div>
 
@@ -193,8 +206,8 @@ export default function ResultModal({
             <motion.div
               className="flex w-full flex-col gap-2 rounded-2xl p-4"
               style={{
-                background: isWin ? 'rgba(16,185,129,0.08)' : 'rgba(255,107,43,0.08)',
-                border: `1px solid ${isWin ? 'rgba(16,185,129,0.2)' : 'rgba(255,107,43,0.2)'}`
+                background: isWin ? 'rgba(16,185,129,0.08)' : isDraw ? 'rgba(217,119,6,0.08)' : 'rgba(255,107,43,0.08)',
+                border: `1px solid ${isWin ? 'rgba(16,185,129,0.2)' : isDraw ? 'rgba(217,119,6,0.2)' : 'rgba(255,107,43,0.2)'}`
               }}
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -202,16 +215,21 @@ export default function ResultModal({
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
-                  {isWin ? 'Total Payout' : 'Stake Lost'}
+                  {isWin ? 'Total Payout' : isDraw ? 'Stake Returned' : 'Stake Lost'}
                 </span>
-                <span className={`font-orbitron text-xl font-black ${isWin ? 'text-[var(--clue-green)]' : 'text-[var(--orange)]'}`}>
-                  {isWin ? `${winnings.toFixed(2)}` : `${stakeAmount.toFixed(2)}`} USDT
+                <span className={`font-orbitron text-xl font-black ${isWin ? 'text-[var(--clue-green)]' : isDraw ? 'text-amber-500' : 'text-[var(--orange)]'}`}>
+                  {isWin ? `${winnings.toFixed(2)}` : isDraw ? `${stakeAmount.toFixed(2)}` : `${stakeAmount.toFixed(2)}`} USDT
                 </span>
               </div>
               {isWin && (
                 <div className="flex items-center justify-between border-t border-[rgba(16,185,129,0.1)] pt-2 text-[10px] text-[var(--text-dim)] uppercase">
                    <span>99% Prize Pool</span>
                    <span>1% Platform Fee Deducted</span>
+                </div>
+              )}
+              {isDraw && (
+                <div className="flex items-center justify-center border-t border-[rgba(217,119,6,0.1)] pt-2 text-[10px] text-amber-500/70 uppercase tracking-widest">
+                  Both stakes returned — no winner
                 </div>
               )}
             </motion.div>
@@ -320,7 +338,17 @@ export default function ResultModal({
                 {statsLoading ? '…' : pointsBefore}
               </span>
             </div>
-            {ratingDelta !== 0 && (
+            {isDraw ? (
+              <motion.div
+                className="flex items-center gap-1 rounded-lg px-3 py-1.5 font-ui text-sm font-bold"
+                style={{ background: 'rgba(217,119,6,0.15)', color: '#D97706' }}
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: 'spring', delay: 0.75, stiffness: 400 }}
+              >
+                No change
+              </motion.div>
+            ) : ratingDelta !== 0 ? (
               <motion.div
                 className="flex items-center gap-1 rounded-lg px-3 py-1.5 font-ui text-lg font-bold"
                 style={{
@@ -333,12 +361,12 @@ export default function ResultModal({
               >
                 {ratingDelta >= 0 ? '+' : ''}{ratingDelta}
               </motion.div>
-            )}
+            ) : null}
             <div className="flex flex-col items-end">
               <span className="font-body text-xs text-[var(--wood-text-soft)]">Updated CMC</span>
               <span
                 className="font-ui text-lg font-bold sm:text-xl"
-                style={{ color: ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)' }}
+                style={{ color: isDraw ? '#D97706' : ratingDelta >= 0 ? 'var(--clue-green)' : 'var(--orange)' }}
               >
                 {statsLoading ? '…' : pointsAfter}
               </span>

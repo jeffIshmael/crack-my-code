@@ -28,7 +28,7 @@ contract GuessMyCode is
 
     // ─── Enums ────────────────────────────────────────────────────────────────
 
-    enum MatchStatus { Pending, Active, Completed, Abandoned, Expired, Refunded }
+    enum MatchStatus { Pending, Active, Completed, Abandoned, Expired, Refunded, Draw }
     enum MatchType   { Free, Paid }
 
     // ─── Structs ──────────────────────────────────────────────────────────────
@@ -110,6 +110,16 @@ contract GuessMyCode is
         string p2Code,
         string historyHash,
         string[] guesses
+    );
+    event MatchDraw(
+        bytes32 indexed matchId,
+        address indexed player1,
+        address indexed player2,
+        uint256 stakeAmount,
+        MatchType matchType,
+        string p1Code,
+        string p2Code,
+        string historyHash
     );
     event MatchAbandoned    (bytes32 indexed matchId, address indexed quitter, address indexed winner);
     event MatchExpired      (bytes32 indexed matchId, address indexed challenger);
@@ -371,6 +381,79 @@ contract GuessMyCode is
         emit MatchCompleted(matchId, winner, loser, payout, fee, m.matchType, p1Code, p2Code, historyHash, guesses);
     }
 
+    /**
+     * Resolve a draw match on-chain (backend only).
+     *
+     * For paid matches, both players are refunded their per-player stakeAmount.
+     * For free matches, we just finalize the match record (no USDT transfers).
+     */
+    function resolveDraw(
+        bytes32 matchId,
+        address player2,
+        uint256 p1Guesses,
+        uint256 p2Guesses,
+        string memory p1Code,
+        string memory p2Code,
+        string memory historyHash
+    ) external nonReentrant onlyBackend matchExists(matchId) {
+        Match storage m = matches[matchId];
+
+        // Support off-chain joins for Free games (mirror resolveMatch behavior)
+        if (m.status == MatchStatus.Pending && m.matchType == MatchType.Free) {
+            require(player2 != address(0), "CB: player2 required for free match");
+            require(player2 != m.player1, "CB: cannot join own challenge");
+
+            m.player2 = player2;
+            m.status = MatchStatus.Active;
+            m.startedAt = block.timestamp;
+
+            // Register player2 and add to match history
+            if (players[player2].registeredAt == 0) {
+                players[player2].points = POINTS_START;
+                players[player2].registeredAt = block.timestamp;
+                emit PlayerRegistered(player2, block.timestamp);
+            }
+            players[player2].matchIds.push(matchId);
+            players[m.player1].matchIds.push(matchId);
+
+            delete challengeBoard[m.player1];
+            emit ChallengeJoined(matchId, m.player1, player2, block.timestamp);
+        }
+
+        require(m.status == MatchStatus.Active, "CB: match not active");
+
+        // For Active matches, player2 must match the stored on-chain player2.
+        require(player2 == m.player2, "CB: invalid player2");
+
+        // For safety (Paid matches must have a stake escrowed)
+        if (m.matchType == MatchType.Paid) {
+            require(m.totalPool > 0 && m.stakeAmount > 0, "CB: missing paid escrow");
+        }
+
+        m.player1Guesses = p1Guesses;
+        m.player2Guesses = p2Guesses;
+        m.player1Code = p1Code;
+        m.player2Code = p2Code;
+        m.historyHash = historyHash;
+
+        // For paid matches, refund both player stakes (no treasury fee on draws)
+        if (m.matchType == MatchType.Paid && m.totalPool > 0) {
+            uint256 stake = m.stakeAmount;
+            require(usdToken.transfer(m.player1, stake), "CB: refund p1 failed");
+            require(usdToken.transfer(m.player2, stake), "CB: refund p2 failed");
+        }
+
+        _recordDraw(m.player1);
+        _recordDraw(m.player2);
+
+        m.winner = address(0);
+        m.quitter = address(0);
+        m.status = MatchStatus.Draw;
+        m.endedAt = block.timestamp;
+
+        emit MatchDraw(matchId, m.player1, m.player2, m.stakeAmount, m.matchType, p1Code, p2Code, historyHash);
+    }
+
     function recordQuit(bytes32 matchId, address quitter)
         external
         nonReentrant
@@ -425,14 +508,11 @@ contract GuessMyCode is
      *      Called by the backend after match resolution or AI game completion.
      */
     function trackGame(MatchType mType, bool isAI) external onlyBackend {
-        if (isAI) {
-            totalAIGames++;
-        } else if (mType == MatchType.Paid) {
-            totalPvPPaidGames++;
-        } else {
-            totalPvPFreeGames++;
-        }
-        emit GameTracked(mType, isAI, totalAIGames, totalPvPPaidGames, totalPvPFreeGames);
+        // Deprecated for MiniPay mode.
+        // Draw/win/loss settlement already updates points and match state via resolveMatch/recordQuit.
+        // We intentionally stop doing extra on-chain bookkeeping to reduce agent transaction count.
+        mType;
+        isAI;
     }
 
     // ─── Internal Point Helpers ───────────────────────────────────────────────
@@ -473,6 +553,15 @@ contract GuessMyCode is
         p.gamesPlayed += 1;
         p.gamesQuit   += 1;
         emit PointsUpdated(player, old, p.points, "quit");
+    }
+
+    function _recordDraw(address player) internal {
+        _autoRegister(player);
+        PlayerProfile storage p = players[player];
+        uint256 old = p.points;
+        // No point change on draws; only count activity.
+        p.gamesPlayed += 1;
+        emit PointsUpdated(player, old, p.points, "draw");
     }
 
     // ─── View Functions ───────────────────────────────────────────────────────
@@ -532,7 +621,7 @@ contract GuessMyCode is
     }
 
     /**
-     * @dev Returns all finished (Completed, Abandoned, Expired, Refunded) matches for a player.
+     * @dev Returns all finished (Completed, Abandoned, Expired, Refunded, Draw) matches for a player.
      */
     function getFinishedChallenges(address wallet) 
         external 
@@ -544,7 +633,7 @@ contract GuessMyCode is
         for (uint256 i = 0; i < all.length; i++) {
             MatchStatus s = matches[all[i]].status;
             if (s == MatchStatus.Completed || s == MatchStatus.Abandoned || 
-                s == MatchStatus.Expired || s == MatchStatus.Refunded) {
+                s == MatchStatus.Expired || s == MatchStatus.Refunded || s == MatchStatus.Draw) {
                 count++;
             }
         }
@@ -554,7 +643,7 @@ contract GuessMyCode is
         for (uint256 i = 0; i < all.length; i++) {
             MatchStatus s = matches[all[i]].status;
             if (s == MatchStatus.Completed || s == MatchStatus.Abandoned || 
-                s == MatchStatus.Expired || s == MatchStatus.Refunded) {
+                s == MatchStatus.Expired || s == MatchStatus.Refunded || s == MatchStatus.Draw) {
                 result[index++] = all[i];
             }
         }

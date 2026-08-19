@@ -408,6 +408,61 @@ export const CONTRACT_ABI =  [
       {
         "indexed": true,
         "internalType": "address",
+        "name": "player1",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "player2",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "stakeAmount",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "enum GuessMyCode.MatchType",
+        "name": "matchType",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "p1Code",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "p2Code",
+        "type": "string"
+      },
+      {
+        "indexed": false,
+        "internalType": "string",
+        "name": "historyHash",
+        "type": "string"
+      }
+    ],
+    "name": "MatchDraw",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "challenger",
         "type": "address"
       }
@@ -1547,6 +1602,49 @@ export const CONTRACT_ABI =  [
   {
     "inputs": [],
     "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      },
+      {
+        "internalType": "address",
+        "name": "player2",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "p1Guesses",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint256",
+        "name": "p2Guesses",
+        "type": "uint256"
+      },
+      {
+        "internalType": "string",
+        "name": "p1Code",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "p2Code",
+        "type": "string"
+      },
+      {
+        "internalType": "string",
+        "name": "historyHash",
+        "type": "string"
+      }
+    ],
+    "name": "resolveDraw",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

@@ -3,7 +3,7 @@ import { prisma } from '@/lib/prisma';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { applyScoreDelta } from '@/lib/user-points';
 import { isRegisteredPlayer } from '@/lib/guest';
-import { recordQuitOnChain, trackGameOnChain } from '../../../../../blockchain/AgentFunctions';
+import { recordQuitOnChain } from '../../../../../blockchain/AgentFunctions';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,14 +49,6 @@ export async function POST(req: NextRequest) {
         where: { id: gameId },
         data: { status: 'COMPLETED', winnerAddress: 'AI' },
       });
-
-      void (async () => {
-        try {
-          await trackGameOnChain(0, true);
-        } catch (err) {
-          console.error('[Blockchain] Track game on quit failed:', err);
-        }
-      })();
 
       return NextResponse.json({
         success: true,

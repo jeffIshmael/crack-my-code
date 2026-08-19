@@ -853,6 +853,8 @@ function InviteWaiting({
 }) {
   const [copied, setCopied] = useState(false);
   const timeLeft = Math.max(0, 300 - searchTime); // 5 minutes
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(joinCode);
@@ -874,8 +876,16 @@ function InviteWaiting({
 
       <div className="flex flex-col items-center gap-2 text-center">
         <h3 className="font-orbitron text-base font-black tracking-widest text-[var(--accent)] uppercase">Waiting for Friend</h3>
+        <div className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[var(--orange)]/30 bg-[var(--orange)]/10 px-4 py-2">
+          <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--orange)]/70">
+            Expires in
+          </span>
+          <span className="font-code text-[20px] font-black tracking-[0.01em] text-[var(--orange)]">
+            {minutes}:{seconds.toString().padStart(2, "0")}
+          </span>
+        </div>
         <p className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-widest max-w-[240px]">
-          Share this Game ID. Friends paste it under Join Challenge on Home or Open. Expires in {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, "0")}.
+          Share this Game ID. Friends paste it under Join Challenge on Home.
         </p>
       </div>
 
