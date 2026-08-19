@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Fredoka, Nunito } from 'next/font/google';
 import './globals.css';
 
 import { WalletProvider } from '@/components/wallet-provider';
@@ -7,6 +8,20 @@ import { FarcasterMiniAppProvider } from '@/components/farcaster-miniapp-provide
 import { ThemeBackground } from '@/components/ThemeBackground';
 import { Toaster } from '@/components/ui/toaster';
 import { buildFcEmbedMetadata } from '@/lib/farcaster-embed';
+
+const fredoka = Fredoka({
+  subsets: ['latin'],
+  weight: ['500', '600', '700'],
+  display: 'swap',
+  variable: '--font-fredoka',
+});
+
+const nunito = Nunito({
+  subsets: ['latin'],
+  weight: ['400', '600', '700', '800'],
+  display: 'swap',
+  variable: '--font-nunito',
+});
 
 export const metadata: Metadata = {
   title: 'Crack-My-Code',
@@ -28,7 +43,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={`${fredoka.variable} ${nunito.variable}`}>
       <head>
         <script
           dangerouslySetInnerHTML={{
