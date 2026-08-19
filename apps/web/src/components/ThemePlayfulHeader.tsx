@@ -29,7 +29,7 @@ export function ThemePlayfulHeader({ points, pointsLoading = false, usdtFormatte
       <div className="theme-playful-header-chip">
         <div className="theme-playful-header__usdt font-body">
           <Image
-            src="/usdt-logo.png"
+            src="/usdt-logo.webp"
             alt=""
             width={22}
             height={22}

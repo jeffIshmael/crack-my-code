@@ -26,7 +26,7 @@ const SECTIONS = [
       <div className="flex flex-col gap-3 text-left">
         <p className="font-body text-sm leading-relaxed text-[var(--wood-text-soft)]">
           Each player sets a secret <strong className="text-[var(--wood-text)]">4-digit code</strong>.
-          Take turns guessing the opponent&apos;s code, first to crack it wins.
+          Take turns guessing the opponent&apos;s code — you each have <strong className="text-[var(--wood-text)]">6 attempts</strong>. First to crack it wins!
         </p>
         <p className="font-body text-sm leading-relaxed text-[var(--wood-text-soft)]">
           After every guess, colored tiles show how close you are:
@@ -43,7 +43,7 @@ const SECTIONS = [
           </li>
         </ul>
         <p className="font-body text-sm leading-relaxed text-[var(--wood-text-soft)]">
-          Play <strong className="text-[var(--wood-text)]">Cipher AI</strong> instantly, or challenge another player in a friendly match.
+          If both players use all 6 guesses without cracking the code, the match ends in a <strong className="text-[var(--wood-text)]">🤝 Draw</strong> — no points change, and any staked USDT is fully refunded.
         </p>
       </div>
     ),
@@ -120,6 +120,12 @@ const SECTIONS = [
                 <td className="px-3 py-2.5">Lose vs another player</td>
                 <td className="px-3 py-2.5 text-right font-bold text-[var(--orange)]">
                   {SCORE_COPY.pvpLoss}
+                </td>
+              </tr>
+              <tr className="border-t border-[var(--border-mid)]">
+                <td className="px-3 py-2.5">🤝 Draw (both exhaust 6 guesses)</td>
+                <td className="px-3 py-2.5 text-right font-bold text-amber-500">
+                  ±0
                 </td>
               </tr>
             </tbody>

@@ -1,0 +1,101 @@
+{
+  "app": "Crack My Code",
+  "url": "https://www.crackmycode.fun",
+  "description": "Full manifest of all URLs, subdomains, and external origins used by the Mini App.",
+  "origins": [
+    {
+      "origin": "https://www.crackmycode.fun",
+      "description": "Primary app domain (Vercel deployment)"
+    },
+    {
+      "origin": "https://crack-my-code.vercel.app",
+      "description": "Vercel deployment alias"
+    },
+    {
+      "origin": "https://forno.celo.org",
+      "description": "Celo Mainnet RPC (public, used for on-chain reads and writes)"
+    },
+    {
+      "origin": "https://api.privy.io",
+      "description": "Privy authentication and embedded wallet API"
+    },
+    {
+      "origin": "https://auth.privy.io",
+      "description": "Privy OAuth and sign-in flows"
+    },
+    {
+      "origin": "https://bundler.privy.io",
+      "description": "Privy smart wallet bundler (ERC-4337 account abstraction)"
+    },
+    {
+      "origin": "https://sockjs-mt1.pusher.com",
+      "description": "Pusher realtime WebSocket transport (in-game updates, matchmaking)"
+    },
+    {
+      "origin": "wss://ws-mt1.pusher.com",
+      "description": "Pusher WebSocket connection"
+    },
+    {
+      "origin": "https://stats.pusher.com",
+      "description": "Pusher stats endpoint"
+    },
+    {
+      "origin": "https://blue-late-antelope-447.mypinata.cloud",
+      "description": "Pinata IPFS gateway (game history uploads for on-chain match resolution)"
+    },
+    {
+      "origin": "https://api.pinata.cloud",
+      "description": "Pinata IPFS upload API"
+    },
+    {
+      "origin": "https://fonts.googleapis.com",
+      "description": "Google Fonts CSS (Orbitron, Inter)"
+    },
+    {
+      "origin": "https://fonts.gstatic.com",
+      "description": "Google Fonts static font files"
+    },
+    {
+      "origin": "https://0317e55136a46557516aa40EA96d66772767C72C.celoscan.io",
+      "description": "CeloScan — verified smart contract explorer link"
+    }
+  ],
+  "smart_contracts": [
+    {
+      "name": "GuessMyCode (Proxy)",
+      "address": "0x0317e55136a46557516aa40EA96d66772767C72C",
+      "chain": "Celo Mainnet (42220)",
+      "celoscan": "https://celoscan.io/address/0x0317e55136a46557516aa40EA96d66772767C72C"
+    },
+    {
+      "name": "GuessMyCode (Implementation v3)",
+      "address": "0xe2CE21a1A84264549FE1Ab3d43D26042a748af82",
+      "chain": "Celo Mainnet (42220)",
+      "celoscan": "https://celoscan.io/address/0xe2CE21a1A84264549FE1Ab3d43D26042a748af82#code"
+    },
+    {
+      "name": "USDT (Tether) on Celo",
+      "address": "0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e",
+      "chain": "Celo Mainnet (42220)",
+      "celoscan": "https://celoscan.io/token/0x48065fbbe25f71c9282ddf5e1cd6d6a887483d5e"
+    }
+  ],
+  "sample_transactions": [
+    {
+      "method": "createChallenge (user stakes USDT + opens match)",
+      "tx": "https://celoscan.io/tx/0xcbc5616033bcf04065f9665f24dfa631c03e620cd8d634f75b1fc1c0ec9c6721"
+    },
+    {
+      "method": "resolveMatch (backend settles winner, pays out escrow)",
+      "tx": "https://celoscan.io/tx/0x758fdd2400e65d3672a82469425f76e8edacec1cbca6654829a2d8c5ad137858"
+    }
+  ],
+  "pagespeed": {
+    "url": "https://pagespeed.web.dev/analysis/https-www-crackmycode-fun/8s8ef3bu9k?form_factor=mobile",
+    "mobile_performance": 56,
+    "accessibility": 91,
+    "best_practices": 77,
+    "seo": 100,
+    "captured_at": "2026-08-19"
+  }
+}

@@ -2,19 +2,19 @@
   "miniapp": {
     "name": "Crack-My-Code",
     "version": "1",
-    "iconUrl": "https://crack-my-code.vercel.app/logo.png",
-    "homeUrl": "https://crack-my-code.vercel.app",
-    "splashImageUrl": "https://crack-my-code.vercel.app/splash.png",
+    "iconUrl": "https://www.crackmycode.fun/minipay-logo.png",
+    "homeUrl": "https://www.crackmycode.fun",
+    "splashImageUrl": "https://www.crackmycode.fun/splash.png",
     "splashBackgroundColor": "#4ab8e8",
-    "webhookUrl": "https://crack-my-code.vercel.app/api/webhook",
+    "webhookUrl": "https://www.crackmycode.fun/api/webhook",
     "primaryCategory": "games",
     "subtitle": "Crack the code and win.",
     "description": "Set your secret code and try to crack theirs first in this fast-paced strategy game on Celo.",
     "screenshotUrls": [
-      "https://crack-my-code.vercel.app/1.png"
+      "https://www.crackmycode.fun/1.png"
     ],
-    "heroImageUrl": "https://crack-my-code.vercel.app/embed.png",
-    "ogImageUrl": "https://crack-my-code.vercel.app/embed.png",
+    "heroImageUrl": "https://www.crackmycode.fun/embed.png",
+    "ogImageUrl": "https://www.crackmycode.fun/embed.png",
     "tags": [
       "games",
       "strategy",

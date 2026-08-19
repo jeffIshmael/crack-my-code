@@ -157,7 +157,7 @@ function MpesaWithdrawForm({
     <>
       <div className="wallet-modal-hero">
         <Image
-          src="/mpesa.png"
+          src="/mpesa.webp"
           alt="M-Pesa"
           width={120}
           height={40}

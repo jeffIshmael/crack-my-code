@@ -108,7 +108,7 @@ export function SettingsPanel({
         <div className="theme-sky-readout flex flex-row gap-2 p-4">
           <div className="flex min-w-0 flex-1 flex-col gap-2">
             <div className="flex items-center gap-2">
-              <Image src="/usdt-logo.png" alt="" width={20} height={20} aria-hidden />
+              <Image src="/usdt-logo.webp" alt="" width={20} height={20} aria-hidden />
               <span className="font-body text-[10px] font-bold uppercase tracking-wider text-[var(--text-dim)]">
                 USDT
               </span>
