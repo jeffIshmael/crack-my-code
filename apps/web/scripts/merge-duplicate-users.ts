@@ -12,7 +12,6 @@ type UserRow = {
   id: number;
   address: string | null;
   points: number | null;
-  rating: number | null;
   _count: { games: number };
 };
 
@@ -37,7 +36,6 @@ async function main() {
       id: true,
       address: true,
       points: true,
-      rating: true,
       _count: { select: { games: true } },
     },
     orderBy: { id: 'asc' },
@@ -72,7 +70,6 @@ async function main() {
     const canonical = pickCanonical(users);
     const duplicates = users.filter((u) => u.id !== canonical.id);
     const mergedPoints = Math.max(...users.map((u) => u.points ?? 1000));
-    const mergedRating = Math.max(...users.map((u) => u.rating ?? 1000));
 
     for (const dup of duplicates) {
       const reassigned = await prisma.game.updateMany({
@@ -91,7 +88,6 @@ async function main() {
       data: {
         address: key,
         points: mergedPoints,
-        rating: mergedRating,
       },
     });
 
