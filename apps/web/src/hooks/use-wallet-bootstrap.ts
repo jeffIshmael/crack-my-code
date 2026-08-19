@@ -11,16 +11,12 @@ import { isLikelyMiniPayHost, isMiniPayClient } from '@/lib/minipay-host';
 export function useWalletBootstrap() {
   const { isMiniPay, isAutoConnect } = useMiniAppEnvironment();
   const { authenticated } = usePrivy();
-  const { isConnected, isConnecting, isReconnecting, status } = useAccount();
+  const { isConnected, isConnecting, isReconnecting } = useAccount();
 
   const isAutoConnectHost =
     isMiniPay || isAutoConnect || isLikelyMiniPayHost() || isMiniPayClient();
 
-  const wagmiPending =
-    isConnecting ||
-    isReconnecting ||
-    status === 'connecting' ||
-    status === 'reconnecting';
+  const wagmiPending = isConnecting || isReconnecting;
 
   const isBootstrapping =
     isAutoConnectHost &&
