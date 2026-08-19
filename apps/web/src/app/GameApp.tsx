@@ -62,6 +62,8 @@ import { pusherClient } from '@/lib/pusher-client';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { isRegisteredPlayer } from '@/lib/guest';
 import { useMiniAppEnvironment } from '@/hooks/use-mini-app-environment';
+import { useWalletBootstrap } from '@/hooks/use-wallet-bootstrap';
+import { isLikelyMiniPayHost } from '@/lib/minipay-host';
 import { useCipherDailyStatus } from '@/hooks/use-cipher-daily-status';
 
 function isDuplicateOfLastGuess(
@@ -96,7 +98,8 @@ export default function Home() {
   const searchParams = useSearchParams();
   const { address: wagmiAddress, isConnected } = useAccount();
   const { login, logout, authenticated, user } = usePrivy();
-  const { isMiniPay, isFarcaster, isReady: envReady } = useMiniAppEnvironment();
+  const { isMiniPay, isFarcaster, isReady: envReady, isAutoConnect } = useMiniAppEnvironment();
+  const { isBootstrapping: isWalletConnecting } = useWalletBootstrap();
   const publicClient = usePublicClient();
   const { disconnect } = useDisconnect();
   const { writeContractAsync } = useWriteContract();
@@ -187,10 +190,15 @@ export default function Home() {
   const [showHowToPlay, setShowHowToPlay] = useState(false);
 
   useEffect(() => {
+    if (isMiniPay || isLikelyMiniPayHost() || isAutoConnect) {
+      setShowSplash(isFarcaster && !isMiniPay && !isLikelyMiniPayHost());
+      setSplashResolved(true);
+      return;
+    }
     if (!envReady) return;
     setShowSplash(isFarcaster);
     setSplashResolved(true);
-  }, [isFarcaster, envReady]);
+  }, [isFarcaster, isMiniPay, isAutoConnect, envReady]);
 
   const handleSplashComplete = useCallback(() => {
     setShowSplash(false);
@@ -1191,6 +1199,119 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [gs.phase, currentGameId, gs.gameMode]);
 
+  const executeOnChainJoin = useCallback(async (gameData: {
+    id: string;
+    stake: number;
+    player1Address: string;
+    mode?: GameMode;
+  }) => {
+    const joinerAddress = (payoutAddress || address)?.toLowerCase();
+    if (!joinerAddress) throw new Error('Wallet not connected');
+
+    const joinMode: GameMode = gameData.mode ?? 'cash';
+
+    const reserveRes = await fetch('/api/games/reserve-join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ gameId: gameData.id, address: joinerAddress }),
+    });
+    const reserveData = await reserveRes.json();
+    if (!reserveRes.ok) {
+      if (reserveRes.status === 409) {
+        throw new Error('Someone else is joining this challenge');
+      }
+      throw new Error(reserveData.error || 'Could not reserve join');
+    }
+
+    if (reserveData.onChainMatchId) {
+      setCurrentOnChainMatchId(reserveData.onChainMatchId);
+    }
+
+    const challenger = gameData.player1Address as `0x${string}`;
+    let txHash: `0x${string}`;
+
+    if (smartWalletClient) {
+      const data = encodeFunctionData({
+        abi: CONTRACT_ABI,
+        functionName: 'joinChallenge',
+        args: [challenger],
+      });
+      txHash = (await smartWalletClient.sendTransaction({
+        to: CONTRACT_ADDRESS as `0x${string}`,
+        data,
+        value: BigInt(0),
+      })) as `0x${string}`;
+      if (!publicClient) throw new Error('Public client not available');
+      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+      if (receipt.status !== 'success') throw new Error('Join transaction failed');
+    } else {
+      const hash = await writeContractAsync({
+        address: CONTRACT_ADDRESS,
+        abi: CONTRACT_ABI,
+        functionName: 'joinChallenge',
+        args: [challenger],
+      });
+      if (!publicClient) throw new Error('Public client not available');
+      const receipt = await publicClient.waitForTransactionReceipt({ hash });
+      if (receipt.status !== 'success') throw new Error('Join transaction failed');
+      txHash = hash;
+    }
+
+    const confirmRes = await fetch('/api/games/confirm-join', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        gameId: gameData.id,
+        address: joinerAddress,
+        joinTxHash: txHash,
+      }),
+    });
+    const confirmData = await confirmRes.json();
+    if (!confirmRes.ok) {
+      if (confirmRes.status === 409) {
+        throw new Error('Someone else joined first');
+      }
+      throw new Error(confirmData.error || 'Join confirmation failed');
+    }
+
+    const stake = parseFloat(String(gameData.stake)) || 0;
+    setJoinGameIdInput('');
+    setPendingJoinStake(null);
+    handleMatchFound(confirmData.gameId, confirmData.opponentAddress, {
+      mode: joinMode,
+      stake: joinMode === 'cash' ? stake : 0,
+    });
+    setActiveTab('home');
+    toast.success('Joined!', {
+      description:
+        joinMode === 'cash'
+          ? 'Stake locked. Set your secret code to start.'
+          : 'Set your secret code — game starts when both players lock in.',
+    });
+  }, [
+    payoutAddress,
+    address,
+    smartWalletClient,
+    publicClient,
+    writeContractAsync,
+    handleMatchFound,
+  ]);
+
+  const executeJoinGame = useCallback(async (gameData: {
+    id: string;
+    mode: string;
+    stake: number;
+    player1Address: string;
+  }) => {
+    const joinMode: GameMode = gameData.mode === 'cash' ? 'cash' : 'fun';
+    await executeOnChainJoin({
+      id: gameData.id,
+      stake: parseFloat(String(gameData.stake)) || 0,
+      player1Address: gameData.player1Address,
+      mode: joinMode,
+    });
+  }, [executeOnChainJoin]);
+
   const handleFindMatch = useCallback(async (mode: GameMode, stake: number, isPublic: boolean = true, userBalance?: number) => {
     if (mode === 'cash' && !PROFESSIONAL_MODE_ENABLED) {
       toast.info('Professional mode coming soon', {
@@ -1211,27 +1332,23 @@ export default function Home() {
     try {
       let onChainMatchId: string | undefined;
 
-      // --- ON-CHAIN: Create Challenge ---
-      if (mode !== 'ai' && isConnected && txAddress) {
+      const createOnChainChallenge = async (): Promise<string | undefined> => {
         const isPaid = mode === 'cash';
         const stakeAmt = parseUnits(stake.toString(), 6);
-        console.log("the paid status", isPaid);
-
-
         let receipt;
 
         if (smartWalletClient) {
           const data = encodeFunctionData({
             abi: CONTRACT_ABI,
             functionName: 'createChallenge',
-            args: [isPaid, stakeAmt]
+            args: [isPaid, stakeAmt],
           });
           const txHash = await smartWalletClient.sendTransaction({
             to: CONTRACT_ADDRESS as `0x${string}`,
-            data: data,
-            value: BigInt(0)
+            data,
+            value: BigInt(0),
           });
-          if (!publicClient) throw new Error("Public client not available");
+          if (!publicClient) throw new Error('Public client not available');
           receipt = await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
         } else {
           const hash = await writeContractAsync({
@@ -1240,7 +1357,7 @@ export default function Home() {
             functionName: 'createChallenge',
             args: [isPaid, stakeAmt],
           });
-          if (!publicClient) throw new Error("Public client not available");
+          if (!publicClient) throw new Error('Public client not available');
           receipt = await publicClient.waitForTransactionReceipt({ hash });
         }
 
@@ -1249,11 +1366,42 @@ export default function Home() {
           eventName: 'ChallengeCreated',
           logs: receipt.logs,
         });
+        return logs.length > 0 ? logs[0].args.matchId : undefined;
+      };
 
-        if (logs.length > 0) {
-          onChainMatchId = logs[0].args.matchId;
-          setCurrentOnChainMatchId(onChainMatchId);
+      // Public PvP: join an existing host on-chain before opening a new challenge.
+      if (mode !== 'ai' && isPublic && isConnected && txAddress) {
+        const seekRes = await fetch('/api/games/find-match', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            address: effectiveAddress,
+            mode,
+            stake,
+            isPublic,
+            seekHost: true,
+            smartWalletAddress: smartWalletAddress || payoutAddress,
+          }),
+        });
+        const seekData = await seekRes.json();
+        if (!seekRes.ok) {
+          throw new Error(seekData.error || 'Matchmaking failed');
         }
+
+        if (seekData.status === 'join_available') {
+          await executeOnChainJoin({
+            id: seekData.gameId,
+            stake: parseFloat(String(seekData.stake)) || 0,
+            player1Address: seekData.player1Address,
+            mode,
+          });
+          return;
+        }
+      }
+
+      if (mode !== 'ai' && isConnected && txAddress) {
+        onChainMatchId = await createOnChainChallenge();
+        if (onChainMatchId) setCurrentOnChainMatchId(onChainMatchId);
       }
 
       const res = await fetch('/api/games/find-match', {
@@ -1309,7 +1457,7 @@ export default function Home() {
         }, 1500);
       }
     }
-  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive]);
+  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive, executeOnChainJoin]);
 
   const handleCancelMatchmaking = useCallback(async (options?: { fromTimeout?: boolean }) => {
     const gameId = currentGameIdRef.current;
@@ -1439,6 +1587,25 @@ export default function Home() {
 
     const playerAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
     const gameId = currentGameId;
+    let onChainMatchId = currentOnChainMatchIdRef.current ?? undefined;
+
+    if (!onChainMatchId && gameId && (gs.gameMode === 'cash' || gs.gameMode === 'fun')) {
+      try {
+        const lobbyRes = await fetch(`/api/games/lobby?id=${gameId}`);
+        if (lobbyRes.ok) {
+          const game = await lobbyRes.json();
+          onChainMatchId = game.onChainMatchId ?? undefined;
+        }
+      } catch {
+        /* use ref only */
+      }
+    }
+
+    const isOnChainQuit =
+      (gs.gameMode === 'cash' || gs.gameMode === 'fun') &&
+      !!onChainMatchId &&
+      isRegisteredPlayer(playerAddress) &&
+      isConnected;
 
     if (!gameId) {
       setGs(initialGameState(gs.playerPoints));
@@ -1448,10 +1615,45 @@ export default function Home() {
     }
 
     try {
+      let quitTxHash: `0x${string}` | undefined;
+
+      if (isOnChainQuit) {
+        if (smartWalletClient) {
+          const data = encodeFunctionData({
+            abi: CONTRACT_ABI,
+            functionName: 'quitMatch',
+            args: [onChainMatchId as `0x${string}`],
+          });
+          quitTxHash = (await smartWalletClient.sendTransaction({
+            to: CONTRACT_ADDRESS as `0x${string}`,
+            data,
+            value: BigInt(0),
+          })) as `0x${string}`;
+          if (!publicClient) throw new Error('Public client not available');
+          const receipt = await publicClient.waitForTransactionReceipt({ hash: quitTxHash });
+          if (receipt.status !== 'success') throw new Error('Quit transaction failed');
+        } else {
+          const hash = await writeContractAsync({
+            address: CONTRACT_ADDRESS,
+            abi: CONTRACT_ABI,
+            functionName: 'quitMatch',
+            args: [onChainMatchId as `0x${string}`],
+          });
+          if (!publicClient) throw new Error('Public client not available');
+          const receipt = await publicClient.waitForTransactionReceipt({ hash });
+          if (receipt.status !== 'success') throw new Error('Quit transaction failed');
+          quitTxHash = hash;
+        }
+      }
+
       const res = await fetch('/api/games/quit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameId, address: playerAddress }),
+        body: JSON.stringify({
+          gameId,
+          address: playerAddress,
+          ...(quitTxHash ? { quitTxHash } : {}),
+        }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -1492,6 +1694,10 @@ export default function Home() {
     isSignedIn,
     payoutAddress,
     currentGameId,
+    isConnected,
+    smartWalletClient,
+    publicClient,
+    writeContractAsync,
     clearTurnHandover,
     syncResultStats,
   ]);
@@ -1809,64 +2015,6 @@ export default function Home() {
     return () => window.removeEventListener('keydown', onKey);
   }, [gs.phase, gs.currentInput, handleDigitPress, handleDeleteDigit, handleSubmitGuess]);
 
-  const executeJoinGame = useCallback(async (gameData: {
-    id: string;
-    mode: string;
-    stake: number;
-    player1Address: string;
-  }) => {
-    const actualChallenger = gameData.player1Address;
-    const isPaid = gameData.mode === 'cash';
-    const joinMode: GameMode = isPaid ? 'cash' : 'fun';
-    const stake = parseFloat(String(gameData.stake)) || 0;
-
-    if (isPaid) {
-      if (smartWalletClient) {
-        const data = encodeFunctionData({
-          abi: CONTRACT_ABI,
-          functionName: 'joinChallenge',
-          args: [actualChallenger as `0x${string}`],
-        });
-        const txHash = await smartWalletClient.sendTransaction({
-          to: CONTRACT_ADDRESS as `0x${string}`,
-          data,
-          value: BigInt(0),
-        });
-        if (!publicClient) throw new Error('Public client not available');
-        await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
-      } else {
-        const hash = await writeContractAsync({
-          address: CONTRACT_ADDRESS,
-          abi: CONTRACT_ABI,
-          functionName: 'joinChallenge',
-          args: [actualChallenger as `0x${string}`],
-        });
-        if (!publicClient) throw new Error('Public client not available');
-        await publicClient.waitForTransactionReceipt({ hash });
-      }
-    }
-
-    const res = await fetch('/api/games/join', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ address, gameId: gameData.id }),
-    });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Join failed');
-
-    if (data.status === 'matched') {
-      setJoinGameIdInput('');
-      setPendingJoinStake(null);
-      handleMatchFound(data.gameId, data.opponentAddress, { mode: joinMode, stake });
-      setActiveTab('home');
-      toast.success('Joined!', {
-        description: isPaid
-          ? 'Stake locked. Set your secret code to start.'
-          : 'Set your secret code — game starts when both players lock in.',
-      });
-    }
-  }, [smartWalletClient, publicClient, writeContractAsync, address, handleMatchFound]);
-
   const handleJoinChallenge = useCallback(async (gameIdOrCode: string) => {
     if (!isConnected || !address) return;
 
@@ -1909,7 +2057,11 @@ export default function Home() {
     } catch (err) {
       console.error('Join failed', err);
       const errMsg = getErrorMessage(err);
-      toast.error('Join Error', { description: errMsg });
+      if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
+        toast.error('Challenge taken', { description: errMsg });
+      } else {
+        toast.error('Join Error', { description: errMsg });
+      }
       if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
         setTimeout(() => {
           window.location.href = 'https://link.minipay.xyz/add_cash?tokens=USDT';
@@ -1932,7 +2084,11 @@ export default function Home() {
     } catch (err) {
       console.error('Paid join failed', err);
       const errMsg = getErrorMessage(err);
-      toast.error('Join Error', { description: errMsg });
+      if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
+        toast.error('Challenge taken', { description: errMsg });
+      } else {
+        toast.error('Join Error', { description: errMsg });
+      }
     } finally {
       setIsJoining(null);
     }
@@ -2043,6 +2199,7 @@ export default function Home() {
           isMatchmaking={gs.phase === 'matchmaking'}
           opponentName={gs.opponentName}
           isSignedIn={isSignedIn}
+          isWalletConnecting={isWalletConnecting}
           payoutAddress={payoutAddress}
           cipherStatus={cipherStatus}
           cipherStatusLoaded={cipherStatusLoaded}
@@ -2059,6 +2216,9 @@ export default function Home() {
           joinGameIdInput={joinGameIdInput}
           onJoinGameIdInputChange={setJoinGameIdInput}
           onJoinByGameId={handleJoinByGameId}
+          onJoinCashChallenge={(game) =>
+            executeOnChainJoin({ ...game, mode: 'cash' })
+          }
           isJoining={!!isJoining}
           onHideSearch={handleHideSearch}
           hasPendingSearch={isSearchHidden}
@@ -2201,7 +2361,12 @@ export default function Home() {
 
   const renderOpenGames = () => (
     <motion.div key="games" className="page-tab flex w-full flex-col text-left h-[calc(100dvh-var(--nav-clearance-with-safe))]" {...screenVariants}>
-      {!isSignedIn || !payoutAddress ? (
+      {isWalletConnecting ? (
+        <div className="theme-sky-readout flex flex-col items-center justify-center gap-4 py-16 text-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+          <p className="font-body text-sm text-[var(--text-dim)]">Connecting your MiniPay wallet…</p>
+        </div>
+      ) : !isSignedIn || !payoutAddress ? (
         <div className="theme-sky-readout flex flex-col items-center justify-center gap-4 py-16 text-center">
           <span className="text-4xl" aria-hidden>🛡️</span>
           <p className="font-body text-sm text-[var(--text-dim)]">Connect wallet to view your open challenges</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useMemo } from "react";
+import { useEffect, useLayoutEffect, useMemo } from "react";
 import { createConfig, WagmiProvider } from "@privy-io/wagmi";
 import { http, useConnect, injected, useAccount } from "wagmi";
 import { celo, celoSepolia } from "wagmi/chains";
@@ -109,16 +109,42 @@ function WalletProviderInner({ children }: { children: React.ReactNode }) {
   const { isConnected } = useAccount();
   const { isFarcaster, isMiniPay, isReady: envReady } = useMiniAppEnvironment();
 
+  const connectMiniPay = () => {
+    if (isConnected) return true;
+    if (!(isMiniPay || isLikelyMiniPayHost() || isMiniPayClient())) return false;
+
+    const injectedConnector =
+      connectors.find((c) => c.id === 'injected' || c.id === 'metaMask') ??
+      connectors.find((c) => c.type === 'injected');
+    if (injectedConnector) {
+      connect({ connector: injectedConnector });
+      return true;
+    }
+    return false;
+  };
+
+  useLayoutEffect(() => {
+    if (isConnected) return;
+    if (!(isMiniPay || isLikelyMiniPayHost() || isMiniPayClient())) return;
+
+    if (connectMiniPay()) return;
+
+    let attempts = 0;
+    const interval = window.setInterval(() => {
+      attempts += 1;
+      if (connectMiniPay() || attempts >= 60) {
+        window.clearInterval(interval);
+      }
+    }, 50);
+
+    return () => window.clearInterval(interval);
+  }, [connect, connectors, isConnected, isMiniPay]);
+
   useEffect(() => {
     if (isConnected) return;
 
     if (isMiniPay || isLikelyMiniPayHost() || isMiniPayClient()) {
-      const injectedConnector = connectors.find(c => c.id === 'injected' || c.id === 'metaMask');
-      if (injectedConnector) {
-        connect({ connector: injectedConnector });
-      } else if (connectors.length > 1) {
-        connect({ connector: connectors[1] });
-      }
+      connectMiniPay();
       return;
     }
 

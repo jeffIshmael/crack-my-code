@@ -7,6 +7,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { Wallet } from "lucide-react";
 import { USDT_ADDRESS } from "../../blockchain/constants";
 import { useMiniAppEnvironment } from "@/hooks/use-mini-app-environment";
+import { isLikelyMiniPayHost } from "@/lib/minipay-host";
 import { resolvePayoutAddress } from "@/lib/wallet-address";
 
 interface ConnectButtonProps {
@@ -51,12 +52,13 @@ export function ConnectButton({ onWalletClick }: ConnectButtonProps) {
     }
   }, [authenticated, isConnected, address, fetchPoints]);
 
-  const { isAutoConnect: isAutoConnectEnv, isReady: envReady } = useMiniAppEnvironment();
+  const { isAutoConnect: isAutoConnectEnv, isReady: envReady, isMiniPay } = useMiniAppEnvironment();
+  const isAutoConnectHost = isAutoConnectEnv || isMiniPay || isLikelyMiniPayHost();
 
   const isSyncIssue = authenticated && isConnected && wagmiAddress !== user?.wallet?.address;
 
   if (!authenticated && !isConnected) {
-    if (!envReady || isAutoConnectEnv) {
+    if (!envReady || isAutoConnectHost) {
       return (
         <div className="flex w-full justify-end">
           <div className="flex items-center gap-2 rounded-full border border-[var(--accent)]/20 bg-[var(--accent)]/5 px-6 py-2.5">

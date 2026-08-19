@@ -2,17 +2,25 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
-import { pusherServer } from '@/lib/pusher-server';
 import { generateCipherSecretCode } from '@/lib/game';
 import { generateJoinCode } from '@/lib/join-code';
 import { createGameRecord } from '@/lib/prisma-game';
 import { ensureGuestUser, ensureRegisteredUser } from '@/lib/user-address';
 import { getCipherDailyStatus } from '@/lib/cipher-daily';
 import { isRegisteredPlayer } from '@/lib/guest';
+import { isJoinableChallenge } from '@/lib/open-challenges';
 
 export async function POST(req: NextRequest) {
   try {
-    const { address, mode, stake, onChainMatchId, isPublic = true, smartWalletAddress } = await req.json();
+    const {
+      address,
+      mode,
+      stake,
+      onChainMatchId,
+      isPublic = true,
+      smartWalletAddress,
+      seekHost = false,
+    } = await req.json();
 
     const isAI = mode === 'ai';
     const rawAddress = address || (isAI ? 'GUEST' : null);
@@ -37,7 +45,6 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 1. Ensure the user exists (Guests use a shared GUEST account)
     const user =
       effectiveAddress === 'GUEST'
         ? await ensureGuestUser()
@@ -47,57 +54,61 @@ export async function POST(req: NextRequest) {
           );
 
     if (effectiveAddress === 'GUEST' && !isAI) {
-        return NextResponse.json({ error: 'Guests can only play against AI' }, { status: 403 });
+      return NextResponse.json({ error: 'Guests can only play against AI' }, { status: 403 });
     }
 
-    // 2. Auto-pair public challenges via live matchmaking (not the lobby board).
-    // Invite-only hosts must never be pulled into someone else's public queue.
-    if (isPublic && (mode === 'fun' || mode === 'cash')) {
+    // Seek an open public host before creating a new on-chain challenge (fun + cash).
+    if (
+      seekHost &&
+      isPublic &&
+      (mode === 'fun' || mode === 'cash') &&
+      effectiveAddress !== 'GUEST'
+    ) {
       const pendingGame = await prisma.game.findFirst({
         where: {
           status: 'PENDING',
           mode,
           isPublic: true,
           player2Address: null,
+          onChainMatchId: { not: null },
           player1Address: { not: effectiveAddress },
           ...(mode === 'cash' ? { stake: parseFloat(stake) || 0 } : {}),
         },
         orderBy: { createdAt: 'asc' },
       });
 
-      if (pendingGame) {
-        // MATCH FOUND!
-        const updatedGame = await prisma.game.update({
-          where: { id: pendingGame.id },
-          data: {
-            status: 'ACTIVE',
-            player2Address: effectiveAddress
-          }
-        });
-
-        // Notify Player 1 (the creator) via Pusher
-        await pusherServer.trigger(`private-user-${pendingGame.player1Address.toLowerCase()}`, 'match-found', {
-          gameId: updatedGame.id,
-          opponentAddress: effectiveAddress
-        });
-
-        return NextResponse.json({ 
-          status: 'matched', 
-          gameId: updatedGame.id, 
-          opponentAddress: pendingGame.player1Address 
+      if (
+        pendingGame &&
+        isJoinableChallenge(pendingGame, effectiveAddress, {
+          mode: mode as 'fun' | 'cash',
+          publicOnly: true,
+        })
+      ) {
+        return NextResponse.json({
+          status: 'join_available',
+          gameId: pendingGame.id,
+          opponentAddress: pendingGame.player1Address,
+          player1Address: pendingGame.player1Address,
+          stake: pendingGame.stake,
+          mode: pendingGame.mode,
         });
       }
+
+      return NextResponse.json({ status: 'no_host' });
     }
 
-    // 3. No match found or it's a Cash game / AI game
-    // Create a new PENDING game or an ACTIVE AI game
-    
-    // Generate AI code if applicable
+    if (!isAI && (mode === 'fun' || mode === 'cash') && !onChainMatchId) {
+      return NextResponse.json(
+        { error: 'On-chain challenge required before opening a match' },
+        { status: 400 },
+      );
+    }
+
     let aiCode = null;
     if (isAI) {
       aiCode = generateCipherSecretCode().join('');
     }
-    
+
     let joinCode: string | undefined;
     if (!isAI && !isPublic) {
       joinCode = generateJoinCode();
@@ -115,21 +126,23 @@ export async function POST(req: NextRequest) {
       player2Code: aiCode,
       ...(joinCode ? { joinCode } : {}),
     });
-    
-    // Public challenges match via live matchmaking (websocket + DB queue), not the lobby board.
-    // Only private (invite) challenges appear in "My Open Challenges".
 
-    return NextResponse.json({ 
-      status: isAI ? 'matched' : 'searching', 
+    return NextResponse.json({
+      status: isAI ? 'matched' : 'searching',
       gameId: newGame.id,
       joinCode: newGame.joinCode,
     });
-
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Matchmaking error:', error);
-    return NextResponse.json({ 
-      error: 'Failed to initiate matchmaking',
-      details: process.env.NODE_ENV === 'development' ? error.message : undefined 
-    }, { status: 500 });
+    return NextResponse.json(
+      {
+        error: 'Failed to initiate matchmaking',
+        details:
+          process.env.NODE_ENV === 'development' && error instanceof Error
+            ? error.message
+            : undefined,
+      },
+      { status: 500 },
+    );
   }
 }

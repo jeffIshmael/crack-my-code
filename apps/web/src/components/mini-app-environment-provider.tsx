@@ -7,7 +7,7 @@ import {
   getSyncMiniAppEnvironment,
   type MiniAppEnvironment,
 } from '@/lib/mini-app-environment';
-import { isLikelyMiniPayHost } from '@/lib/minipay-host';
+import { isLikelyMiniPayHost, isMiniPayClient, watchForMiniPayInjection } from '@/lib/minipay-host';
 import { DismissMiniAppSplash } from '@/components/dismiss-mini-app-splash';
 
 const PENDING: MiniAppEnvironment = {
@@ -39,19 +39,34 @@ export function MiniAppEnvironmentProvider({ children }: { children: React.React
   useLayoutEffect(() => {
     if (isLikelyMiniPayHost()) {
       setEnvironment((prev) => (prev.isMiniPay ? prev : getSyncMiniAppEnvironment() ?? prev));
+      return;
     }
+
+    return watchForMiniPayInjection(() => {
+      const detected = getSyncMiniAppEnvironment();
+      if (detected) {
+        setEnvironment((prev) => (prev.isMiniPay ? prev : detected));
+      }
+    });
   }, []);
 
   useEffect(() => {
     let cancelled = false;
 
-    if (!getSyncMiniAppEnvironment()) {
-      void sdk.isInMiniApp().then((inMiniApp) => {
-        if (!cancelled && inMiniApp) {
-          setEnvironment((prev) => (prev.isAutoConnect ? prev : MINI_APP_BOOTSTRAP));
-        }
-      });
+    // MiniPay first — never wait on the Farcaster SDK in MiniPay's WebView.
+    if (isLikelyMiniPayHost() || isMiniPayClient()) {
+      const detected = getSyncMiniAppEnvironment();
+      if (detected && !cancelled) setEnvironment(detected);
+      return () => {
+        cancelled = true;
+      };
     }
+
+    void sdk.isInMiniApp().then((inMiniApp) => {
+      if (!cancelled && inMiniApp) {
+        setEnvironment((prev) => (prev.isAutoConnect ? prev : MINI_APP_BOOTSTRAP));
+      }
+    });
 
     void detectMiniAppEnvironment().then((detected) => {
       if (!cancelled) {

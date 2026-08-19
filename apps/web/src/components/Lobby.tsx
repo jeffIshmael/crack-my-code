@@ -11,18 +11,23 @@ import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
-import { X, Lock } from 'lucide-react';
+import { X, Lock, Check, ArrowLeft } from 'lucide-react';
 import { ThemeLogo } from '@/components/ThemeLogo';
 import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
 import JoinChallenge from '@/components/JoinChallenge';
 import { FarcasterShareGameButton } from '@/components/FarcasterShareGameButton';
 import { buildGameShareUrl } from '@/lib/farcaster-embed';
 import type { CipherDailyStatus } from '@/hooks/use-cipher-daily-status';
+import { useMiniAppEnvironment } from '@/hooks/use-mini-app-environment';
+import type { OpenChallengeSummary } from '@/lib/open-challenges';
+
+const MINIPAY_ADD_USDT_URL = 'https://link.minipay.xyz/add_cash?tokens=USDT';
 
 interface LobbyProps {
   points: number;
   pointsLoading?: boolean;
   isSignedIn?: boolean;
+  isWalletConnecting?: boolean;
   payoutAddress?: string;
   cipherStatus?: CipherDailyStatus | null;
   cipherStatusLoaded?: boolean;
@@ -38,6 +43,11 @@ interface LobbyProps {
   joinGameIdInput?: string;
   onJoinGameIdInputChange?: (value: string) => void;
   onJoinByGameId?: () => void;
+  onJoinCashChallenge?: (game: {
+    id: string;
+    player1Address: string;
+    stake: number;
+  }) => Promise<void>;
   isJoining?: boolean;
   /** Called when user hides the searching screen so they can browse the lobby */
   onHideSearch?: () => void;
@@ -60,6 +70,7 @@ export default function Lobby({
   points,
   pointsLoading = false,
   isSignedIn = false,
+  isWalletConnecting = false,
   payoutAddress,
   cipherStatus = null,
   cipherStatusLoaded = true,
@@ -75,6 +86,7 @@ export default function Lobby({
   joinGameIdInput = '',
   onJoinGameIdInputChange,
   onJoinByGameId,
+  onJoinCashChallenge,
   isJoining = false,
   onHideSearch,
   hasPendingSearch = false,
@@ -83,7 +95,9 @@ export default function Lobby({
 }: LobbyProps) {
   const { isConnected, address: wagmiAddress } = useAccount();
   const { login } = usePrivy();
+  const { isMiniPay } = useMiniAppEnvironment();
   const walletAddress = payoutAddress || wagmiAddress;
+  const canUseWallet = isSignedIn || isWalletConnecting;
   const { data: usdtData } = useBalance({
     address: walletAddress as `0x${string}` | undefined,
     token: USDT_ADDRESS as `0x${string}`,
@@ -96,6 +110,14 @@ export default function Lobby({
   const [selectedMode, setSelectedMode] = useState<GameMode>('fun');
   const [stake, setStake] = useState<string>('5');
   const [isCreating, setIsCreating] = useState(false);
+  const [cashVisibility, setCashVisibility] = useState<boolean | null>(null);
+  const [showCashTxModal, setShowCashTxModal] = useState(false);
+  const [showJoinCashModal, setShowJoinCashModal] = useState(false);
+  const [pendingCreateAfterApprove, setPendingCreateAfterApprove] = useState(false);
+  const [pendingJoinAfterApprove, setPendingJoinAfterApprove] = useState(false);
+  const [isJoiningPublic, setIsJoiningPublic] = useState(false);
+  const [stakesWithOpen, setStakesWithOpen] = useState<number[]>([]);
+  const [openByStake, setOpenByStake] = useState<Record<string, OpenChallengeSummary | null>>({});
 
   const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
     address: USDT_ADDRESS,
@@ -115,7 +137,7 @@ export default function Lobby({
   const cipherAtDailyCap = cipherStatusLoaded && Boolean(cipherStatus?.atDailyCap);
   const cipherButtonDisabled = isCreating || cipherAtDailyCap || cipherStatusPending || hasPendingSearch;
 
-  const { writeContract: approve, data: approveHash, isPending: isApprovingAction } = useWriteContract();
+  const { writeContractAsync: approve, data: approveHash, isPending: isApprovingAction } = useWriteContract();
 
   const { isLoading: isWaitingForApproval } = useWaitForTransactionReceipt({
     hash: approveHash,
@@ -131,7 +153,7 @@ export default function Lobby({
 
   const handleApprove = async (amount: bigint) => {
     try {
-      approve({
+      await approve({
         address: USDT_ADDRESS,
         abi: ERC20_ABI,
         functionName: 'approve',
@@ -151,6 +173,47 @@ export default function Lobby({
     }
   }, [stake]);
 
+  const selectedStakeAmount = parseFloat(stake) || 0;
+  const usdtBalance = parseFloat(usdtData?.formatted || '0');
+  const usdtBalanceLoading = !!walletAddress && usdtData === undefined;
+  const canAffordStake = !usdtBalanceLoading && usdtBalance >= selectedStakeAmount;
+
+  const joinTarget = openByStake[String(selectedStakeAmount)] ?? null;
+  const canJoinExisting = cashVisibility === true && !!joinTarget;
+
+  const handleAddUsdt = () => {
+    window.location.href = MINIPAY_ADD_USDT_URL;
+  };
+
+  useEffect(() => {
+    if (!showPvPModal || pvpStep !== 'config' || selectedMode !== 'cash' || cashVisibility !== true) {
+      return;
+    }
+    if (!walletAddress) return;
+
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const res = await fetch(
+          `/api/games/open-challenges?excludeAddress=${encodeURIComponent(walletAddress)}`,
+        );
+        const data = await res.json();
+        if (!res.ok || cancelled) return;
+        setStakesWithOpen(data.stakesWithOpen ?? []);
+        setOpenByStake(data.byStake ?? {});
+      } catch {
+        // polling is best-effort
+      }
+    };
+
+    poll();
+    const intervalId = setInterval(poll, 2500);
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [showPvPModal, pvpStep, selectedMode, cashVisibility, walletAddress]);
+
   const handleStartPvP = (mode: GameMode) => {
     if (mode === 'cash' && !PROFESSIONAL_MODE_ENABLED) {
       toast.info('Professional mode coming soon', {
@@ -159,8 +222,9 @@ export default function Lobby({
       return;
     }
     setSelectedMode(mode);
+    setCashVisibility(null);
     if (mode === 'cash') {
-      setPvpStep('config');
+      setPvpStep('visibility');
     } else {
       setPvpStep('visibility');
     }
@@ -182,6 +246,94 @@ export default function Lobby({
       setIsCreating(false);
     }
   };
+
+  useEffect(() => {
+    if (!pendingCreateAfterApprove) return;
+    if (isApproving) return;
+    if (allowance < stakeBigInt) return;
+    if (cashVisibility === null) return;
+    setPendingCreateAfterApprove(false);
+    void handleFinalizeChallenge(cashVisibility);
+  }, [pendingCreateAfterApprove, isApproving, allowance, stakeBigInt, cashVisibility]);
+
+  const handleProceedCashChallenge = async () => {
+    if (cashVisibility === null) {
+      toast.error('Select visibility first', {
+        description: 'Choose Invite only or Anyone can join before opening a challenge.',
+      });
+      return;
+    }
+
+    if (!canAffordStake) {
+      toast.error('Insufficient USDT balance', {
+        description: `You need ${selectedStakeAmount.toFixed(1)} USDT but only have ${usdtBalance.toFixed(2)} USDT available.`,
+      });
+      if (isMiniPay) {
+        handleAddUsdt();
+      }
+      return;
+    }
+
+    setShowCashTxModal(false);
+
+    if (allowance < stakeBigInt) {
+      setPendingCreateAfterApprove(true);
+      await handleApprove(stakeBigInt);
+      return;
+    }
+
+    await handleFinalizeChallenge(cashVisibility);
+  };
+
+  const handleProceedJoinCash = async () => {
+    if (!joinTarget || !onJoinCashChallenge) return;
+
+    if (!canAffordStake) {
+      toast.error('Insufficient USDT balance', {
+        description: `You need ${selectedStakeAmount.toFixed(1)} USDT but only have ${usdtBalance.toFixed(2)} USDT available.`,
+      });
+      if (isMiniPay) handleAddUsdt();
+      return;
+    }
+
+    setShowJoinCashModal(false);
+
+    if (allowance < stakeBigInt) {
+      setPendingJoinAfterApprove(true);
+      await handleApprove(stakeBigInt);
+      return;
+    }
+
+    setIsJoiningPublic(true);
+    try {
+      await onJoinCashChallenge({
+        id: joinTarget.gameId,
+        player1Address: joinTarget.hostAddress,
+        stake: joinTarget.stake,
+      });
+      setShowPvPModal(false);
+      setPvpStep('selection');
+    } catch (err) {
+      console.error('Public join failed', err);
+      const errMsg = getErrorMessage(err);
+      if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
+        toast.error('Challenge taken', { description: errMsg });
+      } else {
+        toast.error('Join Error', { description: errMsg });
+      }
+    } finally {
+      setIsJoiningPublic(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!pendingJoinAfterApprove) return;
+    if (isApproving) return;
+    if (allowance < stakeBigInt) return;
+    if (!joinTarget) return;
+    setPendingJoinAfterApprove(false);
+    void handleProceedJoinCash();
+  }, [pendingJoinAfterApprove, isApproving, allowance, stakeBigInt, joinTarget]);
 
   const proceedStartAI = async () => {
     setIsCreating(true);
@@ -240,7 +392,16 @@ export default function Lobby({
           <ThemeLogo />
         </div>
 
-        {isSignedIn && walletAddress ? (
+        {isWalletConnecting ? (
+          <div className="mt-1 flex w-full justify-center">
+            <div className="home-sign-in-btn theme-sky-readout flex items-center gap-2 px-6 py-2">
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-[var(--accent)] border-t-transparent" />
+              <span className="font-ui text-[10px] uppercase tracking-widest text-[var(--text)]">
+                Connecting wallet…
+              </span>
+            </div>
+          </div>
+        ) : isSignedIn && walletAddress ? (
           <ThemePlayfulHeader
             points={points}
             pointsLoading={pointsLoading}
@@ -453,22 +614,34 @@ export default function Lobby({
 
                 <button
                   type="button"
-                  onClick={hasPendingSearch ? undefined : (isSignedIn ? openPvPModal : () => login())}
-                  disabled={hasPendingSearch}
+                  onClick={hasPendingSearch ? undefined : (canUseWallet ? openPvPModal : () => login())}
+                  disabled={hasPendingSearch || isWalletConnecting}
                   className={`theme-game-btn theme-game-btn--pvp group ${
-                    hasPendingSearch ? 'opacity-50 cursor-not-allowed' : isSignedIn ? 'theme-game-btn--lively' : 'theme-game-btn--signin-required'
+                    hasPendingSearch || isWalletConnecting
+                      ? 'opacity-50 cursor-not-allowed'
+                      : canUseWallet
+                        ? 'theme-game-btn--lively'
+                        : 'theme-game-btn--signin-required'
                   }`}
-                  aria-disabled={!isSignedIn || hasPendingSearch}
+                  aria-disabled={!canUseWallet || hasPendingSearch || isWalletConnecting}
                 >
                   <div className="theme-game-btn__inner">
                     <span className="theme-game-btn__emoji-badge" aria-hidden>⚔️</span>
                     <div className="theme-game-btn__content">
                       <span className="theme-game-btn__title">Vs Opponent</span>
                       <span className="theme-game-btn__subtitle">
-                        {hasPendingSearch ? '⏳ Finish or cancel current game first' : isSignedIn ? 'Public or invite-only match' : '🔒 Sign in to duel'}
+                        {hasPendingSearch
+                          ? '⏳ Finish or cancel current game first'
+                          : isWalletConnecting
+                            ? 'Connecting wallet…'
+                            : canUseWallet
+                              ? 'Public or invite-only match'
+                              : '🔒 Sign in to duel'}
                       </span>
                     </div>
-                    <span className="theme-game-btn__go">{hasPendingSearch ? '⏳' : isSignedIn ? 'DUEL' : '🔒'}</span>
+                    <span className="theme-game-btn__go">
+                      {hasPendingSearch ? '⏳' : isWalletConnecting ? '…' : canUseWallet ? 'DUEL' : '🔒'}
+                    </span>
                   </div>
                 </button>
               </motion.div>
@@ -480,8 +653,10 @@ export default function Lobby({
                     onChange={onJoinGameIdInputChange}
                     onJoin={onJoinByGameId}
                     isJoining={isJoining}
-                    disabled={!isSignedIn || hasPendingSearch}
-                    onSignInRequired={hasPendingSearch ? undefined : () => login()}
+                    disabled={!canUseWallet || hasPendingSearch || isWalletConnecting}
+                    onSignInRequired={
+                      hasPendingSearch || isWalletConnecting ? undefined : () => login()
+                    }
                     collapsible
                   />
                 </motion.div>
@@ -584,23 +759,40 @@ export default function Lobby({
                           <span className="font-ui text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">Friendly match</span>
                           <span className="text-xl transition-transform group-hover:scale-110" aria-hidden>⚔️</span>
                         </div>
-                        <p className="font-body text-[11px] text-[var(--text-dim)]">Free match · climb the global ranking</p>
-                      </button>
-
-                      <div className="theme-sky-readout relative flex flex-col gap-2 p-5 opacity-60">
-                        <div className="absolute top-3 right-3 rounded-full bg-[var(--orange-dim)] px-2.5 py-1">
-                          <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--orange)]">
-                            Coming soon
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-[11px] text-[var(--text-dim)]">Free match · climb the global ranking</p>
+                          <span
+                            className="shrink-0 text-lg font-black leading-none text-[var(--text-dim)] transition-colors group-hover:text-[var(--accent)]"
+                            aria-hidden
+                          >
+                            &gt;
                           </span>
                         </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleStartPvP('cash')}
+                        className="theme-sky-readout group relative flex flex-col gap-2 p-5 text-left transition-all hover:translate-y-[-2px] active:translate-y-[1px]"
+                      >
                         <div className="flex items-center justify-between">
-                          <span className="font-ui text-sm font-bold text-[var(--text-dim)]">Professional</span>
-                          <span className="text-xl grayscale" aria-hidden>💰</span>
+                          <span className="font-ui text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">
+                            Professional
+                          </span>
+                          <span className="text-xl transition-transform group-hover:scale-110" aria-hidden>💰</span>
                         </div>
-                        <p className="font-body pr-16 text-[11px] text-[var(--text-dim)]">
-                          USDT stakes · winner takes 99%
-                        </p>
-                      </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-[11px] text-[var(--text-dim)]">
+                            USDT stakes · winner takes 99%
+                          </p>
+                          <span
+                            className="shrink-0 text-lg font-black leading-none text-[var(--text-dim)] transition-colors group-hover:text-[var(--accent)]"
+                            aria-hidden
+                          >
+                            &gt;
+                          </span>
+                        </div>
+                      </button>
                     </div>
                   </motion.div>
                 ) : pvpStep === 'config' ? (
@@ -625,54 +817,96 @@ export default function Lobby({
                               key={amt}
                               type="button"
                               onClick={() => setStake(String(amt))}
-                              className={`rounded-2xl border-2 p-3 font-ui text-base font-bold transition-all ${
+                              className={`relative rounded-2xl border-2 p-3 font-ui text-base font-bold transition-all ${
                                 parseFloat(stake) === amt
                                   ? 'border-[var(--orange)] bg-[var(--orange)]/15 text-[var(--orange)] scale-[1.04]'
                                   : 'border-[var(--border-mid)] bg-[var(--bg-elevated)] text-[var(--text)] hover:border-[var(--orange)]/50'
                               }`}
                             >
+                              {cashVisibility === true && stakesWithOpen.includes(amt) && (
+                                <span
+                                  className="absolute left-2 top-2 h-2 w-2 rounded-full bg-[var(--clue-green)] animate-pulse"
+                                  aria-hidden
+                                />
+                              )}
+                              {parseFloat(stake) === amt && (
+                                <span className="absolute right-1.5 top-1.5 inline-flex h-4 w-4 items-center justify-center rounded-full bg-[var(--orange)] text-white">
+                                  <Check size={11} />
+                                </span>
+                              )}
                               {amt} <span className="text-[10px] font-normal text-[var(--text-dim)]">USDT</span>
                             </button>
                           ))}
                         </div>
                         <div className="flex items-center justify-end px-1">
-                          <span className="font-body text-[10px] text-[var(--text-dim)]">
-                            Available: <span className="font-bold text-[var(--text)]">{usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)} USDT` : '…'}</span>
+                          <span className={`font-body text-[10px] ${!canAffordStake && !usdtBalanceLoading ? 'text-red-600' : 'text-[var(--text-dim)]'}`}>
+                            Available:{' '}
+                            <span className={`font-bold ${!canAffordStake && !usdtBalanceLoading ? 'text-red-700' : 'text-[var(--text)]'}`}>
+                              {usdtBalanceLoading ? '…' : `${usdtBalance.toFixed(2)} USDT`}
+                            </span>
                           </span>
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div className="flex flex-col gap-1 rounded-2xl border-2 border-[var(--clue-green)]/20 bg-[var(--clue-green-bg)] p-4">
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="flex flex-col items-center justify-center gap-0.5 rounded-xl border-2 border-[var(--clue-green)]/20 bg-[var(--clue-green-bg)] px-2.5 py-2 text-center">
                           <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--text-dim)]">Winner reward</span>
-                          <span className="font-ui text-xl font-bold text-[var(--clue-green)]">
-                            {((parseFloat(stake) || 0) * 2 * 0.99).toFixed(3)} <span className="text-[10px]">USDT</span>
+                          <span className="font-ui text-base font-bold leading-tight text-[var(--clue-green)]">
+                            {((parseFloat(stake) || 0) * 2 * 0.99).toFixed(3)} <span className="text-[9px]">USDT</span>
                           </span>
                         </div>
-                        <div className="theme-sky-readout flex flex-col gap-1 p-4 !shadow-none">
+                        <div className="theme-sky-readout flex flex-col gap-0.5 px-2.5 py-2 !shadow-none">
                           <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--text-dim)]">Platform fee</span>
-                          <span className="font-ui text-xl font-bold text-[var(--text)]">
-                            1.0 <span className="text-[10px]">%</span>
+                          <span className="font-ui text-base font-bold leading-tight text-[var(--text)]">
+                            1.0 <span className="text-[9px]">%</span>
                           </span>
                         </div>
                       </div>
 
-                      <div className="flex flex-col gap-2">
+                      {!usdtBalanceLoading && !canAffordStake && selectedStakeAmount >= 0.1 && (
+                        <div className="flex flex-col items-center gap-1 px-3 py-1 text-center">
+                          <p className="font-body text-sm text-red-700">
+                            Insufficient balance.
+                          </p>
+                          {isMiniPay && (
+                            <button
+                              type="button"
+                              onClick={handleAddUsdt}
+                              className="font-ui text-[11px] font-bold uppercase tracking-wide text-[var(--accent)] underline underline-offset-2"
+                            >
+                              Add USDT
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex flex-col gap-3">
                         <button
                           type="button"
-                          onClick={() => allowance < stakeBigInt ? handleApprove(stakeBigInt) : setPvpStep('visibility')}
-                          disabled={isApproving || isCreating || (parseFloat(stake) || 0) < 0.1}
-                          className="theme-game-btn theme-game-btn--pvp w-full min-h-0 py-4 disabled:opacity-50"
+                          onClick={() => (canJoinExisting ? setShowJoinCashModal(true) : setShowCashTxModal(true))}
+                          disabled={
+                            isApproving ||
+                            isCreating ||
+                            isJoiningPublic ||
+                            selectedStakeAmount < 0.1 ||
+                            usdtBalanceLoading ||
+                            !canAffordStake ||
+                            (canJoinExisting && !onJoinCashChallenge)
+                          }
+                          className="w-full rounded-2xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-4 font-ui text-sm font-bold uppercase tracking-wide text-white shadow-[0_4px_0_#0a5a87] transition-transform active:translate-y-1 active:shadow-[0_1px_0_#0a5a87] disabled:opacity-50"
                         >
-                          <span className="theme-game-btn__title text-sm">
-                            {isApproving ? 'Approving…' : allowance < stakeBigInt ? 'Approve USDT' : 'Choose visibility'}
-                          </span>
+                          {isApproving || isJoiningPublic
+                            ? 'Processing…'
+                            : canJoinExisting
+                              ? `Join ${(parseFloat(stake) || 0).toFixed(1)} USDT challenge`
+                              : `Open ${(parseFloat(stake) || 0).toFixed(1)} USDT challenge`}
                         </button>
                         <button
                           type="button"
-                          onClick={() => setPvpStep('selection')}
-                          className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                          onClick={() => setPvpStep('visibility')}
+                          className="mx-auto flex items-center justify-center gap-1.5 py-1 font-ui text-[11px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]"
                         >
+                          <ArrowLeft size={14} aria-hidden />
                           Go back
                         </button>
                       </div>
@@ -694,33 +928,49 @@ export default function Lobby({
                     <div className="grid grid-cols-1 gap-3">
                       <button
                         type="button"
-                        onClick={() => handleFinalizeChallenge(true)}
+                        onClick={() => selectedMode === 'cash' ? (setCashVisibility(true), setPvpStep('config')) : handleFinalizeChallenge(true)}
                         disabled={isCreating}
                         className="theme-sky-readout group flex flex-col gap-2 p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
                       >
                         <div className="flex items-center justify-between">
-                          <span className="font-ui text-sm font-bold text-[var(--text)]">Anyone can join</span>
-                          <span className="text-xl" aria-hidden>🌍</span>
+                          <span className="font-ui text-sm font-bold text-[var(--text)] group-hover:text-[var(--accent)] transition-colors">Anyone can join</span>
+                          <span className="text-xl transition-transform group-hover:scale-110" aria-hidden>🌍</span>
                         </div>
-                        <p className="font-body text-[11px] text-[var(--text-dim)]">Live matchmaking · pairs when another player is searching</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-[11px] text-[var(--text-dim)]">Public queue · join an open stake or create your own</p>
+                          <span
+                            className="shrink-0 text-lg font-black leading-none text-[var(--text-dim)] transition-colors group-hover:text-[var(--accent)]"
+                            aria-hidden
+                          >
+                            &gt;
+                          </span>
+                        </div>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => handleFinalizeChallenge(false)}
+                        onClick={() => selectedMode === 'cash' ? (setCashVisibility(false), setPvpStep('config')) : handleFinalizeChallenge(false)}
                         disabled={isCreating}
-                        className="theme-sky-readout flex flex-col gap-2 border-[var(--accent)]/30 bg-[var(--accent-dim)] p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
+                        className="theme-sky-readout group flex flex-col gap-2 border-[var(--accent)]/30 bg-[var(--accent-dim)] p-5 text-left transition-all hover:translate-y-[-2px] disabled:opacity-50"
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-ui text-sm font-bold text-[var(--accent)]">Invite only</span>
-                          <span className="text-xl" aria-hidden>🔐</span>
+                          <span className="text-xl transition-transform group-hover:scale-110" aria-hidden>🔐</span>
                         </div>
-                        <p className="font-body text-[11px] text-[var(--text-dim)]">Private challenge · share a Game ID with a friend</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-body text-[11px] text-[var(--text-dim)]">Private challenge · share a Game ID with a friend</p>
+                          <span
+                            className="shrink-0 text-lg font-black leading-none text-[var(--text-dim)] transition-colors group-hover:text-[var(--accent)]"
+                            aria-hidden
+                          >
+                            &gt;
+                          </span>
+                        </div>
                       </button>
 
                       <button
                         type="button"
-                        onClick={() => selectedMode === 'cash' ? setPvpStep('config') : setPvpStep('selection')}
+                        onClick={() => setPvpStep('selection')}
                         className="mt-1 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]"
                       >
                         Go back
@@ -732,6 +982,129 @@ export default function Lobby({
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showJoinCashModal && joinTarget && (
+          <motion.div
+            className="fixed inset-0 z-[140] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div
+              className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+              onClick={() => !isApproving && !isJoiningPublic && setShowJoinCashModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 8 }}
+              className="relative z-10 w-full max-w-[420px] rounded-3xl border-2 border-[var(--border-mid)] bg-[var(--bg-surface)] p-5 shadow-xl"
+            >
+              <h3 className="font-ui text-base font-black uppercase tracking-wide text-[var(--accent)]">
+                Ready to join?
+              </h3>
+              <p className="mt-2 font-body text-sm text-[var(--text-dim)]">
+                You are joining a <strong>{joinTarget.stake.toFixed(1)} USDT</strong> public challenge.
+              </p>
+              <p className="mt-2 font-body text-sm text-[var(--text-dim)]">
+                When you proceed, you&apos;ll be asked to sign <strong>2 transactions</strong>:
+              </p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 font-body text-sm text-[var(--text)]">
+                <li>Approve USDT for the match</li>
+                <li>Join the challenge on-chain</li>
+              </ol>
+              <ul className="mt-3 space-y-2.5 font-body text-sm text-[var(--text-dim)]">
+                <li>• If you quit during the match, your opponent wins and you lose your stake.</li>
+                <li>• In case of a draw, your stake is automatically refunded.</li>
+              </ul>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowJoinCashModal(false)}
+                  disabled={isApproving || isJoiningPublic}
+                  className="flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProceedJoinCash}
+                  disabled={isApproving || isJoiningPublic || usdtBalanceLoading || !canAffordStake}
+                  className="flex-1 rounded-xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-60"
+                >
+                  {isApproving
+                    ? 'Waiting for approval…'
+                    : isJoiningPublic
+                      ? 'Joining…'
+                      : 'Proceed'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showCashTxModal && (
+          <motion.div
+            className="fixed inset-0 z-[140] flex items-center justify-center p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <div
+              className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+              onClick={() => !isApproving && !isCreating && setShowCashTxModal(false)}
+            />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 10 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.97, y: 8 }}
+              className="relative z-10 w-full max-w-[420px] rounded-3xl border-2 border-[var(--border-mid)] bg-[var(--bg-surface)] p-5 shadow-xl"
+            >
+              <h3 className="font-ui text-base font-black uppercase tracking-wide text-[var(--accent)]">
+                Ready to start?
+              </h3>
+              <p className="mt-2 font-body text-sm text-[var(--text-dim)]">
+                When you proceed, you&apos;ll be asked to sign <strong>2 transactions</strong>:
+              </p>
+              <ol className="mt-2 list-decimal space-y-1 pl-5 font-body text-sm text-[var(--text)]">
+                <li>Approve USDT for the match</li>
+                <li>Create your challenge on-chain</li>
+              </ol>
+              <p className="mt-3 font-body text-sm text-[var(--text-dim)]">
+                Once created, your challenge will remain open for <strong>5 minutes</strong> for another player to join.
+              </p>
+              <ul className="mt-3 space-y-2.5 font-body text-sm text-[var(--text-dim)]">
+                <li>• If no one joins, your stake is automatically refunded.</li>
+                <li>• If you quit during the match, your opponent wins and you lose your stake.</li>
+                <li>• In case of a draw, your stake is automatically refunded.</li>
+              </ul>
+              <div className="mt-4 flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCashTxModal(false)}
+                  disabled={isApproving || isCreating}
+                  className="flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] disabled:opacity-60"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleProceedCashChallenge}
+                  disabled={isApproving || isCreating || usdtBalanceLoading || !canAffordStake}
+                  className="flex-1 rounded-xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-60"
+                >
+                  {isApproving
+                    ? 'Waiting for approval…'
+                    : isCreating
+                      ? 'Creating challenge…'
+                      : 'Proceed'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
         )}
       </AnimatePresence>
     </motion.div>
