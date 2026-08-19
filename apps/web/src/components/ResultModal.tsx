@@ -402,22 +402,20 @@ export default function ResultModal({
           {gameMode === 'ai' && (
             <motion.button
               onClick={onPlayAgain}
-              className={`group relative w-full shrink-0 overflow-hidden rounded-2xl py-4 font-ui text-sm font-black tracking-[0.2em] transition-all hover:translate-y-[-2px] active:translate-y-[1px] sm:py-5 sm:text-base sm:tracking-[0.25em] ${
-                isWin ? 'result-play-btn result-play-btn--win' : 'result-play-btn'
+              className={`result-modal__btn ${
+                isWin ? 'result-modal__btn--primary-win' : 'result-modal__btn--primary'
               }`}
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.75 }}
             >
-              <span className="relative z-10 inline-flex items-center justify-center gap-2">
-                <span aria-hidden>🔄</span> PLAY AGAIN
-              </span>
+              <span aria-hidden>🔄</span> Play again
             </motion.button>
           )}
 
           {gameMode !== 'ai' && onRematch && (
             <motion.div
-              className="flex w-full flex-col gap-3"
+              className="flex w-full flex-col gap-2.5"
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.75 }}
@@ -431,24 +429,22 @@ export default function ResultModal({
                     type="button"
                     onClick={onRematch}
                     disabled={rematchLoading}
-                    className="theme-game-btn theme-game-btn--pvp w-full min-h-0 py-4 disabled:opacity-50"
+                    className="result-modal__btn result-modal__btn--primary"
                   >
-                    <span className="theme-game-btn__title text-sm">
-                      {rematchLoading ? 'Starting rematch…' : 'Accept rematch'}
-                    </span>
+                    {rematchLoading ? 'Starting rematch…' : 'Accept rematch'}
                   </button>
                   <button
                     type="button"
                     onClick={onDeclineRematch ?? onHome}
                     disabled={rematchLoading}
-                    className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-red-400/50 hover:bg-red-500/15 hover:text-red-300 disabled:opacity-50"
+                    className="result-modal__btn result-modal__btn--secondary result-modal__btn--danger"
                   >
                     Decline
                   </button>
                 </>
               ) : rematchStatus === 'waiting' ? (
-                <div className="theme-card flex flex-col items-center gap-3 px-4 py-5 !shadow-none">
-                  <div className="h-8 w-8 animate-spin rounded-full border-2 border-[var(--border-mid)] border-t-[var(--accent)]" />
+                <div className="theme-sky-readout flex flex-col items-center gap-3 px-4 py-4">
+                  <div className="h-7 w-7 animate-spin rounded-full border-2 border-[var(--border-mid)] border-t-[var(--accent)]" />
                   <p className="text-center font-body text-sm text-[var(--text-2)]">
                     Waiting for <span className="font-bold text-[var(--accent)]">{opponentName}</span> to accept…
                   </p>
@@ -456,7 +452,7 @@ export default function ResultModal({
                     type="button"
                     onClick={onDeclineRematch ?? onHome}
                     disabled={rematchLoading}
-                    className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] transition-colors hover:text-[var(--accent)]"
+                    className="result-modal__btn result-modal__btn--link"
                   >
                     Cancel & go home
                   </button>
@@ -469,27 +465,25 @@ export default function ResultModal({
                   <button
                     type="button"
                     onClick={onHome}
-                    className="flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3.5 font-ui text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    className="result-modal__btn result-modal__btn--secondary"
                   >
                     <span aria-hidden>🏠</span> Go home
                   </button>
                 </>
               ) : (
-                <div className="flex w-full items-stretch gap-3">
+                <div className="result-modal__btn-row">
                   <button
                     type="button"
                     onClick={onRematch}
                     disabled={rematchLoading}
-                    className="theme-game-btn theme-game-btn--pvp flex-1 min-h-0 py-4 disabled:opacity-50"
+                    className="result-modal__btn result-modal__btn--primary"
                   >
-                    <span className="theme-game-btn__title flex items-center justify-center gap-1.5 text-sm">
-                      <span aria-hidden>🔄</span> {rematchLoading ? 'Requesting…' : 'Rematch'}
-                    </span>
+                    <span aria-hidden>🔄</span> {rematchLoading ? 'Requesting…' : 'Rematch'}
                   </button>
                   <button
                     type="button"
                     onClick={onHome}
-                    className="flex flex-1 items-center justify-center gap-1.5 rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 font-ui text-xs font-bold uppercase tracking-widest text-[var(--text-dim)] transition-all hover:border-[var(--accent)] hover:text-[var(--accent)]"
+                    className="result-modal__btn result-modal__btn--secondary"
                   >
                     <span aria-hidden>🏠</span> Go home
                   </button>
