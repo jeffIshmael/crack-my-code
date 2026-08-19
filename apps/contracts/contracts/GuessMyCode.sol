@@ -126,6 +126,7 @@ contract GuessMyCode is
     event GuessCountsUpdated(bytes32 indexed matchId, uint256 player1Guesses, uint256 player2Guesses);
     event PointsUpdated     (address indexed player, uint256 oldPoints, uint256 newPoints, string reason);
     event FeesWithdrawn     (address indexed to, uint256 amount);
+    event ContractBalanceWithdrawn(address indexed to, uint256 amount);
     event TokenUpdated      (address indexed oldToken, address indexed newToken);
     event GameTracked       (MatchType matchType, bool isAI, uint256 totalAI, uint256 totalPvPPaid, uint256 totalPvPFree);
     event BackendUpdated    (address indexed oldBackend, address indexed newBackend);
@@ -327,30 +328,9 @@ contract GuessMyCode is
         string[] memory guesses
     ) external nonReentrant onlyBackend matchExists(matchId) {
         Match storage m = matches[matchId];
-        
-        // Support off-chain joins for Free games
-        if (m.status == MatchStatus.Pending && m.matchType == MatchType.Free) {
-            require(player2 != address(0), "CB: player2 required for free match");
-            require(player2 != m.player1, "CB: cannot join own challenge");
-            
-            m.player2 = player2;
-            m.status = MatchStatus.Active;
-            m.startedAt = block.timestamp;
-            
-            // Register player2 and add to their match history
-            if (players[player2].registeredAt == 0) {
-                players[player2].points = POINTS_START;
-                players[player2].registeredAt = block.timestamp;
-                emit PlayerRegistered(player2, block.timestamp);
-            }
-            players[player2].matchIds.push(matchId);
-            players[m.player1].matchIds.push(matchId);
-            
-            delete challengeBoard[m.player1];
-            emit ChallengeJoined(matchId, m.player1, player2, block.timestamp);
-        }
 
         require(m.status == MatchStatus.Active,                     "CB: match not active");
+        require(player2 == m.player2,                               "CB: invalid player2");
         require(winner == m.player1 || winner == m.player2,         "CB: invalid winner");
 
         address loser = winner == m.player1 ? m.player2 : m.player1;
@@ -398,31 +378,7 @@ contract GuessMyCode is
     ) external nonReentrant onlyBackend matchExists(matchId) {
         Match storage m = matches[matchId];
 
-        // Support off-chain joins for Free games (mirror resolveMatch behavior)
-        if (m.status == MatchStatus.Pending && m.matchType == MatchType.Free) {
-            require(player2 != address(0), "CB: player2 required for free match");
-            require(player2 != m.player1, "CB: cannot join own challenge");
-
-            m.player2 = player2;
-            m.status = MatchStatus.Active;
-            m.startedAt = block.timestamp;
-
-            // Register player2 and add to match history
-            if (players[player2].registeredAt == 0) {
-                players[player2].points = POINTS_START;
-                players[player2].registeredAt = block.timestamp;
-                emit PlayerRegistered(player2, block.timestamp);
-            }
-            players[player2].matchIds.push(matchId);
-            players[m.player1].matchIds.push(matchId);
-
-            delete challengeBoard[m.player1];
-            emit ChallengeJoined(matchId, m.player1, player2, block.timestamp);
-        }
-
         require(m.status == MatchStatus.Active, "CB: match not active");
-
-        // For Active matches, player2 must match the stored on-chain player2.
         require(player2 == m.player2, "CB: invalid player2");
 
         // For safety (Paid matches must have a stake escrowed)
@@ -454,12 +410,26 @@ contract GuessMyCode is
         emit MatchDraw(matchId, m.player1, m.player2, m.stakeAmount, m.matchType, p1Code, p2Code, historyHash);
     }
 
+    /// @notice Player forfeits an active match. Opponent wins; paid stakes settle on-chain.
+    function quitMatch(bytes32 matchId)
+        external
+        nonReentrant
+        whenNotPaused
+        matchExists(matchId)
+    {
+        _abandonMatch(matchId, msg.sender);
+    }
+
     function recordQuit(bytes32 matchId, address quitter)
         external
         nonReentrant
         onlyBackend
         matchExists(matchId)
     {
+        _abandonMatch(matchId, quitter);
+    }
+
+    function _abandonMatch(bytes32 matchId, address quitter) internal {
         Match storage m = matches[matchId];
         require(m.status == MatchStatus.Active,                     "CB: match not active");
         require(quitter == m.player1 || quitter == m.player2,       "CB: invalid quitter");
@@ -483,10 +453,6 @@ contract GuessMyCode is
         m.winner  = opponent;
         m.status  = MatchStatus.Abandoned;
         m.endedAt = block.timestamp;
-
-        // activeMatchOf is deprecated
-        // delete activeMatchOf[m.player1];
-        // delete activeMatchOf[m.player2];
 
         emit MatchAbandoned(matchId, quitter, opponent);
     }
@@ -666,14 +632,43 @@ contract GuessMyCode is
         return usdToken.balanceOf(address(this));
     }
 
+    /// @notice USDT in the contract excluding accumulated protocol fees.
+    function nonFeeBalance() external view returns (uint256) {
+        uint256 balance = usdToken.balanceOf(address(this));
+        return balance > accumulatedFees ? balance - accumulatedFees : 0;
+    }
+
     // ─── Admin Functions ──────────────────────────────────────────────────────
 
-    function withdrawFees(address to, uint256 amount) external onlyOwner {
+    function withdrawFees(address to, uint256 amount) external onlyOwner nonReentrant {
         require(to != address(0),           "CB: zero address");
+        require(amount > 0,                 "CB: zero amount");
         require(amount <= accumulatedFees,  "CB: exceeds accumulated fees");
+        require(usdToken.balanceOf(address(this)) >= amount, "CB: insufficient balance");
         accumulatedFees -= amount;
         require(usdToken.transfer(to, amount), "CB: transfer failed");
         emit FeesWithdrawn(to, amount);
+    }
+
+    /// @notice Owner withdraws non-fee USDT (reward pool, stray transfers, etc.).
+    ///         Does not touch `accumulatedFees`. Avoid calling while paid matches are escrowed.
+    function withdrawContractBalance(address to, uint256 amount) public onlyOwner nonReentrant {
+        require(to != address(0),           "CB: zero address");
+        require(amount > 0,                 "CB: zero amount");
+
+        uint256 balance = usdToken.balanceOf(address(this));
+        uint256 maxWithdraw = balance > accumulatedFees ? balance - accumulatedFees : 0;
+        require(amount <= maxWithdraw,      "CB: exceeds non-fee balance");
+        require(balance >= amount,          "CB: insufficient balance");
+
+        if (amount <= rewardPoolBalance) {
+            rewardPoolBalance -= amount;
+        } else {
+            rewardPoolBalance = 0;
+        }
+
+        require(usdToken.transfer(to, amount), "CB: transfer failed");
+        emit ContractBalanceWithdrawn(to, amount);
     }
 
     function withdrawAllFees(address to) external onlyOwner {

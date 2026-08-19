@@ -52,7 +52,7 @@ export const ERC20_ABI = [
   }
 ] as const;
 
-export const CONTRACT_ABI =  [
+export const CONTRACT_ABI = [
   {
     "anonymous": false,
     "inputs": [
@@ -208,6 +208,25 @@ export const CONTRACT_ABI =  [
       }
     ],
     "name": "CipherRewardPaid",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "ContractBalanceWithdrawn",
     "type": "event"
   },
   {
@@ -1486,6 +1505,19 @@ export const CONTRACT_ABI =  [
   },
   {
     "inputs": [],
+    "name": "nonFeeBalance",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
     "name": "owner",
     "outputs": [
       {
@@ -1572,6 +1604,19 @@ export const CONTRACT_ABI =  [
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "bytes32",
+        "name": "matchId",
+        "type": "bytes32"
+      }
+    ],
+    "name": "quitMatch",
+    "outputs": [],
+    "stateMutability": "nonpayable",
     "type": "function"
   },
   {
@@ -2043,6 +2088,24 @@ export const CONTRACT_ABI =  [
       }
     ],
     "name": "withdrawAllFees",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "to",
+        "type": "address"
+      },
+      {
+        "internalType": "uint256",
+        "name": "amount",
+        "type": "uint256"
+      }
+    ],
+    "name": "withdrawContractBalance",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"

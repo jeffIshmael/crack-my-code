@@ -47,7 +47,7 @@ export default function RootLayout({
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var e=window.ethereum;if(e&&e.isMiniPay)window.__CMC_MINIPAY__=true;}catch(x){}})();`,
+            __html: `(function(){function m(){try{window.__CMC_MINIPAY__=true;}catch(x){}}try{var e=window.ethereum;if(e&&e.isMiniPay){m();return;}}catch(x){}var n=0;var t=setInterval(function(){n++;try{if(window.ethereum&&window.ethereum.isMiniPay){m();clearInterval(t);}}catch(x){}if(n>=80)clearInterval(t);},50);})();`,
           }}
         />
       </head>

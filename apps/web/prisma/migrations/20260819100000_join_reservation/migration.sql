@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "joinReservedBy" TEXT;
+ALTER TABLE "Game" ADD COLUMN IF NOT EXISTS "joinReservedUntil" TIMESTAMP(3);

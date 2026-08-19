@@ -3,6 +3,11 @@
  * Discover / in-app WebViews often omit the flag until late or never set it.
  */
 
+export function markMiniPayHost(): void {
+  if (typeof window === 'undefined') return;
+  (window as Window & { __CMC_MINIPAY__?: boolean }).__CMC_MINIPAY__ = true;
+}
+
 export function isMiniPayClient(): boolean {
   if (typeof window === 'undefined') return false;
   return (window as Window & { ethereum?: { isMiniPay?: boolean } }).ethereum?.isMiniPay === true;
@@ -31,6 +36,35 @@ export function isLikelyMiniPayHost(): boolean {
   }
 
   return false;
+}
+
+/** Poll for late window.ethereum.isMiniPay injection (common in MiniPay WebView). */
+export function watchForMiniPayInjection(onDetected: () => void, maxMs = 4000): () => void {
+  if (typeof window === 'undefined') return () => {};
+  if (isLikelyMiniPayHost()) {
+    onDetected();
+    return () => {};
+  }
+
+  let cancelled = false;
+  const started = Date.now();
+
+  const tick = () => {
+    if (cancelled) return;
+    if (isMiniPayClient()) {
+      markMiniPayHost();
+      onDetected();
+      return;
+    }
+    if (Date.now() - started < maxMs) {
+      window.setTimeout(tick, 50);
+    }
+  };
+
+  tick();
+  return () => {
+    cancelled = true;
+  };
 }
 
 /** Mark MiniPay hosts for lighter Cipher AI (no Web Workers, smaller probe pools). */
