@@ -13,98 +13,98 @@ importers:
   .:
     devDependencies:
       '@types/node':
-        specifier: ^20.8.0
+        specifier: 20.19.39
         version: 20.19.39
       sharp:
-        specifier: ^0.35.3
+        specifier: 0.35.3
         version: 0.35.3(@types/node@20.19.39)
       turbo:
-        specifier: ^1.10.16
+        specifier: 1.13.4
         version: 1.13.4
       typescript:
-        specifier: ^5.2.2
+        specifier: 5.9.3
         version: 5.9.3
 
   apps/contracts:
     dependencies:
       '@openzeppelin/contracts':
-        specifier: ^4.9.0
+        specifier: 4.9.6
         version: 4.9.6
       '@openzeppelin/contracts-upgradeable':
-        specifier: ^4.9.0
+        specifier: 4.9.6
         version: 4.9.6
     devDependencies:
       '@nomicfoundation/hardhat-chai-matchers':
-        specifier: ^2.0.0
+        specifier: 2.1.2
         version: 2.1.2(@nomicfoundation/hardhat-ethers@3.1.3)(chai@4.5.0)(ethers@6.16.0)(hardhat@2.28.6)
       '@nomicfoundation/hardhat-ethers':
-        specifier: ^3.0.0
+        specifier: 3.1.3
         version: 3.1.3(ethers@6.16.0)(hardhat@2.28.6)
       '@nomicfoundation/hardhat-ignition':
-        specifier: ^0.15.0
+        specifier: 0.15.16
         version: 0.15.16(@nomicfoundation/hardhat-verify@2.1.3)(hardhat@2.28.6)
       '@nomicfoundation/hardhat-ignition-ethers':
-        specifier: ^0.15.0
+        specifier: 0.15.17
         version: 0.15.17(@nomicfoundation/hardhat-ethers@3.1.3)(@nomicfoundation/hardhat-ignition@0.15.16)(@nomicfoundation/ignition-core@0.15.15)(ethers@6.16.0)(hardhat@2.28.6)
       '@nomicfoundation/hardhat-network-helpers':
-        specifier: ^1.0.0
+        specifier: 1.1.2
         version: 1.1.2(hardhat@2.28.6)
       '@nomicfoundation/hardhat-toolbox':
-        specifier: ^5.0.0
+        specifier: 5.0.0
         version: 5.0.0(@nomicfoundation/hardhat-chai-matchers@2.1.2)(@nomicfoundation/hardhat-ethers@3.1.3)(@nomicfoundation/hardhat-ignition-ethers@0.15.17)(@nomicfoundation/hardhat-network-helpers@1.1.2)(@nomicfoundation/hardhat-verify@2.1.3)(@typechain/ethers-v6@0.5.1)(@typechain/hardhat@9.1.0)(@types/chai@4.3.20)(@types/mocha@10.0.10)(@types/node@20.19.39)(chai@4.5.0)(ethers@6.16.0)(hardhat-gas-reporter@1.0.10)(hardhat@2.28.6)(solidity-coverage@0.8.17)(ts-node@10.9.2)(typechain@8.3.2)(typescript@5.9.3)
       '@nomicfoundation/hardhat-toolbox-viem':
-        specifier: ^3.0.0
+        specifier: 3.0.0
         version: 3.0.0(@nomicfoundation/hardhat-ignition-viem@0.15.16)(@nomicfoundation/hardhat-network-helpers@1.1.2)(@nomicfoundation/hardhat-verify@2.1.3)(@nomicfoundation/hardhat-viem@2.1.3)(@types/chai-as-promised@7.1.8)(@types/chai@4.3.20)(@types/mocha@10.0.10)(@types/node@20.19.39)(chai@4.5.0)(hardhat-gas-reporter@1.0.10)(hardhat@2.28.6)(solidity-coverage@0.8.17)(ts-node@10.9.2)(typescript@5.9.3)(viem@2.47.18)
       '@nomicfoundation/hardhat-verify':
-        specifier: ^2.0.0
+        specifier: 2.1.3
         version: 2.1.3(hardhat@2.28.6)
       '@openzeppelin/hardhat-upgrades':
-        specifier: ^3.9.1
+        specifier: 3.9.1
         version: 3.9.1(@nomicfoundation/hardhat-ethers@3.1.3)(@nomicfoundation/hardhat-verify@2.1.3)(ethers@6.16.0)(hardhat@2.28.6)
       '@typechain/ethers-v6':
-        specifier: ^0.5.0
+        specifier: 0.5.1
         version: 0.5.1(ethers@6.16.0)(typechain@8.3.2)(typescript@5.9.3)
       '@typechain/hardhat':
-        specifier: ^9.0.0
+        specifier: 9.1.0
         version: 9.1.0(@typechain/ethers-v6@0.5.1)(ethers@6.16.0)(hardhat@2.28.6)(typechain@8.3.2)
       '@types/chai':
-        specifier: ^4.2.0
+        specifier: 4.3.20
         version: 4.3.20
       '@types/mocha':
-        specifier: '>=9.1.0'
+        specifier: 10.0.10
         version: 10.0.10
       '@types/node':
-        specifier: ^20.8.0
+        specifier: 20.19.39
         version: 20.19.39
       chai:
-        specifier: ^4.2.0
+        specifier: 4.5.0
         version: 4.5.0
       dotenv:
-        specifier: ^17.4.2
+        specifier: 17.4.2
         version: 17.4.2
       ethers:
-        specifier: ^6.4.0
+        specifier: 6.16.0
         version: 6.16.0
       hardhat:
-        specifier: ^2.19.0
+        specifier: 2.28.6
         version: 2.28.6(ts-node@10.9.2)(typescript@5.9.3)
       hardhat-gas-reporter:
-        specifier: ^1.0.8
+        specifier: 1.0.10
         version: 1.0.10(hardhat@2.28.6)
       solidity-coverage:
-        specifier: ^0.8.1
+        specifier: 0.8.17
         version: 0.8.17(hardhat@2.28.6)
       ts-node:
-        specifier: '>=8.0.0'
+        specifier: 10.9.2
         version: 10.9.2(@types/node@20.19.39)(typescript@5.9.3)
       typechain:
-        specifier: ^8.3.0
+        specifier: 8.3.2
         version: 8.3.2(typescript@5.9.3)
       typescript:
-        specifier: '>=4.5.0'
+        specifier: 5.9.3
         version: 5.9.3
       viem:
-        specifier: ^2.0.0
+        specifier: 2.47.18
         version: 2.47.18(typescript@5.9.3)(zod@3.25.76)
 
   apps/promo-video:
@@ -2750,7 +2750,7 @@ packages:
       debug: 4.4.3(supports-color@8.1.1)
       lodash: 4.18.1
       pony-cause: 2.1.11
-      semver: 7.7.4
+      semver: 7.8.5
       uuid: 9.0.1
     transitivePeerDependencies:
       - supports-color
@@ -2780,7 +2780,7 @@ packages:
       '@types/debug': 4.1.13
       debug: 4.4.3(supports-color@8.1.1)
       pony-cause: 2.1.11
-      semver: 7.7.4
+      semver: 7.8.5
       uuid: 9.0.1
     transitivePeerDependencies:
       - supports-color
@@ -2797,7 +2797,7 @@ packages:
       '@types/debug': 4.1.13
       debug: 4.4.3(supports-color@8.1.1)
       pony-cause: 2.1.11
-      semver: 7.7.4
+      semver: 7.8.5
       uuid: 9.0.1
     transitivePeerDependencies:
       - supports-color
@@ -16857,6 +16857,7 @@ packages:
     resolution: {integrity: sha512-vFKC2IEtQnVhpT78h1Yp8wzwrf8CM+MzKMHGJZfBtzhZNycRFnXsHk6E5TxIkkMsgNS7mdX3AGB7x2QM2di4lA==}
     engines: {node: '>=10'}
     hasBin: true
+    dev: true
 
   /semver@7.8.5:
     resolution: {integrity: sha512-Y7/KDsb8LjooZpwaqGyulO6DQlksgCncchHGk+sZIY4SBvUocMBEFH5Ur1fI4dV+Jvl0w6cjvucaIi40puRioA==}
@@ -17172,7 +17173,7 @@ packages:
       pify: 4.0.1
       recursive-readdir: 2.2.3
       sc-istanbul: 0.4.6
-      semver: 7.7.4
+      semver: 7.8.5
       shelljs: 0.8.5
       web3-utils: 1.10.4
     dev: true

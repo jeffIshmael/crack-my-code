@@ -25,8 +25,9 @@ function formatAddress(address: string) {
 }
 
 function displayName(entry: LeaderboardEntry, isYou = false) {
-  if (isYou) return 'You';
-  return formatAddress(entry.address);
+  // Prefer showing user-chosen display name; fall back to truncated address only if name is missing.
+  if (isYou) return entry.name ?? 'You';
+  return entry.name ?? formatAddress(entry.address);
 }
 
 function PodiumCard({
@@ -114,7 +115,7 @@ function YourRankBanner({
       <span className="leaderboard-your-rank__label">Your rank</span>
       <div className="leaderboard-your-rank__body">
         <span className="leaderboard-your-rank__number">#{viewer.rank}</span>
-        <span className="leaderboard-your-rank__name truncate">{displayName(viewer, true)}</span>
+        <span className="leaderboard-your-rank__name">{displayName(viewer, true)}</span>
         <span className="leaderboard-your-rank__points">
           {viewer.points.toLocaleString()} <span className="leaderboard-your-rank__points-label">CMC</span>
         </span>
@@ -128,7 +129,7 @@ function ListRow({ entry, isYou }: { entry: LeaderboardEntry; isYou: boolean }) 
     <div className={`leaderboard-row ${isYou ? 'leaderboard-row--you' : ''}`}>
       <span className="leaderboard-row__rank">{entry.rank}</span>
       <div className="leaderboard-row__info min-w-0">
-        <p className="leaderboard-row__name truncate">{displayName(entry, isYou)}</p>
+        <p className="leaderboard-row__name">{displayName(entry, isYou)}</p>
       </div>
       <div className="leaderboard-row__score">
         <span className="leaderboard-row__score-value">{entry.points.toLocaleString()}</span>

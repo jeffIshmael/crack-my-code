@@ -17,6 +17,7 @@ import { BottomNav, type NavTab } from '@/components/BottomNav';
 import { AboutHowToPlay } from '@/components/AboutHowToPlay';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { StatsPanel } from '@/components/StatsPanel';
+import { SetNameModal } from '@/components/SetNameModal';
 import {
   CODE_LENGTH,
   GAME_DURATION,
@@ -76,6 +77,21 @@ function isDuplicateOfLastGuess(
   );
 }
 
+function nameModalDismissedKey(address: string) {
+  return `cmc_name_modal_dismissed:${address.toLowerCase()}`;
+}
+
+function isNameModalDismissed(address?: string | null) {
+  if (!address) return false;
+  if (typeof window === 'undefined') return false;
+  return window.localStorage.getItem(nameModalDismissedKey(address)) === '1';
+}
+
+function dismissNameModal(address: string) {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(nameModalDismissedKey(address), '1');
+}
+
 export default function Home() {
   const searchParams = useSearchParams();
   const { address: wagmiAddress, isConnected } = useAccount();
@@ -128,6 +144,13 @@ export default function Home() {
   });
   const [gs, setGs] = useState(() => initialGameState());
   const [playerStatsLoaded, setPlayerStatsLoaded] = useState(false);
+  const [playerProfileLoaded, setPlayerProfileLoaded] = useState(false);
+  const [playerProfile, setPlayerProfile] = useState<{
+    name: string | null;
+    points: number;
+    needsName: boolean;
+  } | null>(null);
+  const [showSetNameModal, setShowSetNameModal] = useState(false);
   const gsRef = useRef(gs);
   useEffect(() => { gsRef.current = gs; }, [gs]);
 
@@ -182,6 +205,36 @@ export default function Home() {
     const timer = window.setTimeout(() => setShowHowToPlay(true), 350);
     return () => window.clearTimeout(timer);
   }, [showSplash, splashResolved, gs.phase, activeTab]);
+
+  useEffect(() => {
+    const statsAddress = payoutAddress || address;
+
+    if (showSplash || !splashResolved) {
+      setShowSetNameModal(false);
+      return;
+    }
+    if (!statsAddress) {
+      setShowSetNameModal(false);
+      return;
+    }
+    if (!playerProfileLoaded || !playerProfile?.needsName) {
+      setShowSetNameModal(false);
+      return;
+    }
+    if (gs.phase !== 'lobby' || activeTab !== 'home') return;
+    if (isNameModalDismissed(statsAddress)) return;
+
+    setShowSetNameModal(true);
+  }, [
+    showSplash,
+    splashResolved,
+    payoutAddress,
+    address,
+    playerProfileLoaded,
+    playerProfile?.needsName,
+    gs.phase,
+    activeTab,
+  ]);
 
   useEffect(() => {
     warmCipherWorker();
@@ -450,6 +503,32 @@ export default function Home() {
     return null;
   }, [address, payoutAddress]);
 
+  const refreshPlayerProfile = useCallback(
+    async (): Promise<{ name: string | null; points: number; needsName: boolean } | null> => {
+      const statsAddress = payoutAddress || address;
+      if (!statsAddress) return null;
+      if (!isRegisteredPlayer(statsAddress)) return null;
+
+      try {
+        const res = await fetch(`/api/users/profile?address=${encodeURIComponent(statsAddress)}`);
+        const data = await res.json();
+        if (typeof data.needsName === 'boolean') {
+          const next = {
+            name: data.name ?? null,
+            points: data.points ?? 1000,
+            needsName: data.needsName,
+          };
+          setPlayerProfile(next);
+          return next;
+        }
+      } catch (err) {
+        console.error('Failed to refresh player profile', err);
+      }
+      return null;
+    },
+    [address, payoutAddress],
+  );
+
   useEffect(() => {
     if (!address) {
       setPlayerStatsLoaded(false);
@@ -459,14 +538,20 @@ export default function Home() {
     let cancelled = false;
     setPlayerStatsLoaded(false);
 
-    refreshUserStats().finally(() => {
-      if (!cancelled) setPlayerStatsLoaded(true);
+    setPlayerProfileLoaded(false);
+    setPlayerProfile(null);
+
+    Promise.allSettled([refreshUserStats(), refreshPlayerProfile()]).finally(() => {
+      if (!cancelled) {
+        setPlayerStatsLoaded(true);
+        setPlayerProfileLoaded(true);
+      }
     });
 
     return () => {
       cancelled = true;
     };
-  }, [address, refreshUserStats]);
+  }, [address, refreshUserStats, refreshPlayerProfile]);
 
   useEffect(() => {
     if ((activeTab === 'home' || activeTab === 'wallet') && address && gs.phase === 'lobby') {
@@ -2194,6 +2279,20 @@ export default function Home() {
         pointsLoading={pointsLoading}
         usdtFormatted={usdtData?.formatted}
         copied={copied}
+        profileName={playerProfile?.name ?? null}
+        onNameSaved={(name) => {
+          if (!address) return;
+          setPlayerProfile((prev) =>
+            prev
+              ? {
+                  ...prev,
+                  name,
+                  needsName: false,
+                }
+              : prev,
+          );
+          dismissNameModal(address);
+        }}
         onLogin={() => login()}
         onCopyAddress={() => {
           if (address) {
@@ -2317,6 +2416,30 @@ export default function Home() {
         {showHowToPlay && gs.phase === 'lobby' && activeTab === 'home' && (
           <HowToPlayModal key="how-to-play" onClose={() => setShowHowToPlay(false)} />
         )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showSetNameModal &&
+          playerProfile?.needsName &&
+          gs.phase === 'lobby' &&
+          activeTab === 'home' &&
+          (payoutAddress || address) && (
+            <SetNameModal
+              open={showSetNameModal}
+              address={String(payoutAddress || address)}
+              initialName={playerProfile?.name}
+              onClose={() => {
+                setShowSetNameModal(false);
+              }}
+              onSaved={(name) => {
+                const statsAddress = payoutAddress || address;
+                if (statsAddress) dismissNameModal(statsAddress);
+                setPlayerProfile((prev) =>
+                  prev ? { ...prev, name, needsName: false } : prev,
+                );
+                setShowSetNameModal(false);
+              }}
+            />
+          )}
       </AnimatePresence>
       <JoinStakeModal
         open={!!pendingJoinStake}
