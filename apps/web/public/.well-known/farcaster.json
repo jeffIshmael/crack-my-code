@@ -2,7 +2,7 @@
   "miniapp": {
     "name": "Crack-My-Code",
     "version": "1",
-    "iconUrl": "https://crack-my-code.vercel.app/icon.png",
+    "iconUrl": "https://crack-my-code.vercel.app/logo.png",
     "homeUrl": "https://crack-my-code.vercel.app",
     "splashImageUrl": "https://crack-my-code.vercel.app/splash.png",
     "splashBackgroundColor": "#4ab8e8",
