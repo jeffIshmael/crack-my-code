@@ -86,13 +86,20 @@ export default function Home() {
   const { writeContractAsync } = useWriteContract();
   const { client: smartWalletClient } = useSmartWallets();
 
+  const isExternalWallet = isMiniPay || isFarcaster || (
+    !!wagmiAddress && !user?.linkedAccounts?.some(
+      (a: any) => a.type === 'wallet' && a.walletClientType === 'privy' &&
+        a.address?.toLowerCase() === wagmiAddress.toLowerCase()
+    )
+  );
+
   const payoutAddress = useMemo(
-    () => resolvePayoutAddress({ smartWalletClient, user, wagmiAddress }),
-    [smartWalletClient, user, wagmiAddress],
+    () => resolvePayoutAddress({ smartWalletClient, user, wagmiAddress, isExternalWallet }),
+    [smartWalletClient, user, wagmiAddress, isExternalWallet],
   );
   const smartWalletAddress = useMemo(
-    () => getSmartWalletAddress(smartWalletClient, user),
-    [smartWalletClient, user],
+    () => isExternalWallet ? wagmiAddress?.toLowerCase() : getSmartWalletAddress(smartWalletClient, user),
+    [smartWalletClient, user, isExternalWallet, wagmiAddress],
   );
   const walletAliases = useMemo(
     () => playerAddressAliases({ payoutAddress, wagmiAddress, user }),
@@ -207,6 +214,7 @@ export default function Home() {
   const [gameHistory, setGameHistory] = useState<any[]>([]);
   const [isCancelling, setIsCancelling] = useState<string | null>(null);
   const [searchTime, setSearchTime] = useState(0);
+  const [isSearchHidden, setIsSearchHidden] = useState(false);
   const [countdown, setCountdown] = useState<number | 'GO' | null>(null);
   const [currentOnChainMatchId, setCurrentOnChainMatchId] = useState<string | null>(null);
   const currentGameIdRef = useRef<string | null>(null);
@@ -420,10 +428,11 @@ export default function Home() {
   }, [gs.phase]);
 
   const refreshUserStats = useCallback(async (): Promise<{ points: number } | null> => {
-    if (!address) return null;
+    const statsAddress = payoutAddress || address;
+    if (!statsAddress) return null;
     try {
       const res = await fetch(
-        `/api/users/stats?address=${encodeURIComponent(address)}`,
+        `/api/users/stats?address=${encodeURIComponent(statsAddress)}`,
       );
       const data = await res.json();
       if (data.points !== undefined) {
@@ -438,7 +447,7 @@ export default function Home() {
       console.error('Failed to refresh user stats', err);
     }
     return null;
-  }, [address]);
+  }, [address, payoutAddress]);
 
   useEffect(() => {
     if (!address) {
@@ -938,6 +947,7 @@ export default function Home() {
     opponentAddress: string,
     meta?: { mode?: GameMode; stake?: number }
   ) => {
+    setIsSearchHidden(false);
     setCurrentGameId(gameId);
     setResultStats(null);
     setRematchStatus('idle');
@@ -1013,7 +1023,7 @@ export default function Home() {
 
   // Poll while matchmaking (public queue + private invite) — backup if Pusher misses
   useEffect(() => {
-    if (gs.phase !== 'matchmaking' || !currentGameId || gs.gameMode === 'ai') return;
+    if ((gs.phase !== 'matchmaking' && !isSearchHidden) || !currentGameId || gs.gameMode === 'ai') return;
 
     const poll = async () => {
       try {
@@ -1035,7 +1045,7 @@ export default function Home() {
     poll();
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [gs.phase, currentGameId, gs.gameMode, handleMatchFound]);
+  }, [gs.phase, currentGameId, gs.gameMode, handleMatchFound, isSearchHidden]);
 
   // Fetch shareable Game ID for private invites (e.g. older games created before joinCode existed)
   useEffect(() => {
@@ -1235,6 +1245,7 @@ export default function Home() {
       }
     }
 
+    setIsSearchHidden(false);
     setGs((prev: GameState): GameState => ({ ...prev, phase: 'lobby' }));
     setSearchTime(0);
     setCurrentGameId(null);
@@ -1246,21 +1257,69 @@ export default function Home() {
     }
   }, [handleCancelChallenge, isConnected, address, smartWalletClient, publicClient, cancelChallenge, fetchMyActive]);
 
+  const handleTimeoutExpiry = useCallback(async () => {
+    const gameId = currentGameIdRef.current;
+    let expireOk = false;
+
+    if (gameId) {
+      try {
+        const res = await fetch('/api/games/expire', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gameId, address: payoutAddress || address }),
+        });
+
+        expireOk = res.ok;
+      } catch (err) {
+        console.error('Expire game failed', err);
+      }
+    }
+
+    setGs((prev: GameState): GameState => ({ ...prev, phase: 'lobby' }));
+    setSearchTime(0);
+    setCurrentGameId(null);
+    setShareableJoinCode(null);
+    setCurrentOnChainMatchId(null);
+    fetchMyActive();
+    
+    const isStakedProfessional =
+      gs.gameMode === 'cash' && (gs.stakeAmount ?? 0) > 0;
+
+    toast.info('Match Expired', {
+      description: expireOk
+        ? isStakedProfessional
+          ? 'No opponent joined in time. Your stake has been returned.'
+          : 'No opponent joined in time. Match expired.'
+        : 'No opponent joined in time. Finalizing…',
+    });
+  }, [address, payoutAddress, fetchMyActive, gs.gameMode, gs.stakeAmount]);
+
+  const handleHideSearch = useCallback(() => {
+    setIsSearchHidden(true);
+    setGs((prev: GameState): GameState => ({ ...prev, phase: 'lobby' }));
+  }, []);
+
+  const handleShowSearch = useCallback(() => {
+    setIsSearchHidden(false);
+    setGs((prev: GameState): GameState => ({
+      ...prev,
+      phase: 'matchmaking',
+      opponentName: shareableJoinCode ? 'WAITING' : 'Searching...',
+    }));
+  }, [shareableJoinCode]);
+
   useEffect(() => {
     let interval: NodeJS.Timeout;
-    if (gs.phase === 'matchmaking') {
+    const isActiveSearch = gs.phase === 'matchmaking' || isSearchHidden;
+    if (isActiveSearch) {
       interval = setInterval(() => {
         setSearchTime(prev => {
-          const timeout = (gs.opponentName === 'WAITING' || gs.gameMode === 'cash') ? 300 : 60;
+          const timeout = gs.gameMode === 'ai' ? 60 : 300;
 
           if (prev >= timeout) {
             clearInterval(interval);
-            void handleCancelMatchmaking({ fromTimeout: true });
-            toast.error("Matchmaking Timeout", {
-              description: gs.opponentName === 'WAITING'
-                ? "Invite expired. No one joined in time."
-                : "No opponents found. Try again or invite a friend."
-            });
+            setIsSearchHidden(false);
+            void handleTimeoutExpiry();
             return 0;
           }
           return prev + 1;
@@ -1270,7 +1329,7 @@ export default function Home() {
       setSearchTime(0);
     }
     return () => clearInterval(interval);
-  }, [gs.phase, gs.gameMode, gs.opponentName, handleCancelMatchmaking]);
+  }, [gs.phase, gs.gameMode, isSearchHidden, handleTimeoutExpiry]);
 
   const handleQuitGame = useCallback(async () => {
     if (!window.confirm('Are you sure you want to quit the game?')) return;
@@ -1857,7 +1916,6 @@ export default function Home() {
     return gs.phase === 'lobby' || gs.phase === 'matchmaking' ? (
       <motion.div key="lobby" className="w-full relative flex flex-col gap-4" {...screenVariants}>
         <Lobby
-          rating={gs.playerPoints}
           points={gs.playerPoints}
           pointsLoading={pointsLoading}
           isMatchmaking={gs.phase === 'matchmaking'}
@@ -1880,6 +1938,10 @@ export default function Home() {
           onJoinGameIdInputChange={setJoinGameIdInput}
           onJoinByGameId={handleJoinByGameId}
           isJoining={!!isJoining}
+          onHideSearch={handleHideSearch}
+          hasPendingSearch={isSearchHidden}
+          onShowSearch={handleShowSearch}
+          pendingStake={gs.stakeAmount}
         />
       </motion.div>
     ) : gs.phase === 'setCode' ? (
@@ -2016,7 +2078,7 @@ export default function Home() {
   };
 
   const renderOpenGames = () => (
-    <motion.div key="games" className="page-tab flex w-full flex-col gap-6 text-left" {...screenVariants}>
+    <motion.div key="games" className="page-tab flex w-full flex-col text-left h-[calc(100dvh-var(--nav-clearance-with-safe))]" {...screenVariants}>
       {!isSignedIn || !payoutAddress ? (
         <div className="theme-sky-readout flex flex-col items-center justify-center gap-4 py-16 text-center">
           <span className="text-4xl" aria-hidden>🛡️</span>
@@ -2031,41 +2093,45 @@ export default function Home() {
         </div>
       ) : (
         <>
-          <div className="theme-tab-switcher">
-            <button
-              type="button"
-              onClick={() => setOpenGamesTab('active')}
-              className={`theme-tab-switcher__btn ${
-                openGamesTab === 'active'
-                  ? 'theme-tab-switcher__btn--active'
-                  : 'theme-tab-switcher__btn--inactive'
-              }`}
-            >
-              My Active
-            </button>
-            <button
-              type="button"
-              onClick={() => setOpenGamesTab('history')}
-              className={`theme-tab-switcher__btn ${
-                openGamesTab === 'history'
-                  ? 'theme-tab-switcher__btn--active'
-                  : 'theme-tab-switcher__btn--inactive'
-              }`}
-            >
-              History
-            </button>
+          <div className="sticky top-0 z-10 bg-[var(--bg)] pb-3 pt-1">
+            <div className="theme-tab-switcher">
+              <button
+                type="button"
+                onClick={() => setOpenGamesTab('active')}
+                className={`theme-tab-switcher__btn ${
+                  openGamesTab === 'active'
+                    ? 'theme-tab-switcher__btn--active'
+                    : 'theme-tab-switcher__btn--inactive'
+                }`}
+              >
+                My Active
+              </button>
+              <button
+                type="button"
+                onClick={() => setOpenGamesTab('history')}
+                className={`theme-tab-switcher__btn ${
+                  openGamesTab === 'history'
+                    ? 'theme-tab-switcher__btn--active'
+                    : 'theme-tab-switcher__btn--inactive'
+                }`}
+              >
+                History
+              </button>
+            </div>
           </div>
 
-          {openGamesTab === 'active' ? (
-            <OpenChallengesList
-              isConnected={!!isConnected}
-              myActiveGames={myActiveGames}
-              onCancelOpenChallenge={handleCancelOpenChallenge}
-              isCancellingId={isCancelling}
-            />
-          ) : (
-            <MatchHistoryList games={gameHistory} address={payoutAddress} walletAliases={walletAliases} />
-          )}
+          <div className="flex-1 overflow-y-auto pb-4">
+            {openGamesTab === 'active' ? (
+              <OpenChallengesList
+                isConnected={!!isConnected}
+                myActiveGames={myActiveGames}
+                onCancelOpenChallenge={handleCancelOpenChallenge}
+                isCancellingId={isCancelling}
+              />
+            ) : (
+              <MatchHistoryList games={gameHistory} address={payoutAddress} walletAliases={walletAliases} />
+            )}
+          </div>
         </>
       )}
     </motion.div>
@@ -2196,7 +2262,7 @@ export default function Home() {
     </motion.div>
   );
 
-  const showBottomNav = splashResolved && !showSplash && (gs.phase === 'lobby' || gs.phase === 'matchmaking');
+  const showBottomNav = splashResolved && !showSplash && (gs.phase === 'lobby' || (gs.phase === 'matchmaking' && gs.gameMode === 'ai'));
   const contentHidden = !splashResolved || showSplash;
 
   return (
@@ -2247,6 +2313,7 @@ export default function Home() {
           setActiveTab(t);
           if (gs.phase === 'result') handleHome();
         }}
+        openGamesCount={myActiveGames.length}
         visible={showBottomNav}
       />
     </main>

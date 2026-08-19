@@ -102,52 +102,6 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      /* Cipher USDT reward campaign ended
-      if (isAI && isRegisteredPlayer(normalizedPlayerAddress) && !game.cipherRewardPaid) {
-        try {
-          await trackGameOnChain(0, true);
-        } catch (trackErr) {
-          console.error('[Blockchain] Track game on-chain failed:', trackErr);
-        }
-
-        const user = await findUserByAddress(normalizedPlayerAddress);
-        const rewardRecipient = (
-          user?.smartWalletAddress?.toLowerCase() ?? normalizedPlayerAddress
-        ) as `0x${string}`;
-
-        const rewardResult = await rewardCipherWinOnChain(rewardRecipient);
-
-        if (rewardResult.status === 'paid') {
-          const amount = Number(rewardResult.amount) / 1_000_000;
-          await prisma.game.update({
-            where: { id: gameId },
-            data: {
-              cipherRewardPaid: true,
-              cipherRewardAmount: amount,
-              cipherRewardTxHash: rewardResult.txHash,
-            },
-          });
-          cipherReward = {
-            paid: true,
-            amount,
-            txHash: rewardResult.txHash,
-          };
-        } else {
-          console.warn('[Cipher reward] skipped:', rewardResult.reason, {
-            gameId,
-            player: rewardRecipient,
-          });
-          cipherReward = { paid: false, reason: rewardResult.reason };
-        }
-      } else if (isAI && isRegisteredPlayer(normalizedPlayerAddress) && game.cipherRewardPaid) {
-        cipherReward = {
-          paid: true,
-          amount: game.cipherRewardAmount ?? 0.1,
-          txHash: game.cipherRewardTxHash ?? '',
-        };
-      }
-      */
-
       if (!isAI) {
         const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;
         if (opponentAddress && isRegisteredPlayer(opponentAddress)) {

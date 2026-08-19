@@ -5,7 +5,7 @@
   "private": true,
   "scripts": {
     "build": "turbo build --filter=web",
-    "dev": "turbo dev",
+    "dev": "turbo dev --filter=web",
     "lint": "turbo lint",
     "clean": "turbo clean",
     "type-check": "turbo type-check",

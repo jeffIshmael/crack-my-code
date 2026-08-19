@@ -147,7 +147,7 @@ contract GuessMyCode is
 
         usdToken       = IERC20(_usdToken);
         treasuryFeeBps = 100;  // 1%
-        matchExpiry    = 600;  // 10 minutes
+        matchExpiry    = 300;  // 5 minutes
         backendAddress = msg.sender;
     }
 

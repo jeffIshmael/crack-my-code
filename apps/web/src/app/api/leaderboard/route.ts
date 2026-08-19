@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
       take: 50,
       select: {
         address: true,
+        smartWalletAddress: true,
         points: true,
         name: true,
         createdAt: true,
@@ -56,8 +57,10 @@ export async function GET(req: NextRequest) {
       .filter((user) => {
         if (!user.address || isGuestAddress(user.address)) return false;
         const key = user.address.toLowerCase();
-        if (seen.has(key)) return false;
+        const smartKey = user.smartWalletAddress?.toLowerCase();
+        if (seen.has(key) || (smartKey && seen.has(smartKey))) return false;
         seen.add(key);
+        if (smartKey) seen.add(smartKey);
         return true;
       })
       .map((user, index) => ({
@@ -69,8 +72,24 @@ export async function GET(req: NextRequest) {
 
     let viewer = null;
     if (address && !isGuestAddress(address)) {
-      const inList = leaderboard.find((e) => e.address === address);
-      viewer = inList ?? (await getUserRank(address));
+      const inList = leaderboard.find(
+        (e) => e.address === address
+      );
+      if (!inList) {
+        // Also check if the viewer's address matches any entry's smartWalletAddress
+        const bySmartMatch = users.find(
+          (u) => u.smartWalletAddress?.toLowerCase() === address
+        );
+        if (bySmartMatch) {
+          const matchAddr = bySmartMatch.address!.toLowerCase();
+          viewer = leaderboard.find((e) => e.address === matchAddr) ?? null;
+        }
+      }
+      if (!viewer && !inList) {
+        viewer = await getUserRank(address);
+      } else if (!viewer) {
+        viewer = inList;
+      }
     }
 
     return NextResponse.json({ leaderboard, viewer });
