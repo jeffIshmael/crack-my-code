@@ -49,6 +49,37 @@ export async function POST(req: NextRequest) {
     const clues = evaluateGuess(digits, opponentCode);
     const tileClues = toTileClues(digits, opponentCode);
 
+    const p1GuessCountBefore = await prisma.guess.count({
+      where: { gameId, isPlayer: true },
+    });
+    const p2GuessCountBefore = await prisma.guess.count({
+      where: { gameId, isPlayer: false },
+    });
+    const myGuessCountBefore = isPlayer1 ? p1GuessCountBefore : p2GuessCountBefore;
+    const guessLimit = maxGuessesForMode(game.mode as 'ai' | 'fun' | 'cash');
+
+    if (game.status !== 'ACTIVE') {
+      return NextResponse.json({ error: 'Game is not active' }, { status: 400 });
+    }
+
+    if (myGuessCountBefore >= guessLimit) {
+      return NextResponse.json({ error: 'No guesses remaining' }, { status: 400 });
+    }
+
+    const expectedTurn = getNextTurnAddress(
+      game.player1Address,
+      game.player2Address,
+      p1GuessCountBefore,
+      p2GuessCountBefore,
+    );
+    if (
+      expectedTurn &&
+      normalizedPlayerAddress !== 'GUEST' &&
+      expectedTurn !== normalizedPlayerAddress.toLowerCase()
+    ) {
+      return NextResponse.json({ error: 'Not your turn' }, { status: 403 });
+    }
+
     // Save guess to DB
     await prisma.guess.create({
       data: {
@@ -249,64 +280,9 @@ export async function POST(req: NextRequest) {
                 console.error('[Blockchain] resolveDrawOnChain failed:', chainErr);
               }
             })();
-          } else if (opponentAddress && isRegisteredPlayer(opponentAddress)) {
-            // Only this player ran out — opponent wins
-            const mode = game.mode as 'fun' | 'cash';
-            await prisma.game.update({
-              where: { id: gameId },
-              data: { status: 'COMPLETED', winnerAddress: opponentAddress },
-            });
-            winner = opponentAddress;
-            await applyScoreDelta(opponentAddress, scoreDeltaForMode(mode, true));
-            await applyScoreDelta(normalizedPlayerAddress, scoreDeltaForMode(mode, false));
-
-            // If this match exists on-chain, finalize winner + pay out escrow
-            void (async () => {
-              const onChainMatchId = (game as any).onChainMatchId as `0x${string}` | undefined;
-              const player2Address = game.player2Address ? (game.player2Address as `0x${string}`) : undefined;
-              if (!onChainMatchId || !player2Address || !opponentAddress) return;
-              try {
-                const allGuesses = await prisma.guess.findMany({
-                  where: { gameId },
-                  orderBy: { createdAt: 'asc' },
-                });
-
-                const guessArray = allGuesses.map((g: { digits: string }) => g.digits);
-
-                const ipfsHash = await uploadToIPFS({
-                  gameId,
-                  player1: game.player1Address,
-                  player2: game.player2Address,
-                  player1Code: game.player1Code,
-                  player2Code: game.player2Code,
-                  winner: opponentAddress,
-                  guesses: allGuesses.map((g) => ({
-                    digits: g.digits,
-                    clues: (() => {
-                      const parsed = JSON.parse(g.clues);
-                      return Array.isArray(parsed) ? parsed : parsed.clues;
-                    })(),
-                    isPlayer: g.isPlayer,
-                    createdAt: g.createdAt,
-                  })),
-                });
-
-                await resolveMatchOnChain(
-                  onChainMatchId,
-                  opponentAddress as `0x${string}`,
-                  player2Address,
-                  p1GuessCount,
-                  p2GuessCount,
-                  game.player1Code || '',
-                  game.player2Code || '',
-                  ipfsHash || '',
-                  guessArray
-                );
-              } catch (chainErr) {
-                console.error('[Blockchain] resolveMatchOnChain failed:', chainErr);
-              }
-            })();
           }
+          // If only this player exhausted guesses, game stays ACTIVE until opponent
+          // finishes their remaining guesses (draw if both fail, win if opponent cracks).
         }
       }
     }
@@ -319,6 +295,7 @@ export async function POST(req: NextRequest) {
           tileClues,
           sender: normalizedPlayerAddress,
           nextTurnAddress,
+          winnerAddress: winner ?? undefined,
         });
       } catch (pusherErr) {
         console.error('[Pusher] opponent-guess failed:', pusherErr);

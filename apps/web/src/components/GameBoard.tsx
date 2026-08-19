@@ -182,6 +182,7 @@ export default function GameBoard({
           pendingOpponentTileClues={view === 'opponent' ? pendingOpponentTileClues : null}
           phase={phase}
           maxGuesses={MAX_GUESSES}
+          turnLocked={inputLocked}
         />
       </div>
 

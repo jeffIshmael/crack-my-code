@@ -29,7 +29,7 @@ import {
   maxGuessesForMode,
   PROFESSIONAL_MODE_ENABLED,
 } from '@/lib/game';
-import type { Clue, GameMode, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
+import type { Clue, GameMode, GameResult, GuessEntry, GameState, GamePhase, TileClue } from '@/lib/game';
 import { SplashScreen } from '@/components/SplashScreen';
 import {
   HowToPlayModal,
@@ -708,13 +708,72 @@ export default function Home() {
     }
   }, [currentGameId, applySyncPayload]);
 
+  const emitTyping = useCallback((input: number[]) => {
+    if (!currentGameId || gsRef.current.gameMode === 'ai') return;
+    const sender = addressRef.current?.toLowerCase();
+    if (!sender) return;
+    const channel = pusherClient.channel(`private-game-${currentGameId}`);
+    if (channel) {
+      channel.trigger('client-typing', { input, sender });
+    }
+  }, [currentGameId]);
+
+  const finalizeGameResult = useCallback(
+    async (
+      winnerAddress: string,
+      mode: GameMode,
+      options?: { opponentCode?: number[] | null },
+    ) => {
+      const playerAddress = addressRef.current || 'GUEST';
+      const scoringMode = mode === 'ai' ? 'ai' : mode;
+      const isDraw = winnerAddress === 'DRAW';
+      const isWin =
+        !isDraw && winnerAddress.toLowerCase() === playerAddress.toLowerCase();
+      const result: GameResult = isDraw ? 'draw' : isWin ? 'win' : 'lose';
+      const delta = isDraw ? 0 : scoreDeltaForMode(scoringMode, isWin);
+
+      let opponentCode = options?.opponentCode ?? undefined;
+      if (!opponentCode && currentGameId) {
+        try {
+          const revealRes = await fetch('/api/games/reveal', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gameId: currentGameId, address: playerAddress }),
+          });
+          const revealData = await revealRes.json();
+          opponentCode = revealData.opponentCode;
+        } catch (err) {
+          console.error('Reveal after game end failed', err);
+        }
+      }
+
+      setGs((prev: GameState) => ({
+        ...prev,
+        phase: 'result',
+        result,
+        ratingDelta: isRegisteredPlayer(playerAddress) ? delta : 0,
+        currentInput: [],
+        opponentCurrentInput: [],
+        isPlayerTurn: false,
+        opponentCode: opponentCode ?? prev.opponentCode,
+      }));
+
+      if (isRegisteredPlayer(playerAddress)) {
+        await syncResultStats(delta);
+      }
+    },
+    [currentGameId, syncResultStats],
+  );
+
   useEffect(() => {
     if (!currentGameId || gs.gameMode === 'ai') return;
 
     const channelName = `private-game-${currentGameId}`;
     const channel = pusherClient.subscribe(channelName);
 
-    const onTyping = (data: { input: number[] }) => {
+    const onTyping = (data: { input: number[]; sender?: string }) => {
+      const myAddress = addressRef.current?.toLowerCase();
+      if (myAddress && data.sender?.toLowerCase() === myAddress) return;
       setGs((prev: GameState) => ({ ...prev, opponentCurrentInput: data.input }));
     };
 
@@ -725,6 +784,7 @@ export default function Home() {
       sender: string;
       nextTurnAddress?: string;
       revealCode?: number[];
+      winnerAddress?: string;
     }) => {
       const myAddress = addressRef.current?.toLowerCase();
       if (!myAddress || data.sender?.toLowerCase() === myAddress) return;
@@ -797,6 +857,13 @@ export default function Home() {
         };
       });
 
+      if (data.winnerAddress) {
+        void finalizeGameResult(data.winnerAddress, gsRef.current.gameMode, {
+          opponentCode: data.revealCode,
+        });
+        return;
+      }
+
       if (!opponentWon) {
         scheduleTurnHandover(isMyTurn);
       }
@@ -817,7 +884,7 @@ export default function Home() {
       channel.unbind('game-started', onGameStarted);
       pusherClient.unsubscribe(channelName);
     };
-  }, [currentGameId, gs.gameMode, syncResultStats, scheduleTurnHandover]);
+  }, [currentGameId, gs.gameMode, syncResultStats, scheduleTurnHandover, finalizeGameResult]);
 
   // Poll server turn state during PvP — backup when Pusher events are missed
   useEffect(() => {
@@ -884,14 +951,6 @@ export default function Home() {
       setTurnNotification(null);
     }
   }, [gs.phase]);
-
-  const emitTyping = (input: number[]) => {
-    if (!currentGameId || gs.gameMode === 'ai') return;
-    const channel = pusherClient.channel(`private-game-${currentGameId}`);
-    if (channel) {
-      channel.trigger('client-typing', { input });
-    }
-  };
 
   const scheduleOpponentTurn = useCallback(() => {
     if (gsRef.current.gameMode !== 'ai') return;
@@ -1822,49 +1881,45 @@ export default function Home() {
                 ...prev,
                 playerGuesses: newGuesses,
                 isPlayerTurn: false,
+                currentInput: [],
+                opponentCurrentInput: [],
               };
             }
 
             if (prev.gameMode === 'ai') {
               playerReviewUntilRef.current = Date.now() + PLAYER_GUESS_REVIEW_MS;
-              return { ...prev, playerGuesses: newGuesses, isPlayerTurn: false, currentInput: [] };
+              return {
+                ...prev,
+                playerGuesses: newGuesses,
+                isPlayerTurn: false,
+                currentInput: [],
+                opponentCurrentInput: [],
+              };
             }
 
-            return { ...prev, playerGuesses: newGuesses, currentInput: [] };
+            return {
+              ...prev,
+              playerGuesses: newGuesses,
+              currentInput: [],
+              opponentCurrentInput: [],
+            };
           });
+
+          emitTyping([]);
 
           if (won) {
             if (isRegisteredPlayer(playerAddress)) {
               await syncResultStats(scoreDeltaForMode(mode, true));
             }
-          } else if (gs.playerGuesses.length + 1 >= maxGuessesForMode(gs.gameMode)) {
-            try {
-              const revealRes = await fetch('/api/games/reveal', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ gameId: currentGameId, address: playerAddress }),
-              });
-              const revealData = await revealRes.json();
-              const isDraw = revealData.winnerAddress === 'DRAW';
-              const loss = scoreDeltaForMode(mode, false);
-              setGs((prev: GameState) => ({
-                ...prev,
-                phase: 'result',
-                result: isDraw ? 'draw' : 'lose',
-                ratingDelta: isDraw ? 0 : (isRegisteredPlayer(playerAddress) ? loss : 0),
-                currentInput: [],
-                opponentCode: revealData.opponentCode || [],
-              }));
-              if (!isDraw && isRegisteredPlayer(playerAddress)) {
-                await syncResultStats(loss);
-              } else if (isDraw && isRegisteredPlayer(playerAddress)) {
-                await syncResultStats(0);
-              }
-            } catch (revealErr) {
-              console.error('Reveal after max guesses failed', revealErr);
-            }
+          } else if (data.winnerAddress) {
+            await finalizeGameResult(data.winnerAddress, gs.gameMode, {
+              opponentCode: data.opponentCode,
+            });
           } else if (gs.gameMode !== 'ai') {
-            scheduleTurnHandover(false);
+            const nextIsMyTurn =
+              typeof data.nextTurnAddress === 'string' &&
+              data.nextTurnAddress.toLowerCase() === playerAddress.toLowerCase();
+            scheduleTurnHandover(nextIsMyTurn);
           }
         }
       } catch (err) {
@@ -1876,7 +1931,7 @@ export default function Home() {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
     }
-  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, refetchUsdtBalance]);
+  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, finalizeGameResult, emitTyping]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
@@ -1884,12 +1939,13 @@ export default function Home() {
     if (turnLockedRef.current) return;
     setGs((prev: GameState) => {
       if (!prev.isPlayerTurn || prev.phase !== 'playing') return prev;
+      if (prev.playerGuesses.length >= maxGuessesForMode(prev.gameMode)) return prev;
       if (prev.currentInput.length >= CODE_LENGTH) return prev;
       const newInput = [...prev.currentInput, digit];
       emitTyping(newInput);
       return { ...prev, currentInput: newInput };
     });
-  }, [currentGameId, gs.gameMode]); // eslint-disable-line
+  }, [emitTyping]);
 
   const handleDeleteDigit = useCallback(() => {
     setGs((prev: GameState) => {
@@ -1897,7 +1953,7 @@ export default function Home() {
       emitTyping(newInput);
       return { ...prev, currentInput: newInput };
     });
-  }, [currentGameId, gs.gameMode]); // eslint-disable-line
+  }, [emitTyping]);
 
   // ─── Phase: Result → Lobby ────────────────────────────────────────────────
 

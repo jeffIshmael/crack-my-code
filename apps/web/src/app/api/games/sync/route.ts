@@ -58,11 +58,13 @@ export async function GET(req: NextRequest) {
         p2Guesses.length,
       );
 
-    let result: 'win' | 'lose' | null = null;
+    let result: 'win' | 'lose' | 'draw' | null = null;
     let opponentCode: number[] | null = null;
     if (game.status === 'COMPLETED' && game.winnerAddress) {
       const winner = game.winnerAddress.toLowerCase();
-      if (winner === 'ai') {
+      if (winner === 'draw') {
+        result = 'draw';
+      } else if (winner === 'ai') {
         result = 'lose';
       } else if (winner === normalizedAddress.toLowerCase()) {
         result = 'win';

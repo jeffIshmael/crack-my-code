@@ -15,6 +15,7 @@ interface ScoreboardProps {
   pendingOpponentTileClues?: TileClue[] | null;
   phase: 'playing' | 'countdown' | 'result' | string;
   maxGuesses?: number;
+  turnLocked?: boolean;
 }
 
 function EmptySlots({ active }: { active?: boolean }) {
@@ -58,13 +59,15 @@ export function Scoreboard({
   pendingOpponentTileClues = null,
   phase,
   maxGuesses = MAX_GUESSES,
+  turnLocked = false,
 }: ScoreboardProps) {
   const boardLabel = view === 'player' ? 'My Board' : `${opponentName}'s Board`;
   const showOpponentLive =
     view === 'opponent' &&
     phase === 'playing' &&
     !isPlayerTurn &&
-    (opponentCurrentInput.length > 0 || pendingOpponentTileClues !== null);
+    (pendingOpponentTileClues !== null ||
+      (!turnLocked && opponentCurrentInput.length > 0));
 
   return (
     <div className="scoreboard-plaque">
@@ -79,7 +82,12 @@ export function Scoreboard({
           {Array.from({ length: maxGuesses }).map((_, rowIdx) => {
             const guess = guesses[rowIdx];
             const isPlayerDraftRow =
-              view === 'player' && rowIdx === guesses.length && isPlayerTurn && phase === 'playing';
+              view === 'player' &&
+              rowIdx === guesses.length &&
+              isPlayerTurn &&
+              phase === 'playing' &&
+              !turnLocked &&
+              currentInput.length > 0;
             const isOpponentLiveRow = showOpponentLive && rowIdx === guesses.length;
 
             if (guess) {
