@@ -24,7 +24,7 @@ export async function GET(req: NextRequest) {
           { player1Address: alias },
           { player2Address: alias },
         ]),
-        status: 'COMPLETED',
+        status: { in: ['COMPLETED', 'EXPIRED'] },
       },
       orderBy: {
         updatedAt: 'desc',
@@ -33,13 +33,11 @@ export async function GET(req: NextRequest) {
       select: {
         id: true,
         mode: true,
+        status: true,
         stake: true,
         winnerAddress: true,
         player1Address: true,
         player2Address: true,
-        cipherRewardPaid: true,
-        cipherRewardAmount: true,
-        cipherRewardTxHash: true,
         createdAt: true,
         updatedAt: true,
       },

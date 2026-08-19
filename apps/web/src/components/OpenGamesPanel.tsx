@@ -15,6 +15,7 @@ export interface OpenGameItem {
   player1Address: string;
   onChainMatchId?: string | null;
   isPublic?: boolean;
+  createdAt?: string;
 }
 
 interface OpenGamesPanelProps {

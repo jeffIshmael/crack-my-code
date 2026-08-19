@@ -18,9 +18,10 @@ interface BottomNavProps {
   activeTab: NavTab;
   onTabChange: (tab: NavTab) => void;
   visible: boolean;
+  openGamesCount?: number;
 }
 
-export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
+export function BottomNav({ activeTab, onTabChange, visible, openGamesCount = 0 }: BottomNavProps) {
   if (!visible) return null;
 
   const tabs = [
@@ -56,12 +57,19 @@ export function BottomNav({ activeTab, onTabChange, visible }: BottomNavProps) {
                   transition={{ type: 'spring', bounce: 0.25, duration: 0.55 }}
                 />
               )}
-              <Icon
-                size={22}
-                className={`relative z-10 transition-colors duration-200 ${
-                  isActive ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
-                }`}
-              />
+              <div className="relative">
+                <Icon
+                  size={22}
+                  className={`relative z-10 transition-colors duration-200 ${
+                    isActive ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'
+                  }`}
+                />
+                {tab.id === 'games' && openGamesCount > 0 && (
+                  <span className="absolute -right-2 -top-1.5 z-20 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[8px] font-black text-white shadow-sm">
+                    {openGamesCount}
+                  </span>
+                )}
+              </div>
               <span
                 className={`relative z-10 mt-1 text-[9px] font-bold uppercase tracking-wide transition-colors duration-200 ${
                   isActive ? 'text-[var(--accent)]' : 'text-[var(--text-dim)]'

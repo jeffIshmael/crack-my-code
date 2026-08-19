@@ -104,6 +104,25 @@ export async function updateGuessCountsOnChain(
 }
 
 /**
+ * Expire a pending match on-chain — refunds the creator's stake.
+ * This is permissionless after matchExpiry, but we call it from the backend agent.
+ */
+export async function expireMatchOnChain(matchId: `0x${string}`) {
+  if (!account || !walletClient) throw new Error("Agent not initialized");
+
+  const { request } = await publicClient.simulateContract({
+    account,
+    address: CONTRACT_ADDRESS,
+    abi: CONTRACT_ABI,
+    functionName: 'expireMatch',
+    args: [matchId],
+  });
+
+  const hash = await walletClient.writeContract(request);
+  return await publicClient.waitForTransactionReceipt({ hash });
+}
+
+/**
  * Track a game completion on-chain (backend only)
  */
 export async function trackGameOnChain(

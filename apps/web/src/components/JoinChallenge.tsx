@@ -25,13 +25,14 @@ export default function JoinChallenge({
 }: JoinChallengeProps) {
   const [focused, setFocused] = useState(false);
   const [open, setOpen] = useState(false);
-  const signInRequired = disabled;
+  const signInRequired = disabled && !!onSignInRequired;
 
   const handleToggle = () => {
     if (signInRequired) {
       onSignInRequired?.();
       return;
     }
+    if (disabled) return;
     setOpen((prev) => !prev);
   };
 
@@ -96,7 +97,7 @@ export default function JoinChallenge({
           type="button"
           onClick={handleToggle}
           className={`theme-game-btn theme-game-btn--join group w-full ${
-            signInRequired ? 'theme-game-btn--signin-required' : 'theme-game-btn--lively'
+            disabled ? (signInRequired ? 'theme-game-btn--signin-required' : 'opacity-50 cursor-not-allowed') : 'theme-game-btn--lively'
           }`}
           aria-expanded={signInRequired ? false : open}
           aria-disabled={signInRequired}
@@ -106,7 +107,7 @@ export default function JoinChallenge({
             <div className="theme-game-btn__content flex-1">
               <span className="theme-game-btn__title">Join Challenge</span>
               <span className="theme-game-btn__subtitle">
-                {signInRequired ? '🔒 Sign in first' : "Paste a friend's Game ID"}
+                {signInRequired ? '🔒 Sign in first' : disabled ? '⏳ Finish or cancel current game first' : "Paste a friend's Game ID"}
               </span>
             </div>
             <ChevronDown

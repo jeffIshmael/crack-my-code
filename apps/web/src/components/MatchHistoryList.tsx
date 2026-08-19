@@ -3,13 +3,11 @@
 interface HistoryGame {
   id: string;
   mode: string;
+  status?: string;
   stake: number;
   winnerAddress?: string | null;
   player1Address: string;
   player2Address?: string | null;
-  cipherRewardPaid?: boolean;
-  cipherRewardAmount?: number | null;
-  cipherRewardTxHash?: string | null;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -33,14 +31,14 @@ function opponentLabel(game: HistoryGame, aliases: string[]) {
     normalized.includes(game.player1Address.toLowerCase())
       ? game.player2Address
       : game.player1Address;
-  if (!opponent) return 'Unknown';
+  if (!opponent) return game.status === 'EXPIRED' ? 'No one joined' : '—';
   return `${opponent.slice(0, 6)}…${opponent.slice(-4)}`;
 }
 
-function modeLabel(mode: string) {
-  if (mode === 'ai') return 'Cipher';
-  if (mode === 'cash') return 'Staked';
-  return 'Friendly';
+function modeIcon(mode: string) {
+  if (mode === 'ai') return '🤖';
+  if (mode === 'cash') return '💰';
+  return '⚔️';
 }
 
 export default function MatchHistoryList({ games, address, walletAliases = [] }: MatchHistoryListProps) {
@@ -63,8 +61,8 @@ export default function MatchHistoryList({ games, address, walletAliases = [] }:
   }
 
   return (
-    <div className="flex flex-col gap-3">
-      {games.map((game) => {
+    <div className="theme-sky-readout flex flex-col rounded-2xl px-4 py-2">
+      {games.map((game, i) => {
         const normalizedAliases = aliases.map((a) => a.toLowerCase());
         const playerAlias = normalizedAliases.find(
           (alias) =>
@@ -72,49 +70,66 @@ export default function MatchHistoryList({ games, address, walletAliases = [] }:
             alias === game.player2Address?.toLowerCase(),
         ) || address?.toLowerCase() || '';
 
-        const isWinner = game.winnerAddress?.toLowerCase() === playerAlias;
-        const isDraw = !game.winnerAddress;
-        const isCipher = game.mode === 'ai';
-        const earnedReward = isCipher && isWinner && game.cipherRewardPaid;
+        const isExpired = game.status === 'EXPIRED';
+        const isWinner = !isExpired && game.winnerAddress?.toLowerCase() === playerAlias;
+        const isDraw = !isExpired && !game.winnerAddress;
+
+        const resultColor = isExpired
+          ? 'text-[var(--text-dim)]'
+          : isWinner
+            ? 'text-[var(--clue-green)]'
+            : isDraw
+              ? 'text-[var(--text-dim)]'
+              : 'text-red-400';
+
+        const resultDot = isExpired
+          ? 'bg-[var(--text-dim)]'
+          : isWinner
+            ? 'bg-[var(--clue-green)]'
+            : isDraw
+              ? 'bg-[var(--text-dim)]'
+              : 'bg-red-400';
+
+        const reward = isExpired
+          ? null
+          : game.mode === 'cash'
+            ? (isWinner ? `+${(game.stake * 2 * 0.99).toFixed(2)}` : `-${game.stake.toFixed(2)}`)
+            : null;
 
         return (
-          <div key={game.id} className="history-game-card">
-            <div className="history-game-card__main">
-              <div className="flex items-center gap-2">
-                <span
-                  className={`history-game-card__result ${
-                    isWinner
-                      ? 'history-game-card__result--win'
-                      : isDraw
-                        ? 'history-game-card__result--draw'
-                        : 'history-game-card__result--loss'
-                  }`}
-                >
-                  {isWinner ? 'Victory' : isDraw ? 'Draw' : 'Defeat'}
-                </span>
-                <span className="history-game-card__mode">{modeLabel(game.mode)}</span>
-              </div>
-              <span className="history-game-card__opponent">
-                vs {opponentLabel(game, aliases)}
+          <div
+            key={game.id}
+            className={`flex items-center gap-3 px-1 py-2.5 ${
+              i < games.length - 1 ? 'border-b border-[var(--border-mid)]/40' : ''
+            }`}
+          >
+            {/* Result dot */}
+            <div className={`h-2 w-2 flex-shrink-0 rounded-full ${resultDot}`} />
+
+            {/* Mode icon + opponent */}
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="text-sm flex-shrink-0" aria-hidden>{modeIcon(game.mode)}</span>
+              <span className="truncate font-ui text-xs font-bold text-[var(--text)]">
+                {opponentLabel(game, aliases)}
               </span>
-              <span className="history-game-card__when">{formatWhen(game.updatedAt || game.createdAt)}</span>
             </div>
 
-            <div className="history-game-card__reward">
-              {game.mode === 'cash' ? (
-                <span className="history-game-card__amount">
-                  {isWinner
-                    ? `+${(game.stake * 2 * 0.99).toFixed(2)} USDT`
-                    : `-${game.stake.toFixed(2)} USDT`}
-                </span>
-              ) : earnedReward ? (
-                <span className="history-game-card__amount history-game-card__amount--reward">
-                  +{(game.cipherRewardAmount ?? 0.1).toFixed(1)} USDT
-                </span>
-              ) : (
-                <span className="history-game-card__amount history-game-card__amount--free">Free</span>
-              )}
-            </div>
+            {/* Result label */}
+            <span className={`flex-shrink-0 font-ui text-[10px] font-black uppercase tracking-wider ${resultColor}`}>
+              {isExpired ? 'EXP' : isWinner ? 'W' : isDraw ? 'D' : 'L'}
+            </span>
+
+            {/* Reward or free */}
+            <span className={`flex-shrink-0 min-w-[60px] text-right font-code text-[11px] font-bold ${
+              isExpired ? 'text-[var(--text-dim)]' : reward && isWinner ? 'text-[var(--clue-green)]' : reward ? 'text-red-400' : 'text-[var(--text-dim)]'
+            }`}>
+              {isExpired ? 'Expired' : reward ? `${reward}` : 'Free'}
+            </span>
+
+            {/* Date */}
+            <span className="flex-shrink-0 w-[52px] text-right font-body text-[10px] text-[var(--text-dim)]">
+              {formatWhen(game.updatedAt || game.createdAt)}
+            </span>
           </div>
         );
       })}

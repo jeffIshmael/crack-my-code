@@ -22,7 +22,7 @@ export async function findUserByAddress(address: string) {
   });
 }
 
-/** Find or create a registered player; always stores lowercase address. */
+/** Find or create a registered player; merges duplicates if both EOA and smart wallet rows exist. */
 export async function ensureRegisteredUser(
   address: string,
   smartWalletAddress?: string | null,
@@ -36,15 +36,55 @@ export async function ensureRegisteredUser(
     throw new Error('Guest accounts cannot be registered as players');
   }
 
-  const existing = await findUserByAddress(normalized);
-  if (existing) {
+  // Find all rows that match either the primary or smart wallet address
+  const candidates = await prisma.user.findMany({
+    where: {
+      OR: [
+        { address: { equals: normalized, mode: 'insensitive' } },
+        { smartWalletAddress: { equals: normalized, mode: 'insensitive' } },
+        ...(normalizedSmart
+          ? [
+              { address: { equals: normalizedSmart, mode: 'insensitive' as const } },
+              { smartWalletAddress: { equals: normalizedSmart, mode: 'insensitive' as const } },
+            ]
+          : []),
+      ],
+    },
+    orderBy: { createdAt: 'asc' },
+  });
+
+  const canonicalAddress = normalizedSmart || normalized;
+
+  if (candidates.length > 1) {
+    // Merge: keep the oldest row, take the highest points, delete the rest
+    const primary = candidates[0]!;
+    const maxPoints = Math.max(...candidates.map((c) => c.points ?? 1000));
+
+    // Move games from duplicate rows to the primary
+    const dupeIds = candidates.slice(1).map((c) => c.id);
+    await prisma.game.updateMany({
+      where: { userId: { in: dupeIds } },
+      data: { userId: primary.id },
+    });
+    // Delete duplicate user rows
+    await prisma.user.deleteMany({ where: { id: { in: dupeIds } } });
+
+    return prisma.user.update({
+      where: { id: primary.id },
+      data: {
+        address: canonicalAddress,
+        smartWalletAddress: normalizedSmart ?? primary.smartWalletAddress,
+        points: maxPoints,
+      },
+    });
+  }
+
+  if (candidates.length === 1) {
+    const existing = candidates[0]!;
     const updates: { address?: string; smartWalletAddress?: string } = {};
-    if (existing.address !== normalized && !normalizedSmart) updates.address = normalized;
+    if (existing.address !== canonicalAddress) updates.address = canonicalAddress;
     if (normalizedSmart && existing.smartWalletAddress !== normalizedSmart) {
       updates.smartWalletAddress = normalizedSmart;
-    }
-    if (normalizedSmart && existing.address !== normalizedSmart) {
-      updates.address = normalizedSmart;
     }
     if (Object.keys(updates).length > 0) {
       return prisma.user.update({
@@ -57,9 +97,9 @@ export async function ensureRegisteredUser(
 
   return prisma.user.create({
     data: {
-      address: normalizedSmart || normalized,
+      address: canonicalAddress,
       smartWalletAddress: normalizedSmart,
-      name: `Player_${(normalizedSmart || normalized).slice(2, 6)}`,
+      name: `Player_${canonicalAddress.slice(2, 6)}`,
       points: 1000,
     },
   });

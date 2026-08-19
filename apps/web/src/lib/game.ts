@@ -9,7 +9,7 @@ export type GamePhase = 'lobby' | 'matchmaking' | 'setCode' | 'playing' | 'resul
 export type GameMode = 'ai' | 'fun' | 'cash';
 
 /** USDT staking / Professional mode — disabled until launch */
-export const PROFESSIONAL_MODE_ENABLED = false;
+export const PROFESSIONAL_MODE_ENABLED = true;
 export type GameResult = 'win' | 'lose' | 'draw' | null;
 
 export interface GuessEntry {

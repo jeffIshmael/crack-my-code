@@ -20,7 +20,6 @@ import { buildGameShareUrl } from '@/lib/farcaster-embed';
 import type { CipherDailyStatus } from '@/hooks/use-cipher-daily-status';
 
 interface LobbyProps {
-  rating: number;
   points: number;
   pointsLoading?: boolean;
   isSignedIn?: boolean;
@@ -40,6 +39,13 @@ interface LobbyProps {
   onJoinGameIdInputChange?: (value: string) => void;
   onJoinByGameId?: () => void;
   isJoining?: boolean;
+  /** Called when user hides the searching screen so they can browse the lobby */
+  onHideSearch?: () => void;
+  /** True when search is hidden but still active — blocks new game creation */
+  hasPendingSearch?: boolean;
+  /** Restore the search screen from the banner */
+  onShowSearch?: () => void;
+  pendingStake?: number;
 }
 
 const stagger = {
@@ -51,7 +57,6 @@ const fadeUp = {
 };
 
 export default function Lobby({
-  rating,
   points,
   pointsLoading = false,
   isSignedIn = false,
@@ -71,6 +76,10 @@ export default function Lobby({
   onJoinGameIdInputChange,
   onJoinByGameId,
   isJoining = false,
+  onHideSearch,
+  hasPendingSearch = false,
+  onShowSearch,
+  pendingStake = 0,
 }: LobbyProps) {
   const { isConnected, address: wagmiAddress } = useAccount();
   const { login } = usePrivy();
@@ -104,7 +113,7 @@ export default function Lobby({
   const cipherGamesToday = cipherStatus?.gamesPlayedToday ?? 0;
   const cipherGamesRemaining = cipherStatus?.gamesRemaining ?? CIPHER_DAILY_WIN_CAP;
   const cipherAtDailyCap = cipherStatusLoaded && Boolean(cipherStatus?.atDailyCap);
-  const cipherButtonDisabled = isCreating || cipherAtDailyCap || cipherStatusPending;
+  const cipherButtonDisabled = isCreating || cipherAtDailyCap || cipherStatusPending || hasPendingSearch;
 
   const { writeContract: approve, data: approveHash, isPending: isApprovingAction } = useWriteContract();
 
@@ -215,6 +224,10 @@ export default function Lobby({
     setShowPvPModal(true);
   };
 
+  const pendingTimeLeft = Math.max(0, 300 - searchTime); // 5 minutes
+  const pendingMinutes = Math.floor(pendingTimeLeft / 60);
+  const pendingSeconds = pendingTimeLeft % 60;
+
   return (
     <motion.div
       className="relative flex min-h-[calc(100dvh-var(--nav-clearance-with-safe))] flex-col items-center justify-between app-page-gutter pt-6 text-[var(--text-on-sky)] overflow-hidden"
@@ -248,6 +261,53 @@ export default function Lobby({
 
       <div className="relative flex w-full flex-1 flex-col items-center justify-center py-2">
         <div className="z-10 flex w-full flex-col">
+          {hasPendingSearch && !isMatchmaking && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mb-4 w-full"
+            >
+              <motion.button
+                type="button"
+                onClick={onShowSearch}
+                animate={{ boxShadow: ['0 0 0px rgba(245,158,11,0.0)', '0 0 16px rgba(245,158,11,0.4)', '0 0 0px rgba(245,158,11,0.0)'] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="w-full flex items-center justify-between gap-3 rounded-2xl border-2 border-[var(--orange)] bg-[var(--orange)]/15 px-4 py-4 transition-all hover:bg-[var(--orange)]/20 active:scale-[0.98]"
+              >
+                <div className="flex items-center gap-3">
+                  <motion.span
+                    className="text-lg"
+                    animate={{ rotate: [0, 15, -15, 0] }}
+                    transition={{ duration: 1.5, repeat: Infinity }}
+                  >
+                    ⏳
+                  </motion.span>
+                  <div className="flex flex-col items-start gap-0.5">
+                    <span className="font-ui text-xs font-black uppercase tracking-widest text-[var(--orange)]">
+                      Game in progress
+                    </span>
+                    <span className="font-body text-[10px] text-[var(--text-dim)]">
+                      Waiting for opponent{pendingStake > 0 ? ` · ${pendingStake} USDT staked` : ''}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex flex-col items-end leading-none">
+                    <span className="font-ui text-[9px] font-bold uppercase tracking-widest text-[var(--orange)]/70">
+                      Expires in
+                    </span>
+                    <span className="font-code text-sm font-black text-[var(--orange)]">
+                      {pendingMinutes}:{pendingSeconds.toString().padStart(2, '0')}
+                    </span>
+                  </div>
+                  <span className="rounded-lg bg-[var(--orange)] px-3 py-1.5 font-ui text-[9px] font-black uppercase tracking-widest text-white">
+                    View
+                  </span>
+                </div>
+              </motion.button>
+            </motion.div>
+          )}
+
           {isMatchmaking ? (
             <div className="w-full">
               {opponentName === 'WAITING' ? (
@@ -257,6 +317,7 @@ export default function Lobby({
                     onCancel={onCancelMatchmaking}
                     joinCode={shareableJoinCode}
                     isCreating={isCreating}
+                    onHide={onHideSearch}
                   />
                 ) : (
                   <div className="theme-card mx-auto flex max-w-[320px] flex-col items-center gap-5 px-6 py-8">
@@ -283,6 +344,7 @@ export default function Lobby({
                   searchTime={searchTime}
                   onCancel={onCancelMatchmaking}
                   isCancelling={isCancellingMatchmaking}
+                  onHide={onHideSearch}
                 />
               )}
             </div>
@@ -307,11 +369,13 @@ export default function Lobby({
                         : 'Play Cipher AI'
                   }
                   className={`theme-game-btn theme-game-btn--ai cipher-mode-btn group ${
-                    cipherAtDailyCap
-                      ? 'cipher-mode-btn--locked'
-                      : cipherStatusPending
-                        ? 'cipher-mode-btn--pending'
-                        : 'theme-game-btn--lively'
+                    hasPendingSearch
+                      ? 'opacity-50 cursor-not-allowed'
+                      : cipherAtDailyCap
+                        ? 'cipher-mode-btn--locked'
+                        : cipherStatusPending
+                          ? 'cipher-mode-btn--pending'
+                          : 'theme-game-btn--lively'
                   }`}
                 >
                   <div className="theme-game-btn__inner">
@@ -359,7 +423,9 @@ export default function Lobby({
                           <span className="cipher-mode-btn__checking">Checking…</span>
                         )}
                       </div>
-                      <span className="theme-game-btn__subtitle">Crack the code to win</span>
+                      <span className="theme-game-btn__subtitle">
+                        {hasPendingSearch ? '⏳ Finish or cancel current game first' : 'Crack the code to win'}
+                      </span>
                       {/* Cipher USDT reward campaign ended
                       <span className="cipher-reward-hint">
                         {isSignedIn ? (
@@ -387,21 +453,22 @@ export default function Lobby({
 
                 <button
                   type="button"
-                  onClick={isSignedIn ? openPvPModal : () => login()}
+                  onClick={hasPendingSearch ? undefined : (isSignedIn ? openPvPModal : () => login())}
+                  disabled={hasPendingSearch}
                   className={`theme-game-btn theme-game-btn--pvp group ${
-                    isSignedIn ? 'theme-game-btn--lively' : 'theme-game-btn--signin-required'
+                    hasPendingSearch ? 'opacity-50 cursor-not-allowed' : isSignedIn ? 'theme-game-btn--lively' : 'theme-game-btn--signin-required'
                   }`}
-                  aria-disabled={!isSignedIn}
+                  aria-disabled={!isSignedIn || hasPendingSearch}
                 >
                   <div className="theme-game-btn__inner">
                     <span className="theme-game-btn__emoji-badge" aria-hidden>⚔️</span>
                     <div className="theme-game-btn__content">
                       <span className="theme-game-btn__title">Vs Opponent</span>
                       <span className="theme-game-btn__subtitle">
-                        {isSignedIn ? 'Public or invite-only match' : '🔒 Sign in to duel'}
+                        {hasPendingSearch ? '⏳ Finish or cancel current game first' : isSignedIn ? 'Public or invite-only match' : '🔒 Sign in to duel'}
                       </span>
                     </div>
-                    <span className="theme-game-btn__go">{isSignedIn ? 'DUEL' : '🔒'}</span>
+                    <span className="theme-game-btn__go">{hasPendingSearch ? '⏳' : isSignedIn ? 'DUEL' : '🔒'}</span>
                   </div>
                 </button>
               </motion.div>
@@ -413,8 +480,8 @@ export default function Lobby({
                     onChange={onJoinGameIdInputChange}
                     onJoin={onJoinByGameId}
                     isJoining={isJoining}
-                    disabled={!isSignedIn}
-                    onSignInRequired={() => login()}
+                    disabled={!isSignedIn || hasPendingSearch}
+                    onSignInRequired={hasPendingSearch ? undefined : () => login()}
                     collapsible
                   />
                 </motion.div>
@@ -551,22 +618,24 @@ export default function Lobby({
 
                     <div className="flex flex-col gap-5">
                       <div className="flex flex-col gap-2">
-                        <label className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)]">USDT amount</label>
-                        <div className="relative flex items-center">
-                          <input
-                            type="number"
-                            value={stake}
-                            onChange={(e) => setStake(e.target.value)}
-                            className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] p-4 pr-16 font-ui text-2xl font-bold text-[var(--orange)] outline-none focus:border-[var(--orange)]"
-                            autoFocus
-                            placeholder="0.00"
-                          />
-                          <span className="absolute right-4 font-ui text-sm font-bold text-[var(--text-dim)]">USDT</span>
+                        <label className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)]">Choose stake</label>
+                        <div className="grid grid-cols-3 gap-2">
+                          {[0.2, 0.5, 1, 2, 5, 10].map((amt) => (
+                            <button
+                              key={amt}
+                              type="button"
+                              onClick={() => setStake(String(amt))}
+                              className={`rounded-2xl border-2 p-3 font-ui text-base font-bold transition-all ${
+                                parseFloat(stake) === amt
+                                  ? 'border-[var(--orange)] bg-[var(--orange)]/15 text-[var(--orange)] scale-[1.04]'
+                                  : 'border-[var(--border-mid)] bg-[var(--bg-elevated)] text-[var(--text)] hover:border-[var(--orange)]/50'
+                              }`}
+                            >
+                              {amt} <span className="text-[10px] font-normal text-[var(--text-dim)]">USDT</span>
+                            </button>
+                          ))}
                         </div>
-                        <div className="flex items-center justify-between px-1">
-                          <span className={`font-body text-[10px] ${(parseFloat(stake) || 0) < 0.1 ? 'font-bold text-red-500' : 'text-[var(--text-dim)]'}`}>
-                            Minimum 0.1 USDT
-                          </span>
+                        <div className="flex items-center justify-end px-1">
                           <span className="font-body text-[10px] text-[var(--text-dim)]">
                             Available: <span className="font-bold text-[var(--text)]">{usdtData ? `${parseFloat(usdtData.formatted).toFixed(2)} USDT` : '…'}</span>
                           </span>
@@ -677,101 +746,93 @@ function MatchmakingPulse({
   searchTime = 0,
   onCancel,
   isCancelling = false,
+  onHide,
 }: {
   opponentName: string,
   mode: GameMode,
   searchTime?: number,
   onCancel?: () => void,
   isCancelling?: boolean,
+  onHide?: () => void,
 }) {
   const isAI = mode === 'ai';
+  const timeLeft = Math.max(0, 300 - searchTime);
+  const minutes = Math.floor(timeLeft / 60);
+  const seconds = timeLeft % 60;
 
   return (
-    <div className="flex flex-col items-center gap-6 py-4">
-      {/* Radar rings */}
-      <div className="relative flex h-28 w-28 items-center justify-center">
+    <div className="flex flex-col items-center gap-8 py-6">
+      {/* Radar animation */}
+      <div className="relative flex h-32 w-32 items-center justify-center">
         {[1, 2, 3].map((ring) => (
           <motion.div
             key={ring}
-            className="absolute rounded-full border"
+            className="absolute rounded-full border-2"
             style={{ borderColor: isAI ? 'var(--clue-yellow)' : 'var(--accent)' }}
-            initial={{ width: 24, height: 24, opacity: 0.8 }}
-            animate={{ width: 112, height: 112, opacity: 0 }}
-            transition={{ duration: 1.8, delay: ring * 0.5, repeat: Infinity, ease: 'easeOut' }}
+            initial={{ width: 28, height: 28, opacity: 0.7 }}
+            animate={{ width: 128, height: 128, opacity: 0 }}
+            transition={{ duration: 2, delay: ring * 0.6, repeat: Infinity, ease: 'easeOut' }}
           />
         ))}
-        {/* Center dot */}
         <div
-          className="relative z-10 flex h-10 w-10 items-center justify-center rounded-full"
-          style={{ background: isAI ? 'rgba(245,158,11,0.1)' : 'var(--accent-dim)', border: `2px solid ${isAI ? 'var(--clue-yellow)' : 'var(--accent)'}`, boxShadow: `0 0 16px ${isAI ? 'rgba(245,158,11,0.3)' : 'var(--accent-glow)'}` }}
+          className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full"
+          style={{
+            background: isAI ? 'rgba(245,158,11,0.1)' : 'var(--accent-dim)',
+            border: `2px solid ${isAI ? 'var(--clue-yellow)' : 'var(--accent)'}`,
+            boxShadow: `0 0 24px ${isAI ? 'rgba(245,158,11,0.3)' : 'var(--accent-glow)'}`,
+          }}
         >
-          <motion.div
-            className="h-3 w-3 rounded-full"
-            style={{ background: isAI ? 'var(--clue-yellow)' : 'var(--accent)' }}
-            animate={{ scale: [1, 1.3, 1] }}
-            transition={{ duration: 0.8, repeat: Infinity }}
-          />
+          <span className="text-2xl">{isAI ? '🤖' : '⚔️'}</span>
         </div>
       </div>
 
-      {/* Text */}
-      <div className="flex flex-col items-center gap-1 text-center">
-        <p className="font-orbitron text-sm font-semibold tracking-widest" style={{ color: isAI ? 'var(--clue-yellow)' : 'var(--accent)' }}>
-          {isAI ? 'INITIALIZING AI' : 'FINDING OPPONENT'}
-        </p>
+      {/* Status text + countdown */}
+      <div className="flex flex-col items-center gap-3 text-center">
+        <h3 className="font-orbitron text-base font-black tracking-widest uppercase" style={{ color: isAI ? 'var(--clue-yellow)' : 'var(--accent)' }}>
+          {isAI ? 'Initializing AI' : 'Finding Opponent'}
+        </h3>
+
         <motion.p
-          className="text-xs"
-          style={{ color: 'var(--text-2)' }}
-          animate={{ opacity: [0.4, 1, 0.4] }}
-          transition={{ duration: 1.4, repeat: Infinity }}
+          className="font-body text-xs text-[var(--text-dim)]"
+          animate={{ opacity: [0.5, 1, 0.5] }}
+          transition={{ duration: 1.6, repeat: Infinity }}
         >
-          {isAI ? 'Booting logical engine' : 'Scanning for challengers'}
-          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.4 }}>.</motion.span>
-          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.6 }}>.</motion.span>
-          <motion.span animate={{ opacity: [0, 1, 0] }} transition={{ duration: 0.8, repeat: Infinity, delay: 0.8 }}>.</motion.span>
+          {isAI ? 'Booting logical engine…' : 'Scanning for challengers…'}
         </motion.p>
 
-        {/* Live Timer */}
         {!isAI && (
-          <div className="mt-4 flex flex-col items-center gap-4">
-            <div className="rounded-full border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] px-4 py-1 shadow-[var(--pop-shadow)]">
-              <span className="font-code text-sm font-bold text-[var(--accent)]">
-                {Math.floor(searchTime / 60)}:{(searchTime % 60).toString().padStart(2, '0')}
+          <div className="mt-2 flex flex-col items-center gap-2">
+            <div className="flex items-center gap-3 rounded-2xl border-2 border-[var(--orange)]/30 bg-[var(--orange)]/10 px-6 py-3">
+              <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--orange)]/70">Expires in</span>
+              <span className="font-code text-xl font-black text-[var(--orange)]">
+                {minutes}:{seconds.toString().padStart(2, '0')}
               </span>
             </div>
-
-            <button
-              type="button"
-              onClick={onCancel}
-              disabled={isCancelling || !onCancel}
-              className="rounded-xl border border-red-500/30 bg-red-500/10 px-6 py-2 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 active:scale-95 disabled:opacity-50"
-            >
-              {isCancelling ? 'CANCELLING...' : 'CANCEL SEARCH'}
-            </button>
           </div>
         )}
       </div>
 
-      {/* Found opponent indicator */}
+      {/* Action buttons */}
       {!isAI && (
-        <motion.div
-          className="flex items-center gap-3 rounded-xl px-4 py-3"
-          style={{ background: 'var(--bg-card)', border: '1px solid var(--border-mid)' }}
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.4 }}
-        >
-          <motion.div
-            className="h-2 w-2 rounded-full"
-            style={{ background: 'var(--orange)' }}
-            animate={{ scale: [1, 1.4, 1] }}
-            transition={{ duration: 0.6, repeat: Infinity }}
-          />
-          <span className="font-code text-sm font-bold" style={{ color: 'var(--orange)' }}>
-            {opponentName}
-          </span>
-          <span className="text-xs" style={{ color: 'var(--text-2)' }}>found</span>
-        </motion.div>
+        <div className="flex w-full max-w-[280px] flex-col gap-2">
+          {onHide && (
+            <button
+              type="button"
+              onClick={onHide}
+              className="w-full rounded-2xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3.5 font-ui text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] transition-all hover:bg-[var(--bg-elevated)]/80 active:scale-[0.98]"
+            >
+              Hide & Browse
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={onCancel}
+            disabled={isCancelling || !onCancel}
+            className="w-full rounded-2xl border-2 border-red-500/20 bg-red-500/5 py-3.5 font-ui text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/15 active:scale-[0.98] disabled:opacity-50"
+          >
+            {isCancelling ? 'Cancelling…' : 'Cancel Search'}
+          </button>
+        </div>
       )}
     </div>
   );
@@ -781,12 +842,14 @@ function InviteWaiting({
   searchTime,
   onCancel,
   joinCode,
-  isCreating
+  isCreating,
+  onHide,
 }: {
   searchTime: number,
   onCancel?: () => void,
   joinCode: string,
-  isCreating?: boolean
+  isCreating?: boolean,
+  onHide?: () => void,
 }) {
   const [copied, setCopied] = useState(false);
   const timeLeft = Math.max(0, 300 - searchTime); // 5 minutes
@@ -832,25 +895,24 @@ function InviteWaiting({
 
         <FarcasterShareGameButton joinCode={joinCode} />
 
-        <button
-          type="button"
-          onClick={() => {
-            const url = buildGameShareUrl(joinCode);
-            void navigator.clipboard.writeText(url);
-            toast.success('Share link copied!');
-          }}
-          className="w-full rounded-2xl border border-[var(--border-mid)] bg-[var(--bg-elevated)] py-3 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] transition-all hover:bg-[var(--bg-elevated)]"
-        >
-          Copy share link
-        </button>
-
-        <button
-          onClick={onCancel}
-          disabled={isCreating}
-          className="rounded-2xl border border-red-500/30 bg-red-500/10 py-4 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 disabled:opacity-50"
-        >
-          {isCreating ? 'CANCELLING...' : 'CANCEL INVITE'}
-        </button>
+        <div className="flex gap-2">
+          {onHide && (
+            <button
+              type="button"
+              onClick={onHide}
+              className="flex-1 rounded-2xl border border-[var(--border-mid)] bg-[var(--bg-elevated)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] transition-all hover:bg-[var(--bg-elevated)]/80"
+            >
+              HIDE
+            </button>
+          )}
+          <button
+            onClick={onCancel}
+            disabled={isCreating}
+            className="flex-1 rounded-2xl border border-red-500/30 bg-red-500/10 py-4 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 disabled:opacity-50"
+          >
+            {isCreating ? 'CANCELLING...' : 'CANCEL INVITE'}
+          </button>
+        </div>
       </div>
     </div>
   );
