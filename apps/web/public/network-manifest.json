@@ -97,5 +97,9 @@
     "best_practices": 77,
     "seo": 100,
     "captured_at": "2026-08-19"
+  },
+  "on_chain_analytics": {
+    "page": "https://www.crackmycode.fun/on-chain-analytics",
+    "api": "https://www.crackmycode.fun/api/stats/on-chain"
   }
 }
