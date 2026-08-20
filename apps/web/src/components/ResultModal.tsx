@@ -6,6 +6,8 @@ import type { GameMode, GameResult } from '@/lib/game';
 
 interface ResultModalProps {
   result: GameResult;
+  /** When a match ends because someone quit, we show the correct copy. */
+  quitContext?: 'player' | 'opponent' | null;
   gameMode: GameMode;
   stakeAmount: number;
   opponentCode: number[];
@@ -52,6 +54,7 @@ function cipherRewardMessage(reason?: string): string {
 
 export default function ResultModal({
   result,
+  quitContext = null,
   gameMode,
   stakeAmount,
   opponentCode,
@@ -72,6 +75,8 @@ export default function ResultModal({
 }: ResultModalProps) {
   const isWin = result === 'win';
   const isDraw = result === 'draw';
+  const isQuitWin = isWin && quitContext === 'opponent';
+  const isQuitLose = !isDraw && !isQuitWin && result === 'lose' && quitContext === 'player';
   const prizePool = stakeAmount * 2;
   const winnings = prizePool * 0.99;
 
@@ -190,14 +195,18 @@ export default function ResultModal({
           >
             <h2 className="font-orbitron text-2xl font-black tracking-widest sm:text-3xl"
               style={{ color: accentColor }}>
-              {isWin ? 'CODE CRACKED' : isDraw ? "IT'S A DRAW" : 'DEFEATED'}
+              {isWin ? (isQuitWin ? 'OPPONENT QUIT' : 'CODE CRACKED') : isDraw ? "IT'S A DRAW" : isQuitLose ? 'YOU QUIT' : 'DEFEATED'}
             </h2>
             <p className="font-body text-sm text-[var(--wood-text-soft)]">
               {isWin
-                ? `You broke ${opponentName}'s code in ${guessCount} guess${guessCount !== 1 ? 'es' : ''}!`
+                ? isQuitWin
+                  ? `Your opponent quit — you win!`
+                  : `You broke ${opponentName}'s code in ${guessCount} guess${guessCount !== 1 ? 'es' : ''}!`
                 : isDraw
                   ? `Neither you nor ${opponentName} cracked the code. Well played!`
-                  : `${opponentName} held their code this time.`}
+                  : isQuitLose
+                    ? `You quit — ${opponentName} wins.`
+                    : `${opponentName} held their code this time.`}
             </p>
           </motion.div>
 
@@ -305,7 +314,7 @@ export default function ResultModal({
             transition={{ delay: 0.45 }}
           >
             <p className="text-center font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--wood-text-soft)] sm:text-xs">
-              {isWin ? 'Code You Cracked' : "Code You Couldn't Crack"}
+              {isWin ? (isQuitWin ? 'Opponent Quit' : 'Code You Cracked') : isQuitLose ? "Opponent Code" : "Code You Couldn't Crack"}
             </p>
             <div className="result-code-frame">
               <div className="flex gap-1.5 sm:gap-2">

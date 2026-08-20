@@ -18,6 +18,7 @@ import { AboutHowToPlay } from '@/components/AboutHowToPlay';
 import { SettingsPanel } from '@/components/SettingsPanel';
 import { StatsPanel } from '@/components/StatsPanel';
 import { SetNameModal } from '@/components/SetNameModal';
+import QuitConfirmModal from '@/components/QuitConfirmModal';
 import {
   CODE_LENGTH,
   GAME_DURATION,
@@ -298,6 +299,8 @@ export default function Home() {
   } | null>(null);
   const [rematchStatus, setRematchStatus] = useState<'idle' | 'waiting' | 'opponent_wants' | 'declined'>('idle');
   const [rematchLoading, setRematchLoading] = useState(false);
+  const [showQuitConfirm, setShowQuitConfirm] = useState(false);
+  const [isQuitting, setIsQuitting] = useState(false);
   const rematchWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const [lastCipherReward, setLastCipherReward] = useState<{
     paid: boolean;
@@ -625,6 +628,13 @@ export default function Home() {
 
         if (data.status === 'COMPLETED' && data.result) {
           const mode = prev.gameMode === 'ai' ? 'ai' : prev.gameMode;
+          const bothZeroGuesses =
+            data.playerGuesses.length === 0 && data.opponentGuesses.length === 0;
+          const quitContext = bothZeroGuesses
+            ? data.result === 'win'
+              ? 'opponent'
+              : 'player'
+            : null;
           const delta =
             data.result === 'win'
               ? scoreDeltaForMode(mode, true)
@@ -647,6 +657,7 @@ export default function Home() {
             isPlayerTurn: false,
             opponentCurrentInput: [],
             currentInput: [],
+            quitContext,
             opponentCode: data.opponentCode ?? prev.opponentCode,
           };
         }
@@ -1638,11 +1649,15 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [gs.phase, gs.gameMode, isSearchHidden, handleTimeoutExpiry]);
 
-  const handleQuitGame = useCallback(async () => {
-    if (!window.confirm('Are you sure you want to quit the game?')) return;
+  const requestQuitGame = useCallback(() => {
+    if (gs.phase !== 'playing') return;
+    setShowQuitConfirm(true);
+  }, [gs.phase]);
 
+  const handleQuitGame = useCallback(async () => {
     clearOppTimer();
     clearTurnHandover();
+    setIsQuitting(true);
 
     const playerAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
     const gameId = currentGameId;
@@ -1723,6 +1738,8 @@ export default function Home() {
         setGs(initialGameState(gs.playerPoints));
         setCurrentGameId(null);
         setCurrentOnChainMatchId(null);
+        setShowQuitConfirm(false);
+        setIsQuitting(false);
         return;
       }
 
@@ -1734,6 +1751,7 @@ export default function Home() {
         phase: 'result',
         result: 'lose',
         ratingDelta: isRegisteredPlayer(playerAddress) ? lossDelta : 0,
+        quitContext: 'player',
         currentInput: [],
         opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
       }));
@@ -1746,6 +1764,9 @@ export default function Home() {
     } catch (err) {
       console.error('Quit game failed', err);
       toast.error('Quit failed', { description: getErrorMessage(err) });
+    } finally {
+      setShowQuitConfirm(false);
+      setIsQuitting(false);
     }
   }, [
     gs.playerPoints,
@@ -2355,7 +2376,7 @@ export default function Home() {
           onDigitPress={handleDigitPress}
           onDelete={handleDeleteDigit}
           onSubmit={() => handleSubmitGuess(gs.currentInput)}
-          onQuit={handleQuitGame}
+          onQuit={requestQuitGame}
           pendingOpponentTileClues={pendingOpponentTileClues}
           turnNotification={turnNotification}
           isAI={gs.gameMode === 'ai'}
@@ -2390,6 +2411,7 @@ export default function Home() {
           {gs.phase === 'result' && gs.result && (
             <ResultModal
               result={gs.result}
+              quitContext={gs.quitContext ?? null}
               gameMode={gs.gameMode}
               stakeAmount={gs.stakeAmount}
               opponentCode={gs.opponentCode}
@@ -2671,6 +2693,12 @@ export default function Home() {
         onCancel={() => {
           if (!isJoining) setPendingJoinStake(null);
         }}
+      />
+      <QuitConfirmModal
+        open={showQuitConfirm}
+        isQuitting={isQuitting}
+        onCancel={() => setShowQuitConfirm(false)}
+        onConfirm={handleQuitGame}
       />
       <div
         className={`app-page-scroll w-full ${showBottomNav ? 'app-page-scroll--with-nav' : ''} ${contentHidden ? 'invisible pointer-events-none' : ''}`}
