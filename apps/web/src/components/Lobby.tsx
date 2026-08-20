@@ -56,6 +56,8 @@ interface LobbyProps {
   /** Restore the search screen from the banner */
   onShowSearch?: () => void;
   pendingStake?: number;
+  /** Active PvP mode while matchmaking (cash/fun/ai) — drives search UI. */
+  gameMode?: GameMode;
 }
 
 const stagger = {
@@ -92,13 +94,14 @@ export default function Lobby({
   hasPendingSearch = false,
   onShowSearch,
   pendingStake = 0,
+  gameMode = 'fun',
 }: LobbyProps) {
   const { isConnected, address: wagmiAddress } = useAccount();
   const { login } = usePrivy();
   const { isMiniPay } = useMiniAppEnvironment();
   const walletAddress = payoutAddress || wagmiAddress;
   const canUseWallet = isSignedIn || isWalletConnecting;
-  const { data: usdtData } = useBalance({
+  const { data: usdtData, refetch: refetchUsdtBalance } = useBalance({
     address: walletAddress as `0x${string}` | undefined,
     token: USDT_ADDRESS as `0x${string}`,
     query: { enabled: !!walletAddress },
@@ -110,6 +113,9 @@ export default function Lobby({
   const [selectedMode, setSelectedMode] = useState<GameMode>('fun');
   const [stake, setStake] = useState<string>('5');
   const [isCreating, setIsCreating] = useState(false);
+  /** Keeps the cash create modal in a locked progress state across approve → create. */
+  const [cashCreatePhase, setCashCreatePhase] = useState<'idle' | 'approving' | 'creating'>('idle');
+  const [cashJoinPhase, setCashJoinPhase] = useState<'idle' | 'approving' | 'joining'>('idle');
   const [cashVisibility, setCashVisibility] = useState<boolean | null>(null);
   const [showCashTxModal, setShowCashTxModal] = useState(false);
   const [showJoinCashModal, setShowJoinCashModal] = useState(false);
@@ -151,7 +157,7 @@ export default function Lobby({
 
   const isApproving = isApprovingAction || isWaitingForApproval;
 
-  const handleApprove = async (amount: bigint) => {
+  const handleApprove = async (amount: bigint): Promise<boolean> => {
     try {
       await approve({
         address: USDT_ADDRESS,
@@ -159,9 +165,11 @@ export default function Lobby({
         functionName: 'approve',
         args: [CONTRACT_ADDRESS, amount],
       });
+      return true;
     } catch (err) {
       console.error('Approval failed', err);
       toast.error('Approval Failed', { description: getErrorMessage(err) });
+      return false;
     }
   };
 
@@ -232,16 +240,20 @@ export default function Lobby({
 
   const handleFinalizeChallenge = async (isPublic: boolean) => {
     setIsCreating(true);
+    setCashCreatePhase('creating');
     try {
       const stakeAmount = selectedMode === 'cash' ? parseFloat(stake) || 0 : 0;
       const currentBalance = parseFloat(usdtData?.formatted || '0');
       await onFindMatch(selectedMode, stakeAmount, isPublic, currentBalance);
+      setShowCashTxModal(false);
       setShowPvPModal(false);
-      setPvpStep('selection'); // Reset for next time
+      setPvpStep('selection');
+      setCashCreatePhase('idle');
+      void refetchUsdtBalance();
     } catch (err) {
       console.error('Failed to create challenge', err);
-      // getErrorMessage is already imported and will handle the message
       toast.error('Challenge Error', { description: getErrorMessage(err) });
+      setCashCreatePhase('idle');
     } finally {
       setIsCreating(false);
     }
@@ -253,6 +265,7 @@ export default function Lobby({
     if (allowance < stakeBigInt) return;
     if (cashVisibility === null) return;
     setPendingCreateAfterApprove(false);
+    setCashCreatePhase('creating');
     void handleFinalizeChallenge(cashVisibility);
   }, [pendingCreateAfterApprove, isApproving, allowance, stakeBigInt, cashVisibility]);
 
@@ -274,11 +287,15 @@ export default function Lobby({
       return;
     }
 
-    setShowCashTxModal(false);
-
+    // Keep modal open so the button stays Approving / Creating (never snaps back to Proceed).
     if (allowance < stakeBigInt) {
+      setCashCreatePhase('approving');
       setPendingCreateAfterApprove(true);
-      await handleApprove(stakeBigInt);
+      const approved = await handleApprove(stakeBigInt);
+      if (!approved) {
+        setPendingCreateAfterApprove(false);
+        setCashCreatePhase('idle');
+      }
       return;
     }
 
@@ -296,14 +313,18 @@ export default function Lobby({
       return;
     }
 
-    setShowJoinCashModal(false);
-
     if (allowance < stakeBigInt) {
+      setCashJoinPhase('approving');
       setPendingJoinAfterApprove(true);
-      await handleApprove(stakeBigInt);
+      const approved = await handleApprove(stakeBigInt);
+      if (!approved) {
+        setPendingJoinAfterApprove(false);
+        setCashJoinPhase('idle');
+      }
       return;
     }
 
+    setCashJoinPhase('joining');
     setIsJoiningPublic(true);
     try {
       await onJoinCashChallenge({
@@ -311,8 +332,11 @@ export default function Lobby({
         player1Address: joinTarget.hostAddress,
         stake: joinTarget.stake,
       });
+      setShowJoinCashModal(false);
       setShowPvPModal(false);
       setPvpStep('selection');
+      setCashJoinPhase('idle');
+      void refetchUsdtBalance();
     } catch (err) {
       console.error('Public join failed', err);
       const errMsg = getErrorMessage(err);
@@ -321,6 +345,7 @@ export default function Lobby({
       } else {
         toast.error('Join Error', { description: errMsg });
       }
+      setCashJoinPhase('idle');
     } finally {
       setIsJoiningPublic(false);
     }
@@ -332,6 +357,7 @@ export default function Lobby({
     if (allowance < stakeBigInt) return;
     if (!joinTarget) return;
     setPendingJoinAfterApprove(false);
+    setCashJoinPhase('joining');
     void handleProceedJoinCash();
   }, [pendingJoinAfterApprove, isApproving, allowance, stakeBigInt, joinTarget]);
 
@@ -479,6 +505,8 @@ export default function Lobby({
                     joinCode={shareableJoinCode}
                     isCreating={isCreating}
                     onHide={onHideSearch}
+                    stakeAmount={pendingStake}
+                    isCash={gameMode === 'cash'}
                   />
                 ) : (
                   <div className="theme-card mx-auto flex max-w-[320px] flex-col items-center gap-5 px-6 py-8">
@@ -501,7 +529,8 @@ export default function Lobby({
               ) : (
                 <MatchmakingPulse
                   opponentName={opponentName}
-                  mode={selectedMode}
+                  mode={gameMode}
+                  stakeAmount={pendingStake}
                   searchTime={searchTime}
                   onCancel={onCancelMatchmaking}
                   isCancelling={isCancellingMatchmaking}
@@ -994,7 +1023,10 @@ export default function Lobby({
           >
             <div
               className="absolute inset-0 bg-black/45 backdrop-blur-sm"
-              onClick={() => !isApproving && !isJoiningPublic && setShowJoinCashModal(false)}
+              onClick={() => {
+                if (cashJoinPhase !== 'idle' || isApproving || isJoiningPublic) return;
+                setShowJoinCashModal(false);
+              }}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 10 }}
@@ -1023,7 +1055,7 @@ export default function Lobby({
                 <button
                   type="button"
                   onClick={() => setShowJoinCashModal(false)}
-                  disabled={isApproving || isJoiningPublic}
+                  disabled={cashJoinPhase !== 'idle' || isApproving || isJoiningPublic}
                   className="flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] disabled:opacity-60"
                 >
                   Cancel
@@ -1031,12 +1063,12 @@ export default function Lobby({
                 <button
                   type="button"
                   onClick={handleProceedJoinCash}
-                  disabled={isApproving || isJoiningPublic || usdtBalanceLoading || !canAffordStake}
+                  disabled={cashJoinPhase !== 'idle' || isApproving || isJoiningPublic || usdtBalanceLoading || !canAffordStake}
                   className="flex-1 rounded-xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-60"
                 >
-                  {isApproving
-                    ? 'Waiting for approval…'
-                    : isJoiningPublic
+                  {cashJoinPhase === 'approving' || isApproving
+                    ? 'Approving…'
+                    : cashJoinPhase === 'joining' || isJoiningPublic
                       ? 'Joining…'
                       : 'Proceed'}
                 </button>
@@ -1055,7 +1087,10 @@ export default function Lobby({
           >
             <div
               className="absolute inset-0 bg-black/45 backdrop-blur-sm"
-              onClick={() => !isApproving && !isCreating && setShowCashTxModal(false)}
+              onClick={() => {
+                if (cashCreatePhase !== 'idle' || isApproving || isCreating) return;
+                setShowCashTxModal(false);
+              }}
             />
             <motion.div
               initial={{ opacity: 0, scale: 0.96, y: 10 }}
@@ -1085,7 +1120,7 @@ export default function Lobby({
                 <button
                   type="button"
                   onClick={() => setShowCashTxModal(false)}
-                  disabled={isApproving || isCreating}
+                  disabled={cashCreatePhase !== 'idle' || isApproving || isCreating}
                   className="flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] disabled:opacity-60"
                 >
                   Cancel
@@ -1093,13 +1128,13 @@ export default function Lobby({
                 <button
                   type="button"
                   onClick={handleProceedCashChallenge}
-                  disabled={isApproving || isCreating || usdtBalanceLoading || !canAffordStake}
+                  disabled={cashCreatePhase !== 'idle' || isApproving || isCreating || usdtBalanceLoading || !canAffordStake}
                   className="flex-1 rounded-xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-60"
                 >
-                  {isApproving
-                    ? 'Waiting for approval…'
-                    : isCreating
-                      ? 'Creating challenge…'
+                  {cashCreatePhase === 'approving' || isApproving
+                    ? 'Approving…'
+                    : cashCreatePhase === 'creating' || isCreating
+                      ? 'Creating…'
                       : 'Proceed'}
                 </button>
               </div>
@@ -1116,6 +1151,7 @@ export default function Lobby({
 function MatchmakingPulse({
   opponentName,
   mode,
+  stakeAmount = 0,
   searchTime = 0,
   onCancel,
   isCancelling = false,
@@ -1123,15 +1159,18 @@ function MatchmakingPulse({
 }: {
   opponentName: string,
   mode: GameMode,
+  stakeAmount?: number,
   searchTime?: number,
   onCancel?: () => void,
   isCancelling?: boolean,
   onHide?: () => void,
 }) {
   const isAI = mode === 'ai';
+  const isCash = mode === 'cash';
   const timeLeft = Math.max(0, 300 - searchTime);
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;
+  const accent = isAI ? 'var(--clue-yellow)' : isCash ? 'var(--orange)' : 'var(--accent)';
 
   return (
     <div className="flex flex-col items-center gap-8 py-6">
@@ -1141,7 +1180,7 @@ function MatchmakingPulse({
           <motion.div
             key={ring}
             className="absolute rounded-full border-2"
-            style={{ borderColor: isAI ? 'var(--clue-yellow)' : 'var(--accent)' }}
+            style={{ borderColor: accent }}
             initial={{ width: 28, height: 28, opacity: 0.7 }}
             animate={{ width: 128, height: 128, opacity: 0 }}
             transition={{ duration: 2, delay: ring * 0.6, repeat: Infinity, ease: 'easeOut' }}
@@ -1150,27 +1189,42 @@ function MatchmakingPulse({
         <div
           className="relative z-10 flex h-14 w-14 items-center justify-center rounded-full"
           style={{
-            background: isAI ? 'rgba(245,158,11,0.1)' : 'var(--accent-dim)',
-            border: `2px solid ${isAI ? 'var(--clue-yellow)' : 'var(--accent)'}`,
-            boxShadow: `0 0 24px ${isAI ? 'rgba(245,158,11,0.3)' : 'var(--accent-glow)'}`,
+            background: isAI ? 'rgba(245,158,11,0.1)' : isCash ? 'rgba(255,107,43,0.12)' : 'var(--accent-dim)',
+            border: `2px solid ${accent}`,
+            boxShadow: `0 0 24px ${isAI ? 'rgba(245,158,11,0.3)' : isCash ? 'rgba(255,107,43,0.35)' : 'var(--accent-glow)'}`,
           }}
         >
-          <span className="text-2xl">{isAI ? '🤖' : '⚔️'}</span>
+          <span className="text-2xl">{isAI ? '🤖' : isCash ? '💰' : '⚔️'}</span>
         </div>
       </div>
 
       {/* Status text + countdown */}
       <div className="flex flex-col items-center gap-3 text-center">
-        <h3 className="font-orbitron text-base font-black tracking-widest uppercase" style={{ color: isAI ? 'var(--clue-yellow)' : 'var(--accent)' }}>
-          {isAI ? 'Initializing AI' : 'Finding Opponent'}
+        <h3 className="font-orbitron text-base font-black tracking-widest uppercase" style={{ color: accent }}>
+          {isAI ? 'Initializing AI' : isCash ? 'Professional Match' : 'Finding Opponent'}
         </h3>
+
+        {isCash && stakeAmount > 0 && (
+          <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--orange)]/40 bg-[var(--orange)]/10 px-5 py-2.5">
+            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--orange)]/80">
+              Stake locked
+            </span>
+            <span className="font-orbitron text-lg font-black text-[var(--orange)]">
+              {stakeAmount.toFixed(2)} USDT
+            </span>
+          </div>
+        )}
 
         <motion.p
           className="font-body text-xs text-[var(--text-dim)]"
           animate={{ opacity: [0.5, 1, 0.5] }}
           transition={{ duration: 1.6, repeat: Infinity }}
         >
-          {isAI ? 'Booting logical engine…' : 'Scanning for challengers…'}
+          {isAI
+            ? 'Booting logical engine…'
+            : isCash
+              ? 'Waiting for a challenger to match your stake…'
+              : 'Scanning for challengers…'}
         </motion.p>
 
         {!isAI && (
@@ -1203,7 +1257,7 @@ function MatchmakingPulse({
             disabled={isCancelling || !onCancel}
             className="w-full rounded-2xl border-2 border-red-500/20 bg-red-500/5 py-3.5 font-ui text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/15 active:scale-[0.98] disabled:opacity-50"
           >
-            {isCancelling ? 'Cancelling…' : 'Cancel Search'}
+            {isCancelling ? 'Cancelling…' : isCash ? 'Cancel & Refund' : 'Cancel Search'}
           </button>
         </div>
       )}
@@ -1217,12 +1271,16 @@ function InviteWaiting({
   joinCode,
   isCreating,
   onHide,
+  stakeAmount = 0,
+  isCash = false,
 }: {
   searchTime: number,
   onCancel?: () => void,
   joinCode: string,
   isCreating?: boolean,
   onHide?: () => void,
+  stakeAmount?: number,
+  isCash?: boolean,
 }) {
   const [copied, setCopied] = useState(false);
   const timeLeft = Math.max(0, 300 - searchTime); // 5 minutes
@@ -1249,6 +1307,16 @@ function InviteWaiting({
 
       <div className="flex flex-col items-center gap-2 text-center">
         <h3 className="font-orbitron text-base font-black tracking-widest text-[var(--accent)] uppercase">Waiting for Friend</h3>
+        {isCash && stakeAmount > 0 && (
+          <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--orange)]/40 bg-[var(--orange)]/10 px-5 py-2">
+            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--orange)]/80">
+              Stake locked
+            </span>
+            <span className="font-orbitron text-base font-black text-[var(--orange)]">
+              {stakeAmount.toFixed(2)} USDT
+            </span>
+          </div>
+        )}
         <div className="flex items-center justify-center gap-2 rounded-2xl border-2 border-[var(--orange)]/30 bg-[var(--orange)]/10 px-4 py-2">
           <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--orange)]/70">
             Expires in
