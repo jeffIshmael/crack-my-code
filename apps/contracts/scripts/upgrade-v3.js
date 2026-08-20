@@ -1,4 +1,4 @@
-// Upgrades GuessMyCode proxy to V3 (quitMatch, withdrawContractBalance, no virtual joins).
+// Upgrades GuessMyCode proxy (escrowedStakes liability + safer withdraws).
 // Run: npx hardhat run scripts/upgrade-v3.js --network celo
 
 const { ethers, upgrades } = require('hardhat');
@@ -30,7 +30,19 @@ async function main() {
   console.log('Proxy:', proxyAddress);
   console.log('Implementation:', implementationAddress);
 
-  // Sync ABI for the web app
+  // New storage starts at 0 — sync if any live Pending/Active paid stakes remain.
+  // Ops can override with SYNC_ESCROWED_STAKES (USDT 6-decimal units, e.g. 200000 = 0.2).
+  const syncRaw = process.env.SYNC_ESCROWED_STAKES;
+  if (syncRaw !== undefined && syncRaw !== '') {
+    const amount = BigInt(syncRaw);
+    const tx = await upgraded.syncEscrowedStakes(amount);
+    await tx.wait();
+    console.log('syncEscrowedStakes →', amount.toString());
+  } else {
+    const current = await upgraded.escrowedStakes();
+    console.log('escrowedStakes (post-upgrade):', current.toString());
+  }
+
   require('./sync-abi');
 
   console.log('\nVerifying implementation on Celoscan...');

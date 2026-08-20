@@ -36,7 +36,21 @@ export function getErrorMessage(error: any): string {
     return 'Insufficient USDT balance to join this challenge.';
   }
 
-  // Handle Contract Custom Errors (CB: ...)
+  // Handle Contract Custom Errors (CB: ...) — check before AA/ERC20 heuristics
+  if (message.includes('CB:')) {
+    const cbMatch = message.match(/CB:\s*([^"\n.]+)/i);
+    if (cbMatch) {
+      const reason = cbMatch[1].trim().toLowerCase();
+      if (reason.includes('match not pending') || reason.includes('match already started')) {
+        return 'This challenge is already closed.';
+      }
+      if (reason.includes('stake transfer failed')) {
+        return 'Insufficient USDT balance or allowance.';
+      }
+      return `CB: ${cbMatch[1].trim()}`;
+    }
+  }
+
   if (message.includes('CB: stake transfer failed')) {
     return 'Insufficient USDT balance or allowance.';
   }
