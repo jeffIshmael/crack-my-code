@@ -133,93 +133,75 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // --- ON-CHAIN + Pusher: run after response (non-blocking) ---
-      void (async () => {
-        if (isAI) {
-          try {
-            await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
-              digits,
-              clues,
-              tileClues,
-              sender: normalizedPlayerAddress,
-              nextTurnAddress,
-              revealCode: isWin ? opponentCode : undefined,
-            });
-          } catch (pusherErr) {
-            console.error('[Pusher] opponent-guess failed:', pusherErr);
-          }
-          return;
-        }
-
-        if ((game as any).onChainMatchId && game.mode !== 'ai') {
-          try {
-            const p1GuessCount = await prisma.guess.count({ where: { gameId, isPlayer: true } });
-            const p2GuessCount = await prisma.guess.count({ where: { gameId, isPlayer: false } });
-
-            const allGuesses = await prisma.guess.findMany({
-              where: { gameId },
-              orderBy: { createdAt: 'asc' },
-            });
-            const guessArray = allGuesses.map((g: { digits: string }) => g.digits);
-
-            const ipfsHash = await uploadToIPFS({
-              gameId,
-              player1: game.player1Address,
-              player2: game.player2Address,
-              player1Code: game.player1Code,
-              player2Code: game.player2Code,
-              winner: playerAddress,
-              guesses: allGuesses.map((g) => ({
-                digits: g.digits,
-                clues: (() => {
-                  const parsed = JSON.parse(g.clues);
-                  return Array.isArray(parsed) ? parsed : parsed.clues;
-                })(),
-                isPlayer: g.isPlayer,
-                createdAt: g.createdAt,
-              })),
-            });
-
-            const receipt = await resolveMatchOnChain(
-              (game as any).onChainMatchId as `0x${string}`,
-              normalizedPlayerAddress as `0x${string}`,
-              (game.player2Address || '') as `0x${string}`,
-              p1GuessCount,
-              p2GuessCount,
-              game.player1Code || '',
-              game.player2Code || '',
-              ipfsHash || '',
-              guessArray,
-            );
-            console.log('[Blockchain] Resolve ok', {
-              gameId,
-              matchId: (game as any).onChainMatchId,
-              winner: normalizedPlayerAddress,
-              txHash: receipt.transactionHash,
-            });
-          } catch (err) {
-            console.error('[Blockchain] Resolve failed:', {
-              gameId,
-              matchId: (game as any).onChainMatchId,
-              winner: normalizedPlayerAddress,
-              error: err instanceof Error ? err.message : err,
-            });
-          }
-        }
-
+      // Cash/fun PvP: await on-chain settle BEFORE returning — fire-and-forget gets killed
+      // when the Next.js request ends, so refunds/payouts never land.
+      if (!isAI && (game as any).onChainMatchId && game.mode !== 'ai') {
         try {
-          await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
-            digits,
-            clues,
-            tileClues,
-            sender: normalizedPlayerAddress,
-            nextTurnAddress,
-            revealCode: isWin ? opponentCode : undefined,
+          const settleP1 = await prisma.guess.count({ where: { gameId, isPlayer: true } });
+          const settleP2 = await prisma.guess.count({ where: { gameId, isPlayer: false } });
+          const allGuesses = await prisma.guess.findMany({
+            where: { gameId },
+            orderBy: { createdAt: 'asc' },
           });
-        } catch (pusherErr) {
-          console.error('[Pusher] opponent-guess failed:', pusherErr);
+          const guessArray = allGuesses.map((g: { digits: string }) => g.digits);
+          const ipfsHash = await uploadToIPFS({
+            gameId,
+            player1: game.player1Address,
+            player2: game.player2Address,
+            player1Code: game.player1Code,
+            player2Code: game.player2Code,
+            winner: normalizedPlayerAddress,
+            guesses: allGuesses.map((g) => ({
+              digits: g.digits,
+              clues: (() => {
+                const parsed = JSON.parse(g.clues);
+                return Array.isArray(parsed) ? parsed : parsed.clues;
+              })(),
+              isPlayer: g.isPlayer,
+              createdAt: g.createdAt,
+            })),
+          });
+
+          const receipt = await resolveMatchOnChain(
+            (game as any).onChainMatchId as `0x${string}`,
+            normalizedPlayerAddress as `0x${string}`,
+            (game.player2Address || '') as `0x${string}`,
+            settleP1,
+            settleP2,
+            game.player1Code || '',
+            game.player2Code || '',
+            ipfsHash || '',
+            guessArray,
+          );
+          console.log('[Blockchain] Resolve ok', {
+            gameId,
+            matchId: (game as any).onChainMatchId,
+            winner: normalizedPlayerAddress,
+            txHash: receipt.transactionHash,
+          });
+        } catch (err) {
+          console.error('[Blockchain] Resolve failed:', {
+            gameId,
+            matchId: (game as any).onChainMatchId,
+            winner: normalizedPlayerAddress,
+            error: err instanceof Error ? err.message : err,
+          });
         }
-      })();
+      }
+
+      try {
+        await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
+          digits,
+          clues,
+          tileClues,
+          sender: normalizedPlayerAddress,
+          nextTurnAddress,
+          revealCode: isWin ? opponentCode : undefined,
+          winnerAddress: winner ?? undefined,
+        });
+      } catch (pusherErr) {
+        console.error('[Pusher] opponent-guess failed:', pusherErr);
+      }
     } else {
       const playerGuessCount = isPlayer1 ? p1GuessCount : p2GuessCount;
       const guessLimit = maxGuessesForMode(game.mode as 'ai' | 'fun' | 'cash');
@@ -235,7 +217,6 @@ export async function POST(req: NextRequest) {
           });
           winner = 'AI';
         } else {
-          const opponentAddress = (isPlayer1 ? game.player2Address : game.player1Address)?.toLowerCase();
           const opponentGuessCount = isPlayer1 ? p2GuessCount : p1GuessCount;
 
           // Both players exhausted all guesses without cracking the code → DRAW
@@ -245,26 +226,13 @@ export async function POST(req: NextRequest) {
               data: { status: 'COMPLETED', winnerAddress: 'DRAW' },
             });
             winner = 'DRAW';
-            // No points awarded or deducted for a draw
 
-            // If this match exists on-chain, finalize draw + refund both stakes
-            void (async () => {
-              const onChainMatchId = (game as any).onChainMatchId as `0x${string}` | undefined;
-              const player2Address = game.player2Address ? (game.player2Address as `0x${string}`) : undefined;
-              if (!onChainMatchId || !player2Address) {
-                console.warn('[Blockchain] Draw skipped — missing onChainMatchId or player2', {
-                  gameId,
-                  onChainMatchId,
-                  player2Address,
-                });
-                return;
-              }
+            const onChainMatchId = (game as any).onChainMatchId as `0x${string}` | undefined;
+            const player2Address = game.player2Address
+              ? (game.player2Address as `0x${string}`)
+              : undefined;
+            if (onChainMatchId && player2Address && game.mode === 'cash') {
               try {
-                const allGuesses = await prisma.guess.findMany({
-                  where: { gameId },
-                  orderBy: { createdAt: 'asc' },
-                });
-
                 const ipfsHash = await uploadToIPFS({
                   gameId,
                   player1: game.player1Address,
@@ -272,17 +240,7 @@ export async function POST(req: NextRequest) {
                   player1Code: game.player1Code,
                   player2Code: game.player2Code,
                   winner: 'DRAW',
-                  guesses: allGuesses.map((g) => ({
-                    digits: g.digits,
-                    clues: (() => {
-                      const parsed = JSON.parse(g.clues);
-                      return Array.isArray(parsed) ? parsed : parsed.clues;
-                    })(),
-                    isPlayer: g.isPlayer,
-                    createdAt: g.createdAt,
-                  })),
                 });
-
                 const receipt = await resolveDrawOnChain(
                   onChainMatchId,
                   player2Address,
@@ -305,10 +263,14 @@ export async function POST(req: NextRequest) {
                   error: chainErr instanceof Error ? chainErr.message : chainErr,
                 });
               }
-            })();
+            } else if (game.mode === 'cash') {
+              console.warn('[Blockchain] Draw skipped — missing onChainMatchId or player2', {
+                gameId,
+                onChainMatchId,
+                player2Address,
+              });
+            }
           }
-          // If only this player exhausted guesses, game stays ACTIVE until opponent
-          // finishes their remaining guesses (draw if both fail, win if opponent cracks).
         }
       }
     }
