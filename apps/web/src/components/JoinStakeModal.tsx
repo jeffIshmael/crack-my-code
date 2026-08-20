@@ -16,9 +16,11 @@ interface JoinStakeModalProps {
   stake: number;
   opponentLabel?: string;
   isJoining: boolean;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
   onCancel: () => void;
 }
+
+type JoinPhase = 'idle' | 'approving' | 'joining';
 
 export default function JoinStakeModal({
   open,
@@ -54,22 +56,35 @@ export default function JoinStakeModal({
   });
 
   const allowance = (allowanceData as bigint) ?? 0n;
-  const needsApproval = allowance < stakeBigInt;
   const balance = parseFloat(usdtData?.formatted || '0');
   const canAfford = balance >= stake;
 
   const { writeContractAsync: approve, isPending: isApprovingAction } = useWriteContract();
-  const [isConfirmingApprove, setIsConfirmingApprove] = useState(false);
-  const isApproving = isApprovingAction || isConfirmingApprove;
+  const [phase, setPhase] = useState<JoinPhase>('idle');
+  const busy = phase !== 'idle' || isJoining || isApprovingAction;
 
-  const handleApprove = async () => {
-    setIsConfirmingApprove(true);
+  // Reset progress when modal closes so the next open starts clean.
+  if (!open && phase !== 'idle') {
+    setPhase('idle');
+  }
+
+  const waitForAllowance = async (needed: bigint): Promise<boolean> => {
+    for (let i = 0; i < 25; i++) {
+      const result = await refetchAllowance();
+      const value = (result.data as bigint | undefined) ?? 0n;
+      if (value >= needed) return true;
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    return false;
+  };
+
+  const handleApprove = async (amount: bigint): Promise<boolean> => {
     try {
       const hash = await approve({
         address: USDT_ADDRESS,
         abi: ERC20_ABI,
         functionName: 'approve',
-        args: [CONTRACT_ADDRESS, stakeBigInt],
+        args: [CONTRACT_ADDRESS, amount],
       });
       if (publicClient && hash) {
         await publicClient.waitForTransactionReceipt({
@@ -79,22 +94,50 @@ export default function JoinStakeModal({
           timeout: 45_000,
         });
       }
-      for (let i = 0; i < 25; i++) {
-        const result = await refetchAllowance();
-        const value = (result.data as bigint | undefined) ?? 0n;
-        if (value >= stakeBigInt) break;
-        await new Promise((r) => setTimeout(r, 400));
+      const ready = await waitForAllowance(amount);
+      if (!ready) {
+        console.warn('Allowance not visible yet after approve; continuing');
       }
+      return true;
     } catch (err) {
       toast.error('Approval Failed', { description: getErrorMessage(err) });
+      return false;
+    }
+  };
+
+  const handleProceed = async () => {
+    if (!canAfford || busy) return;
+
+    // Continuous: Approve USDT (if needed) → joinChallenge. One Proceed, no button flip.
+    if (allowance < stakeBigInt) {
+      setPhase('approving');
+      const ok = await handleApprove(stakeBigInt);
+      if (!ok) {
+        setPhase('idle');
+        return;
+      }
+    }
+
+    setPhase('joining');
+    try {
+      await onConfirm();
+    } catch {
+      /* parent toasts */
     } finally {
-      setIsConfirmingApprove(false);
+      setPhase('idle');
     }
   };
 
   const handleAddUsdt = () => {
     window.location.href = MINIPAY_ADD_USDT_URL;
   };
+
+  const buttonLabel =
+    phase === 'approving' || isApprovingAction
+      ? 'Approving…'
+      : phase === 'joining' || isJoining
+        ? 'Joining…'
+        : 'Proceed';
 
   return (
     <AnimatePresence>
@@ -105,7 +148,7 @@ export default function JoinStakeModal({
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="absolute inset-0 bg-black/45 backdrop-blur-sm"
-            onClick={() => !isApproving && !isJoining && onCancel()}
+            onClick={() => !busy && onCancel()}
           />
           <motion.div
             initial={{ opacity: 0, scale: 0.96, y: 10 }}
@@ -156,30 +199,19 @@ export default function JoinStakeModal({
               <button
                 type="button"
                 onClick={onCancel}
-                disabled={isApproving || isJoining}
+                disabled={busy}
                 className="flex-1 rounded-xl border-2 border-[var(--border-mid)] bg-[var(--bg-elevated)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] disabled:opacity-60"
               >
                 Cancel
               </button>
-              {needsApproval ? (
-                <button
-                  type="button"
-                  onClick={() => void handleApprove()}
-                  disabled={isApproving || !canAfford}
-                  className="flex-1 rounded-xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-60"
-                >
-                  {isApproving ? 'Approving…' : 'Approve USDT'}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onConfirm}
-                  disabled={isJoining || !canAfford}
-                  className="flex-1 rounded-xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-60"
-                >
-                  {isJoining ? 'Joining…' : 'Proceed'}
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => void handleProceed()}
+                disabled={busy || !canAfford}
+                className="flex-1 rounded-xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-60"
+              >
+                {buttonLabel}
+              </button>
             </div>
           </motion.div>
         </div>

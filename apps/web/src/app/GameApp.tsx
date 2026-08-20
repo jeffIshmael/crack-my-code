@@ -1182,28 +1182,38 @@ export default function Home() {
     if (!isAIMatch) {
       opponentAddressRef.current = opponentAddress.toLowerCase();
     }
-    const mode = isAIMatch ? 'ai' : (meta?.mode ?? 'fun');
     const initialOpponentName = isAIMatch
       ? 'Cipher'
       : (meta?.opponentName || formatAddressShort(opponentAddress));
-    
-    setGs((prev: GameState) => ({
-      ...prev,
-      phase: 'setCode',
-      gameMode: mode,
-      stakeAmount: meta?.stake ?? prev.stakeAmount,
-      opponentName: initialOpponentName,
-      playerCode: [],
-      playerGuesses: [],
-      opponentGuesses: [],
-      opponentGuessCount: 0,
-      currentInput: [],
-      isPlayerTurn: true,
-      timeLeft: GAME_DURATION,
-      result: null,
-      quitContext: null,
-      ratingDelta: null,
-    }));
+
+    // Preserve cash/stake from invite matchmaking when Pusher omits meta (host path).
+    setGs((prev: GameState) => {
+      const mode: GameMode = isAIMatch
+        ? 'ai'
+        : meta?.mode ?? (prev.gameMode === 'cash' || prev.gameMode === 'fun' ? prev.gameMode : 'fun');
+      const stake =
+        mode === 'cash'
+          ? (meta?.stake != null && meta.stake > 0 ? meta.stake : prev.stakeAmount)
+          : 0;
+
+      return {
+        ...prev,
+        phase: 'setCode',
+        gameMode: mode,
+        stakeAmount: stake,
+        opponentName: initialOpponentName,
+        playerCode: [],
+        playerGuesses: [],
+        opponentGuesses: [],
+        opponentGuessCount: 0,
+        currentInput: [],
+        isPlayerTurn: true,
+        timeLeft: GAME_DURATION,
+        result: null,
+        quitContext: null,
+        ratingDelta: null,
+      };
+    });
 
     if (!isAIMatch) {
       void fetchOpponentDisplayName(opponentAddress).then((name) => {
@@ -1224,11 +1234,18 @@ export default function Home() {
     const channelName = `private-user-${address.toLowerCase()}`;
     const channel = pusherClient.subscribe(channelName);
 
-    channel.bind('match-found', (data: { gameId: string; opponentAddress: string }) => {
-      handleMatchFound(data.gameId, data.opponentAddress);
-      setActiveTab('home');
-      toast.success('Opponent joined!', { description: 'Set your secret code to begin.' });
-    });
+    channel.bind(
+      'match-found',
+      (data: { gameId: string; opponentAddress: string; mode?: string; stake?: number }) => {
+        const mode = data.mode === 'cash' ? 'cash' : data.mode === 'ai' ? 'ai' : data.mode === 'fun' ? 'fun' : undefined;
+        handleMatchFound(data.gameId, data.opponentAddress, {
+          mode,
+          stake: data.stake != null ? parseFloat(String(data.stake)) || 0 : undefined,
+        });
+        setActiveTab('home');
+        toast.success('Opponent joined!', { description: 'Set your secret code to begin.' });
+      },
+    );
 
     channel.bind('rematch-request', () => {
       setRematchStatus('opponent_wants');
