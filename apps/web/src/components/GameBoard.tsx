@@ -146,13 +146,11 @@ export default function GameBoard({
           </div>
 
           {winnerReward > 0 && (
-            <div className="flex shrink-0 flex-col items-center rounded-xl border border-[var(--clue-green)]/40 bg-[var(--clue-green-bg)] px-2.5 py-1">
-              <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--clue-green)]/80">
+            <div className="flex shrink-0 flex-col items-center rounded-xl border border-[var(--border-mid)] bg-[var(--cream)] px-2.5 py-1">
+              <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--text-dim)]">
                 Winner
               </span>
-              <span className="inline-flex items-center gap-1 font-orbitron text-[11px] font-black leading-none text-[#1FA84A]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/usdt-logo.webp" alt="" width={12} height={12} className="shrink-0" aria-hidden />
+              <span className="font-orbitron text-[11px] font-black leading-none text-[#1FA84A]">
                 {winnerReward.toLocaleString(undefined, {
                   minimumFractionDigits: 3,
                   maximumFractionDigits: 3,

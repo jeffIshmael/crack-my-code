@@ -1,26 +1,64 @@
-import { createWalletClient, createPublicClient, formatEther, formatUnits, http, parseEther } from 'viem';
+import { createWalletClient, createPublicClient, formatEther, formatUnits, http, parseEther, type PublicClient, type WalletClient, type Account } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 import { celo } from 'viem/chains';
 import { CONTRACT_ADDRESS, CONTRACT_ABI } from './constants';
 
-const privateKey = process.env.AGENT_PRIVATE_KEY as `0x${string}` | undefined;
+const RPC_URL = process.env.CELO_RPC_URL || 'https://forno.celo.org';
 
-if (!privateKey) {
-  console.warn("AGENT_PRIVATE_KEY not set. Backend on-chain functions will fail.");
+let cachedAccount: Account | null | undefined;
+let cachedPublicClient: PublicClient | undefined;
+let cachedWalletClient: WalletClient | null | undefined;
+
+function getPrivateKey(): `0x${string}` | undefined {
+  const raw = process.env.AGENT_PRIVATE_KEY || process.env.OWNER_PRIVATE_KEY;
+  if (!raw) return undefined;
+  return (raw.startsWith('0x') ? raw : `0x${raw}`) as `0x${string}`;
 }
 
-const account = privateKey ? privateKeyToAccount(privateKey) : null;
+function getAccount(): Account | null {
+  if (cachedAccount !== undefined) return cachedAccount;
+  const privateKey = getPrivateKey();
+  if (!privateKey) {
+    console.warn('AGENT_PRIVATE_KEY not set. Backend on-chain functions will fail.');
+    cachedAccount = null;
+    return null;
+  }
+  cachedAccount = privateKeyToAccount(privateKey);
+  console.log('[Blockchain] Agent wallet', cachedAccount.address);
+  return cachedAccount;
+}
 
-const publicClient = createPublicClient({
-  chain: celo,
-  transport: http(),
-});
+function getPublicClient(): PublicClient {
+  if (!cachedPublicClient) {
+    cachedPublicClient = createPublicClient({
+      chain: celo,
+      transport: http(RPC_URL),
+    });
+  }
+  return cachedPublicClient;
+}
 
-const walletClient = account ? createWalletClient({
-  account,
-  chain: celo,
-  transport: http(),
-}) : null;
+function getWalletClient(): WalletClient | null {
+  if (cachedWalletClient !== undefined) return cachedWalletClient;
+  const account = getAccount();
+  if (!account) {
+    cachedWalletClient = null;
+    return null;
+  }
+  cachedWalletClient = createWalletClient({
+    account,
+    chain: celo,
+    transport: http(RPC_URL),
+  });
+  return cachedWalletClient;
+}
+
+function requireAgent(): { account: Account; walletClient: WalletClient; publicClient: PublicClient } {
+  const account = getAccount();
+  const walletClient = getWalletClient();
+  if (!account || !walletClient) throw new Error('Agent not initialized');
+  return { account, walletClient, publicClient: getPublicClient() };
+}
 
 /**
  * Resolve a match on-chain (backend only)
@@ -36,7 +74,7 @@ export async function resolveMatchOnChain(
   historyHash: string,
   guesses: string[]
 ) {
-  if (!account || !walletClient) throw new Error("Agent not initialized");
+  const { account, walletClient, publicClient } = requireAgent();
 
   const { request } = await publicClient.simulateContract({
     account,
@@ -44,18 +82,18 @@ export async function resolveMatchOnChain(
     abi: CONTRACT_ABI,
     functionName: 'resolveMatch',
     args: [
-      matchId, 
-      winner, 
-      player2, 
-      BigInt(p1Guesses), 
-      BigInt(p2Guesses), 
-      p1Code, 
-      p2Code, 
-      historyHash, 
-      guesses
+      matchId,
+      winner,
+      player2,
+      BigInt(p1Guesses),
+      BigInt(p2Guesses),
+      p1Code,
+      p2Code,
+      historyHash,
+      guesses,
     ],
   });
-  
+
   const hash = await walletClient.writeContract(request);
   return await publicClient.waitForTransactionReceipt({ hash });
 }
@@ -72,13 +110,13 @@ export async function resolveDrawOnChain(
   p2Code: string,
   historyHash: string
 ) {
-  if (!account || !walletClient) throw new Error("Agent not initialized");
+  const { account, walletClient, publicClient } = requireAgent();
 
   const { request } = await publicClient.simulateContract({
     account,
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
-    functionName: "resolveDraw",
+    functionName: 'resolveDraw',
     args: [
       matchId,
       player2,
@@ -101,7 +139,7 @@ export async function recordQuitOnChain(
   matchId: `0x${string}`,
   quitter: `0x${string}`
 ) {
-  if (!account || !walletClient) throw new Error("Agent not initialized");
+  const { account, walletClient, publicClient } = requireAgent();
 
   const { request } = await publicClient.simulateContract({
     account,
@@ -110,7 +148,7 @@ export async function recordQuitOnChain(
     functionName: 'recordQuit',
     args: [matchId, quitter],
   });
-  
+
   const hash = await walletClient.writeContract(request);
   return await publicClient.waitForTransactionReceipt({ hash });
 }
@@ -123,7 +161,7 @@ export async function updateGuessCountsOnChain(
   p1Guesses: number,
   p2Guesses: number
 ) {
-  if (!account || !walletClient) throw new Error("Agent not initialized");
+  const { account, walletClient, publicClient } = requireAgent();
 
   const { request } = await publicClient.simulateContract({
     account,
@@ -132,7 +170,7 @@ export async function updateGuessCountsOnChain(
     functionName: 'updateGuessCounts',
     args: [matchId, BigInt(p1Guesses), BigInt(p2Guesses)],
   });
-  
+
   const hash = await walletClient.writeContract(request);
   return await publicClient.waitForTransactionReceipt({ hash });
 }
@@ -147,7 +185,7 @@ export async function updateGuessCountsOnChain(
 let expireMatchChain: Promise<unknown> = Promise.resolve();
 
 export async function expireMatchOnChain(matchId: `0x${string}`) {
-  if (!account || !walletClient) throw new Error("Agent not initialized");
+  const { account, walletClient, publicClient } = requireAgent();
 
   const run = async () => {
     const { request } = await publicClient.simulateContract({
@@ -158,7 +196,7 @@ export async function expireMatchOnChain(matchId: `0x${string}`) {
       args: [matchId],
     });
 
-    const hash = await walletClient!.writeContract(request);
+    const hash = await walletClient.writeContract(request);
     return await publicClient.waitForTransactionReceipt({ hash });
   };
 
@@ -177,7 +215,7 @@ export async function trackGameOnChain(
   matchType: number,
   isAI: boolean
 ) {
-  if (!account || !walletClient) throw new Error("Agent not initialized");
+  const { account, walletClient, publicClient } = requireAgent();
 
   const { request } = await publicClient.simulateContract({
     account,
@@ -186,7 +224,7 @@ export async function trackGameOnChain(
     functionName: 'trackGame',
     args: [matchType, isAI],
   });
-  
+
   const hash = await walletClient.writeContract(request);
   return await publicClient.waitForTransactionReceipt({ hash });
 }
@@ -202,7 +240,7 @@ export type CipherRewardResult =
 export async function rewardCipherWinOnChain(
   player: `0x${string}`,
 ): Promise<CipherRewardResult> {
-  if (!account || !walletClient) throw new Error("Agent not initialized");
+  const { account, walletClient, publicClient } = requireAgent();
 
   const rewardAmount = await publicClient.readContract({
     address: CONTRACT_ADDRESS,
@@ -254,6 +292,7 @@ export async function rewardCipherWinOnChain(
  * Read how many cipher rewards a wallet received today (UTC).
  */
 export async function getCipherRewardsToday(player: `0x${string}`): Promise<number> {
+  const publicClient = getPublicClient();
   const count = await publicClient.readContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
@@ -270,14 +309,14 @@ export async function sendCeloToUser(
   to: `0x${string}`,
   amount: string
 ) {
-  if (!account || !walletClient) throw new Error("Agent not initialized");
+  const { walletClient, publicClient } = requireAgent();
 
   console.log(`Sending ${amount} Celo to ${to}...`);
   const hash = await walletClient.sendTransaction({
     to,
     value: parseEther(amount),
   });
-  
+
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   console.log(`Transaction successful! Hash: ${receipt.transactionHash}`);
   return receipt;
@@ -287,8 +326,9 @@ export async function sendCeloToUser(
  * Get the agent wallet's CELO balance
  */
 export async function getAgentBalance() {
-  if (!account) throw new Error("Agent not initialized");
-  const balance = await publicClient.getBalance({ address: account.address });
+  const account = getAccount();
+  if (!account) throw new Error('Agent not initialized');
+  const balance = await getPublicClient().getBalance({ address: account.address });
   return balance; // Returns BigInt in wei
 }
 
@@ -296,7 +336,7 @@ export async function getAgentBalance() {
  * Get the on-chain Cipher reward pool balance (USDT, 6 decimals).
  */
 export async function getRewardPoolBalance() {
-  return publicClient.readContract({
+  return getPublicClient().readContract({
     address: CONTRACT_ADDRESS,
     abi: CONTRACT_ABI,
     functionName: 'rewardPoolBalance',
@@ -322,7 +362,9 @@ export type AgentTreasurySnapshot = {
  * Agent CELO balance + contract reward pool in one read.
  */
 export async function getAgentTreasurySnapshot(): Promise<AgentTreasurySnapshot> {
-  if (!account) throw new Error("Agent not initialized");
+  const account = getAccount();
+  if (!account) throw new Error('Agent not initialized');
+  const publicClient = getPublicClient();
 
   const [celoWei, rewardPoolRaw, cipherWinRewardRaw] = await Promise.all([
     publicClient.getBalance({ address: account.address }),
@@ -368,5 +410,5 @@ export async function getAgentTreasurySnapshot(): Promise<AgentTreasurySnapshot>
  * Get the agent wallet's address
  */
 export function getAgentAddress() {
-  return account?.address || null;
+  return getAccount()?.address || null;
 }
