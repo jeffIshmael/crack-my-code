@@ -153,15 +153,15 @@ export default function OnChainAnalyticsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <MetricCard
                     label="Reward pool"
-                    value={`${parseFloat(data.treasury.rewardPoolUsdt).toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT`}
+                    value={`${parseFloat(data.treasury.rewardPoolUsdt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} USDT`}
                   />
                   <MetricCard
                     label="Escrow balance"
-                    value={`${parseFloat(data.treasury.escrowBalanceUsdt).toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT`}
+                    value={`${parseFloat(data.treasury.escrowBalanceUsdt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} USDT`}
                   />
                   <MetricCard
                     label="Accumulated fees"
-                    value={`${parseFloat(data.treasury.accumulatedFeesUsdt).toLocaleString(undefined, { maximumFractionDigits: 2 })} USDT`}
+                    value={`${parseFloat(data.treasury.accumulatedFeesUsdt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} USDT`}
                   />
                 </div>
               </section>

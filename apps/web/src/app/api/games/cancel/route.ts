@@ -39,6 +39,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Already retired by expire/agent — idempotent success for stuck UI.
+    if (game.status === 'EXPIRED' || game.status === 'CANCELLED' || game.status === 'COMPLETED') {
+      return NextResponse.json({ success: true, alreadyClosed: true });
+    }
+
     await prisma.game.delete({
       where: { id: gameId },
     });

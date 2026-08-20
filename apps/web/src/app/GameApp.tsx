@@ -46,6 +46,7 @@ import { resolvePayoutAddress, playerAddressAliases, getSmartWalletAddress } fro
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
 import { getErrorMessage } from '@/lib/errors';
+import { isMatchAlreadySettledError } from '@/lib/expire-match';
 import { sendUsdtToAddress } from '@/lib/send-usdt';
 import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, ArrowLeft, ChevronRight } from 'lucide-react';
 
@@ -1668,16 +1669,38 @@ export default function Home() {
     let expireOk = false;
 
     if (gameId) {
-      try {
-        const res = await fetch('/api/games/expire', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gameId, address: payoutAddress || address }),
-        });
+      // Retry while the chain clock catches up (425) — avoid a one-shot "Finalizing…" dead end.
+      for (let attempt = 0; attempt < 8; attempt++) {
+        try {
+          const res = await fetch('/api/games/expire', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ gameId, address: payoutAddress || address }),
+          });
 
-        expireOk = res.ok;
-      } catch (err) {
-        console.error('Expire game failed', err);
+          if (res.ok) {
+            expireOk = true;
+            break;
+          }
+
+          // Background cleanup may have expired it already.
+          if (res.status === 409) {
+            expireOk = true;
+            break;
+          }
+
+          if (res.status === 425) {
+            await new Promise((r) => setTimeout(r, 4000));
+            continue;
+          }
+
+          const data = await res.json().catch(() => ({}));
+          console.error('Expire game failed', res.status, data);
+          break;
+        } catch (err) {
+          console.error('Expire game failed', err);
+          break;
+        }
       }
     }
 
@@ -1687,22 +1710,28 @@ export default function Home() {
     setShareableJoinCode(null);
     setCurrentOnChainMatchId(null);
     fetchMyActive();
-    
+
     const isStakedProfessional =
-      gs.gameMode === 'cash' && (gs.stakeAmount ?? 0) > 0;
+      gsRef.current.gameMode === 'cash' && (gsRef.current.stakeAmount ?? 0) > 0;
 
     toast.info('Match Expired', {
       description: expireOk
         ? isStakedProfessional
           ? 'No opponent joined in time. Your stake has been returned.'
           : 'No opponent joined in time. Match expired.'
-        : 'No opponent joined in time. Finalizing…',
+        : isStakedProfessional
+          ? 'No opponent joined in time. Checking refund…'
+          : 'No opponent joined in time. Finalizing…',
     });
 
     if (isStakedProfessional) {
       void refetchUsdtBalance();
+      // Refund tx may land a beat after we return — refresh again shortly.
+      window.setTimeout(() => {
+        void refetchUsdtBalance();
+      }, 4000);
     }
-  }, [address, payoutAddress, fetchMyActive, gs.gameMode, gs.stakeAmount, refetchUsdtBalance]);
+  }, [address, payoutAddress, fetchMyActive, refetchUsdtBalance]);
 
   const handleHideSearch = useCallback(() => {
     setIsSearchHidden(true);
@@ -2324,22 +2353,32 @@ export default function Home() {
     const toastId = toast.loading('Closing challenge...');
     try {
       if (onChainMatchId) {
-        await cancelChallenge(onChainMatchId as `0x${string}`);
+        try {
+          await cancelChallenge(onChainMatchId as `0x${string}`);
+        } catch (err) {
+          // Already expired/cancelled on-chain — stake refunded; still sync DB/UI.
+          if (!isMatchAlreadySettledError(err)) throw err;
+        }
       }
       const res = await fetch('/api/games/cancel', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ gameId, address }),
       });
-      if (!res.ok) throw new Error('API cancellation failed');
+      if (!res.ok && res.status !== 404) {
+        const body = await res.json().catch(() => null);
+        throw new Error(body?.error || 'API cancellation failed');
+      }
+      setMyActiveGames((prev) => prev.filter((g) => g.id !== gameId));
       toast.success('Challenge closed', { id: toastId });
       fetchMyActive();
+      void refetchUsdtBalance();
     } catch (err) {
       toast.error(getErrorMessage(err), { id: toastId });
     } finally {
       setIsCancelling(null);
     }
-  }, [address, cancelChallenge, fetchMyActive]);
+  }, [address, cancelChallenge, fetchMyActive, refetchUsdtBalance]);
 
   const pointsLoading = !!address && !playerStatsLoaded;
 

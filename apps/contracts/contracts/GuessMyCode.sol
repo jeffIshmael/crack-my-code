@@ -91,7 +91,10 @@ contract GuessMyCode is
     mapping(address => uint256) public cipherRewardsToday;
     mapping(uint256 => mapping(address => mapping(uint8 => bool))) public weeklyRewardClaimed;
 
-    uint256[37] private __gap;
+    /// @notice USDT reserved for Pending/Active paid match stakes (must not be withdrawn).
+    uint256 public escrowedStakes;
+
+    uint256[36] private __gap;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -133,6 +136,7 @@ contract GuessMyCode is
     event RewardPoolDeposited(address indexed from, uint256 amount, uint256 newBalance);
     event CipherRewardPaid  (address indexed player, uint256 amount, uint256 dailyCount);
     event WeeklyRewardPaid  (address indexed player, uint256 amount, uint8 prizeIndex, uint256 weekId);
+    event EscrowedStakesSynced(uint256 oldAmount, uint256 newAmount);
 
     // ─── Modifiers ────────────────────────────────────────────────────────────
 
@@ -207,6 +211,7 @@ contract GuessMyCode is
         if (isPaid) {
             require(stakeAmt >= MIN_STAKE, "CB: stake below 0.1 USDT minimum");
             require(usdToken.transferFrom(msg.sender, address(this), stakeAmt), "CB: stake transfer failed");
+            _lockEscrow(stakeAmt);
         }
 
         matchId = keccak256(abi.encodePacked(msg.sender, block.timestamp, _matchNonce++));
@@ -256,6 +261,7 @@ contract GuessMyCode is
 
         if (m.matchType == MatchType.Paid) {
             require(usdToken.transferFrom(msg.sender, address(this), m.stakeAmount), "CB: stake transfer failed");
+            _lockEscrow(m.stakeAmount);
             m.totalPool = m.stakeAmount * 2;
         }
 
@@ -284,6 +290,7 @@ contract GuessMyCode is
         require(msg.sender == m.player1 || msg.sender == owner(), "CB: not authorized");
 
         if (m.matchType == MatchType.Paid && m.stakeAmount > 0) {
+            _releaseEscrow(m.stakeAmount);
             require(usdToken.transfer(m.player1, m.stakeAmount), "CB: refund failed");
         }
 
@@ -303,12 +310,30 @@ contract GuessMyCode is
         require(block.timestamp > m.createdAt + matchExpiry,            "CB: not yet expired");
 
         if (m.matchType == MatchType.Paid && m.stakeAmount > 0) {
+            _releaseEscrow(m.stakeAmount);
             require(usdToken.transfer(m.player1, m.stakeAmount), "CB: refund failed");
         }
 
         m.status  = MatchStatus.Expired;
         m.endedAt = block.timestamp;
 
+        delete challengeBoard[m.player1];
+
+        emit MatchExpired(matchId, m.player1);
+    }
+
+    /// @notice Owner closes a Pending challenge without on-chain refund.
+    ///         Use only when the stake was already repaid off-chain (ops recovery).
+    function forceExpireMatch(bytes32 matchId) external onlyOwner nonReentrant matchExists(matchId) {
+        Match storage m = matches[matchId];
+        require(m.status == MatchStatus.Pending, "CB: match not pending");
+
+        if (m.matchType == MatchType.Paid && m.stakeAmount > 0) {
+            _releaseEscrow(m.stakeAmount);
+        }
+
+        m.status  = MatchStatus.Expired;
+        m.endedAt = block.timestamp;
         delete challengeBoard[m.player1];
 
         emit MatchExpired(matchId, m.player1);
@@ -345,6 +370,7 @@ contract GuessMyCode is
         uint256 fee    = 0;
 
         if (m.matchType == MatchType.Paid && m.totalPool > 0) {
+            _releaseEscrow(m.totalPool);
             fee             = (m.totalPool * treasuryFeeBps) / 10000;
             payout          = m.totalPool - fee;
             accumulatedFees += fee;
@@ -395,6 +421,7 @@ contract GuessMyCode is
         // For paid matches, refund both player stakes (no treasury fee on draws)
         if (m.matchType == MatchType.Paid && m.totalPool > 0) {
             uint256 stake = m.stakeAmount;
+            _releaseEscrow(m.totalPool);
             require(usdToken.transfer(m.player1, stake), "CB: refund p1 failed");
             require(usdToken.transfer(m.player2, stake), "CB: refund p2 failed");
         }
@@ -440,6 +467,7 @@ contract GuessMyCode is
         uint256 fee    = 0;
 
         if (m.matchType == MatchType.Paid && m.totalPool > 0) {
+            _releaseEscrow(m.totalPool);
             fee             = (m.totalPool * treasuryFeeBps) / 10000;
             payout          = m.totalPool - fee;
             accumulatedFees += fee;
@@ -632,10 +660,26 @@ contract GuessMyCode is
         return usdToken.balanceOf(address(this));
     }
 
-    /// @notice USDT in the contract excluding accumulated protocol fees.
+    /// @notice USDT that may be withdrawn (excludes fees, match escrow, and reward pool).
     function nonFeeBalance() external view returns (uint256) {
         uint256 balance = usdToken.balanceOf(address(this));
-        return balance > accumulatedFees ? balance - accumulatedFees : 0;
+        uint256 reserved = accumulatedFees + escrowedStakes + rewardPoolBalance;
+        return balance > reserved ? balance - reserved : 0;
+    }
+
+    function _lockEscrow(uint256 amount) internal {
+        escrowedStakes += amount;
+    }
+
+    function _releaseEscrow(uint256 amount) internal {
+        if (amount == 0) return;
+        // Clamp: pre-upgrade Pending stakes may not be reflected in escrowedStakes yet.
+        // Ops should call syncEscrowedStakes after upgrade; withdraws still reserve the counter.
+        if (escrowedStakes >= amount) {
+            escrowedStakes -= amount;
+        } else {
+            escrowedStakes = 0;
+        }
     }
 
     // ─── Admin Functions ──────────────────────────────────────────────────────
@@ -650,25 +694,27 @@ contract GuessMyCode is
         emit FeesWithdrawn(to, amount);
     }
 
-    /// @notice Owner withdraws non-fee USDT (reward pool, stray transfers, etc.).
-    ///         Does not touch `accumulatedFees`. Avoid calling while paid matches are escrowed.
+    /// @notice Owner withdraws surplus USDT only.
+    ///         Cannot touch `accumulatedFees`, `escrowedStakes`, or `rewardPoolBalance`.
     function withdrawContractBalance(address to, uint256 amount) public onlyOwner nonReentrant {
         require(to != address(0),           "CB: zero address");
         require(amount > 0,                 "CB: zero amount");
 
         uint256 balance = usdToken.balanceOf(address(this));
-        uint256 maxWithdraw = balance > accumulatedFees ? balance - accumulatedFees : 0;
+        uint256 reserved = accumulatedFees + escrowedStakes + rewardPoolBalance;
+        uint256 maxWithdraw = balance > reserved ? balance - reserved : 0;
         require(amount <= maxWithdraw,      "CB: exceeds non-fee balance");
         require(balance >= amount,          "CB: insufficient balance");
 
-        if (amount <= rewardPoolBalance) {
-            rewardPoolBalance -= amount;
-        } else {
-            rewardPoolBalance = 0;
-        }
-
         require(usdToken.transfer(to, amount), "CB: transfer failed");
         emit ContractBalanceWithdrawn(to, amount);
+    }
+
+    /// @notice One-time / ops sync after upgrade if live Pending/Active stakes exist.
+    function syncEscrowedStakes(uint256 amount) external onlyOwner {
+        uint256 old = escrowedStakes;
+        escrowedStakes = amount;
+        emit EscrowedStakesSynced(old, amount);
     }
 
     function withdrawAllFees(address to) external onlyOwner {

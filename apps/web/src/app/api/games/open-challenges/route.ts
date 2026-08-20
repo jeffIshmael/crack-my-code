@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { expireMatchOnChain } from '../../../../../blockchain/AgentFunctions';
+import { isMatchAlreadySettledError, isNotYetExpiredError } from '@/lib/expire-match';
 import {
   isJoinableOpenChallenge,
   toOpenChallengeSummary,
@@ -33,6 +34,20 @@ async function expireStaleGames(limit = 5) {
         data: { status: 'EXPIRED' },
       });
     } catch (err) {
+      if (isMatchAlreadySettledError(err)) {
+        // On-chain already settled (client expire / cancel won the race) — sync DB.
+        await prisma.game.updateMany({
+          where: { id: game.id, status: 'PENDING' },
+          data: { status: 'EXPIRED' },
+        });
+        continue;
+      }
+
+      if (isNotYetExpiredError(err)) {
+        // Chain clock behind our cutoff — leave PENDING for a later poll.
+        continue;
+      }
+
       console.error('[open-challenges] expire stale failed:', game.id, err);
     }
   }

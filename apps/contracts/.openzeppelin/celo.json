@@ -3732,6 +3732,1050 @@
         },
         "namespaces": {}
       }
+    },
+    "245fde6f60f537d0d9658fad773ac46b48d1ff06a9f803eff6b544adabdbee8c": {
+      "address": "0x3C50d7EAD80FD66185be8E191C8E1d29f02a801E",
+      "txHash": "0x242a63670cffca498b031f488be661a539e8b29d061a66915b956ce3b5e83792",
+      "layout": {
+        "solcVersion": "0.8.28",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:169"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:111"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:40"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "202",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "252",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:116"
+          },
+          {
+            "label": "usdToken",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_contract(IERC20)1586",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:77"
+          },
+          {
+            "label": "treasuryFeeBps",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:79"
+          },
+          {
+            "label": "matchExpiry",
+            "offset": 0,
+            "slot": "303",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:81"
+          },
+          {
+            "label": "accumulatedFees",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:82"
+          },
+          {
+            "label": "_matchNonce",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:84"
+          },
+          {
+            "label": "players",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_mapping(t_address,t_struct(PlayerProfile)1655_storage)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:86"
+          },
+          {
+            "label": "matches",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_mapping(t_bytes32,t_struct(Match)1692_storage)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:87"
+          },
+          {
+            "label": "activeMatchOf",
+            "offset": 0,
+            "slot": "308",
+            "type": "t_mapping(t_address,t_bytes32)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:88"
+          },
+          {
+            "label": "challengeBoard",
+            "offset": 0,
+            "slot": "309",
+            "type": "t_mapping(t_address,t_bytes32)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:90"
+          },
+          {
+            "label": "totalAIGames",
+            "offset": 0,
+            "slot": "310",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:91"
+          },
+          {
+            "label": "totalPvPPaidGames",
+            "offset": 0,
+            "slot": "311",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:91"
+          },
+          {
+            "label": "totalPvPFreeGames",
+            "offset": 0,
+            "slot": "312",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:92"
+          },
+          {
+            "label": "backendAddress",
+            "offset": 0,
+            "slot": "313",
+            "type": "t_address",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:92"
+          },
+          {
+            "label": "rewardPoolBalance",
+            "offset": 0,
+            "slot": "314",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:97"
+          },
+          {
+            "label": "cipherWinReward",
+            "offset": 0,
+            "slot": "315",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:99"
+          },
+          {
+            "label": "weeklyPrizes",
+            "offset": 0,
+            "slot": "316",
+            "type": "t_array(t_uint256)4_storage",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:101"
+          },
+          {
+            "label": "lastCipherRewardDay",
+            "offset": 0,
+            "slot": "320",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:102"
+          },
+          {
+            "label": "cipherRewardsToday",
+            "offset": 0,
+            "slot": "321",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:102"
+          },
+          {
+            "label": "weeklyRewardClaimed",
+            "offset": 0,
+            "slot": "322",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_mapping(t_uint8,t_bool)))",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:103"
+          },
+          {
+            "label": "escrowedStakes",
+            "offset": 0,
+            "slot": "323",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:104"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "324",
+            "type": "t_array(t_uint256)36_storage",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:105"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)36_storage": {
+            "label": "uint256[36]",
+            "numberOfBytes": "1152"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)4_storage": {
+            "label": "uint256[4]",
+            "numberOfBytes": "128"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IERC20)1586": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_enum(MatchStatus)1636": {
+            "label": "enum GuessMyCode.MatchStatus",
+            "members": [
+              "Pending",
+              "Active",
+              "Completed",
+              "Abandoned",
+              "Expired",
+              "Refunded",
+              "Draw"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(MatchType)1639": {
+            "label": "enum GuessMyCode.MatchType",
+            "members": [
+              "Free",
+              "Paid"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_bytes32)": {
+            "label": "mapping(address => bytes32)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_uint8,t_bool))": {
+            "label": "mapping(address => mapping(uint8 => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(PlayerProfile)1655_storage)": {
+            "label": "mapping(address => struct GuessMyCode.PlayerProfile)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(Match)1692_storage)": {
+            "label": "mapping(bytes32 => struct GuessMyCode.Match)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_mapping(t_uint8,t_bool)))": {
+            "label": "mapping(uint256 => mapping(address => mapping(uint8 => bool)))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint8,t_bool)": {
+            "label": "mapping(uint8 => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Match)1692_storage": {
+            "label": "struct GuessMyCode.Match",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "winner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "quitter",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "matchType",
+                "type": "t_enum(MatchType)1639",
+                "offset": 20,
+                "slot": "4"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(MatchStatus)1636",
+                "offset": 21,
+                "slot": "4"
+              },
+              {
+                "label": "stakeAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "totalPool",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "createdAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "startedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "endedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "player1Guesses",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "player2Guesses",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "player1Code",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "12"
+              },
+              {
+                "label": "player2Code",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "13"
+              },
+              {
+                "label": "historyHash",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "14"
+              }
+            ],
+            "numberOfBytes": "480"
+          },
+          "t_struct(PlayerProfile)1655_storage": {
+            "label": "struct GuessMyCode.PlayerProfile",
+            "members": [
+              {
+                "label": "points",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "gamesPlayed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "gamesWon",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "gamesLost",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "gamesQuit",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "registeredAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "matchIds",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
+    },
+    "b29973c074b07d53f5f1173d1595aaab41031e0f48097da71c95795067d9212c": {
+      "address": "0x520c7F58911F49f03E178D06D77EC6502C5F727b",
+      "txHash": "0x56ce0c9ff0aa0bf9d8a4a6a92149c6e9804fdc9cccc619c4e1b5cbcacac86a45",
+      "layout": {
+        "solcVersion": "0.8.28",
+        "storage": [
+          {
+            "label": "_initialized",
+            "offset": 0,
+            "slot": "0",
+            "type": "t_uint8",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:63",
+            "retypedFrom": "bool"
+          },
+          {
+            "label": "_initializing",
+            "offset": 1,
+            "slot": "0",
+            "type": "t_bool",
+            "contract": "Initializable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol:68"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "1",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ERC1967UpgradeUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/ERC1967/ERC1967UpgradeUpgradeable.sol:169"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "51",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "UUPSUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol:111"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "101",
+            "type": "t_array(t_uint256)50_storage",
+            "contract": "ContextUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol:40"
+          },
+          {
+            "label": "_owner",
+            "offset": 0,
+            "slot": "151",
+            "type": "t_address",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:22"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "152",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "OwnableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol:94"
+          },
+          {
+            "label": "_status",
+            "offset": 0,
+            "slot": "201",
+            "type": "t_uint256",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:38"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "202",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "ReentrancyGuardUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/ReentrancyGuardUpgradeable.sol:88"
+          },
+          {
+            "label": "_paused",
+            "offset": 0,
+            "slot": "251",
+            "type": "t_bool",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:29"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "252",
+            "type": "t_array(t_uint256)49_storage",
+            "contract": "PausableUpgradeable",
+            "src": "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol:116"
+          },
+          {
+            "label": "usdToken",
+            "offset": 0,
+            "slot": "301",
+            "type": "t_contract(IERC20)1586",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:77"
+          },
+          {
+            "label": "treasuryFeeBps",
+            "offset": 0,
+            "slot": "302",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:79"
+          },
+          {
+            "label": "matchExpiry",
+            "offset": 0,
+            "slot": "303",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:81"
+          },
+          {
+            "label": "accumulatedFees",
+            "offset": 0,
+            "slot": "304",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:82"
+          },
+          {
+            "label": "_matchNonce",
+            "offset": 0,
+            "slot": "305",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:84"
+          },
+          {
+            "label": "players",
+            "offset": 0,
+            "slot": "306",
+            "type": "t_mapping(t_address,t_struct(PlayerProfile)1655_storage)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:86"
+          },
+          {
+            "label": "matches",
+            "offset": 0,
+            "slot": "307",
+            "type": "t_mapping(t_bytes32,t_struct(Match)1692_storage)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:87"
+          },
+          {
+            "label": "activeMatchOf",
+            "offset": 0,
+            "slot": "308",
+            "type": "t_mapping(t_address,t_bytes32)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:88"
+          },
+          {
+            "label": "challengeBoard",
+            "offset": 0,
+            "slot": "309",
+            "type": "t_mapping(t_address,t_bytes32)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:90"
+          },
+          {
+            "label": "totalAIGames",
+            "offset": 0,
+            "slot": "310",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:91"
+          },
+          {
+            "label": "totalPvPPaidGames",
+            "offset": 0,
+            "slot": "311",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:91"
+          },
+          {
+            "label": "totalPvPFreeGames",
+            "offset": 0,
+            "slot": "312",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:92"
+          },
+          {
+            "label": "backendAddress",
+            "offset": 0,
+            "slot": "313",
+            "type": "t_address",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:92"
+          },
+          {
+            "label": "rewardPoolBalance",
+            "offset": 0,
+            "slot": "314",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:97"
+          },
+          {
+            "label": "cipherWinReward",
+            "offset": 0,
+            "slot": "315",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:99"
+          },
+          {
+            "label": "weeklyPrizes",
+            "offset": 0,
+            "slot": "316",
+            "type": "t_array(t_uint256)4_storage",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:101"
+          },
+          {
+            "label": "lastCipherRewardDay",
+            "offset": 0,
+            "slot": "320",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:102"
+          },
+          {
+            "label": "cipherRewardsToday",
+            "offset": 0,
+            "slot": "321",
+            "type": "t_mapping(t_address,t_uint256)",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:102"
+          },
+          {
+            "label": "weeklyRewardClaimed",
+            "offset": 0,
+            "slot": "322",
+            "type": "t_mapping(t_uint256,t_mapping(t_address,t_mapping(t_uint8,t_bool)))",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:103"
+          },
+          {
+            "label": "escrowedStakes",
+            "offset": 0,
+            "slot": "323",
+            "type": "t_uint256",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:104"
+          },
+          {
+            "label": "__gap",
+            "offset": 0,
+            "slot": "324",
+            "type": "t_array(t_uint256)36_storage",
+            "contract": "GuessMyCode",
+            "src": "contracts/GuessMyCode.sol:105"
+          }
+        ],
+        "types": {
+          "t_address": {
+            "label": "address",
+            "numberOfBytes": "20"
+          },
+          "t_array(t_bytes32)dyn_storage": {
+            "label": "bytes32[]",
+            "numberOfBytes": "32"
+          },
+          "t_array(t_uint256)36_storage": {
+            "label": "uint256[36]",
+            "numberOfBytes": "1152"
+          },
+          "t_array(t_uint256)49_storage": {
+            "label": "uint256[49]",
+            "numberOfBytes": "1568"
+          },
+          "t_array(t_uint256)4_storage": {
+            "label": "uint256[4]",
+            "numberOfBytes": "128"
+          },
+          "t_array(t_uint256)50_storage": {
+            "label": "uint256[50]",
+            "numberOfBytes": "1600"
+          },
+          "t_bool": {
+            "label": "bool",
+            "numberOfBytes": "1"
+          },
+          "t_bytes32": {
+            "label": "bytes32",
+            "numberOfBytes": "32"
+          },
+          "t_contract(IERC20)1586": {
+            "label": "contract IERC20",
+            "numberOfBytes": "20"
+          },
+          "t_enum(MatchStatus)1636": {
+            "label": "enum GuessMyCode.MatchStatus",
+            "members": [
+              "Pending",
+              "Active",
+              "Completed",
+              "Abandoned",
+              "Expired",
+              "Refunded",
+              "Draw"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_enum(MatchType)1639": {
+            "label": "enum GuessMyCode.MatchType",
+            "members": [
+              "Free",
+              "Paid"
+            ],
+            "numberOfBytes": "1"
+          },
+          "t_mapping(t_address,t_bytes32)": {
+            "label": "mapping(address => bytes32)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_mapping(t_uint8,t_bool))": {
+            "label": "mapping(address => mapping(uint8 => bool))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_struct(PlayerProfile)1655_storage)": {
+            "label": "mapping(address => struct GuessMyCode.PlayerProfile)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_address,t_uint256)": {
+            "label": "mapping(address => uint256)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_bytes32,t_struct(Match)1692_storage)": {
+            "label": "mapping(bytes32 => struct GuessMyCode.Match)",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint256,t_mapping(t_address,t_mapping(t_uint8,t_bool)))": {
+            "label": "mapping(uint256 => mapping(address => mapping(uint8 => bool)))",
+            "numberOfBytes": "32"
+          },
+          "t_mapping(t_uint8,t_bool)": {
+            "label": "mapping(uint8 => bool)",
+            "numberOfBytes": "32"
+          },
+          "t_string_storage": {
+            "label": "string",
+            "numberOfBytes": "32"
+          },
+          "t_struct(Match)1692_storage": {
+            "label": "struct GuessMyCode.Match",
+            "members": [
+              {
+                "label": "id",
+                "type": "t_bytes32",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "player1",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "player2",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "winner",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "quitter",
+                "type": "t_address",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "matchType",
+                "type": "t_enum(MatchType)1639",
+                "offset": 20,
+                "slot": "4"
+              },
+              {
+                "label": "status",
+                "type": "t_enum(MatchStatus)1636",
+                "offset": 21,
+                "slot": "4"
+              },
+              {
+                "label": "stakeAmount",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "totalPool",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "6"
+              },
+              {
+                "label": "createdAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "7"
+              },
+              {
+                "label": "startedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "8"
+              },
+              {
+                "label": "endedAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "9"
+              },
+              {
+                "label": "player1Guesses",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "10"
+              },
+              {
+                "label": "player2Guesses",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "11"
+              },
+              {
+                "label": "player1Code",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "12"
+              },
+              {
+                "label": "player2Code",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "13"
+              },
+              {
+                "label": "historyHash",
+                "type": "t_string_storage",
+                "offset": 0,
+                "slot": "14"
+              }
+            ],
+            "numberOfBytes": "480"
+          },
+          "t_struct(PlayerProfile)1655_storage": {
+            "label": "struct GuessMyCode.PlayerProfile",
+            "members": [
+              {
+                "label": "points",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "0"
+              },
+              {
+                "label": "gamesPlayed",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "1"
+              },
+              {
+                "label": "gamesWon",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "2"
+              },
+              {
+                "label": "gamesLost",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "3"
+              },
+              {
+                "label": "gamesQuit",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "4"
+              },
+              {
+                "label": "registeredAt",
+                "type": "t_uint256",
+                "offset": 0,
+                "slot": "5"
+              },
+              {
+                "label": "matchIds",
+                "type": "t_array(t_bytes32)dyn_storage",
+                "offset": 0,
+                "slot": "6"
+              }
+            ],
+            "numberOfBytes": "224"
+          },
+          "t_uint256": {
+            "label": "uint256",
+            "numberOfBytes": "32"
+          },
+          "t_uint8": {
+            "label": "uint8",
+            "numberOfBytes": "1"
+          }
+        },
+        "namespaces": {}
+      }
     }
   }
 }

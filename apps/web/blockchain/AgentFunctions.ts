@@ -140,20 +140,34 @@ export async function updateGuessCountsOnChain(
 /**
  * Expire a pending match on-chain — refunds the creator's stake.
  * This is permissionless after matchExpiry, but we call it from the backend agent.
+ *
+ * Serialized: open-challenges + /api/games/expire can race the same agent wallet
+ * and produce "nonce too low" if fired in parallel.
  */
+let expireMatchChain: Promise<unknown> = Promise.resolve();
+
 export async function expireMatchOnChain(matchId: `0x${string}`) {
   if (!account || !walletClient) throw new Error("Agent not initialized");
 
-  const { request } = await publicClient.simulateContract({
-    account,
-    address: CONTRACT_ADDRESS,
-    abi: CONTRACT_ABI,
-    functionName: 'expireMatch',
-    args: [matchId],
-  });
+  const run = async () => {
+    const { request } = await publicClient.simulateContract({
+      account,
+      address: CONTRACT_ADDRESS,
+      abi: CONTRACT_ABI,
+      functionName: 'expireMatch',
+      args: [matchId],
+    });
 
-  const hash = await walletClient.writeContract(request);
-  return await publicClient.waitForTransactionReceipt({ hash });
+    const hash = await walletClient!.writeContract(request);
+    return await publicClient.waitForTransactionReceipt({ hash });
+  };
+
+  const result = expireMatchChain.then(run, run);
+  expireMatchChain = result.then(
+    () => undefined,
+    () => undefined,
+  );
+  return result;
 }
 
 /**
