@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { applyScoreDelta } from '@/lib/user-points';
 import { isRegisteredPlayer } from '@/lib/guest';
+import { pusherServer } from '@/lib/pusher-server';
 import { CONTRACT_ABI } from '../../../../../blockchain/constants';
 
 export const dynamic = 'force-dynamic';
@@ -30,10 +31,13 @@ export async function POST(req: NextRequest) {
     }
 
     if (game.status === 'COMPLETED' || game.status === 'CANCELLED') {
-      const opponentCode = game.player2Code?.split('').map(Number) ?? null;
+      const isPlayer1 = game.player1Address.toLowerCase() === normalized.toLowerCase();
+      const opponentCodeStr = isPlayer1 ? game.player2Code : game.player1Code;
+      const opponentCode = opponentCodeStr?.split('').map(Number) ?? null;
       return NextResponse.json({
         success: true,
         alreadyEnded: true,
+        endedByQuit: false,
         winnerAddress: game.winnerAddress,
         opponentCode,
       });
@@ -123,21 +127,41 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const winnerAddress = opponentAddress.toLowerCase();
+
     await prisma.game.update({
       where: { id: gameId },
-      data: { status: 'COMPLETED', winnerAddress: opponentAddress.toLowerCase() },
+      data: { status: 'COMPLETED', winnerAddress },
     });
 
     if (isRegisteredPlayer(opponentAddress)) {
-      await applyScoreDelta(opponentAddress.toLowerCase(), scoreDeltaForMode(mode, true));
+      await applyScoreDelta(winnerAddress, scoreDeltaForMode(mode, true));
     }
     if (isRegisteredPlayer(normalized)) {
       await applyScoreDelta(normalized, scoreDeltaForMode(mode, false));
     }
 
+    // Notify the remaining player immediately (sync poll is the backup).
+    try {
+      const winnerCode = (isPlayer1 ? game.player1Code : game.player2Code)
+        ?.split('')
+        .map(Number) ?? null;
+
+      await pusherServer.trigger(`private-game-${gameId}`, 'match-ended', {
+        reason: 'quit',
+        winnerAddress,
+        quitterAddress: normalized,
+        // Winner sees the quitter's secret code.
+        opponentCode: winnerCode,
+      });
+    } catch (pusherErr) {
+      console.error('[Pusher] match-ended (quit) failed:', pusherErr);
+    }
+
     return NextResponse.json({
       success: true,
-      winnerAddress: opponentAddress.toLowerCase(),
+      endedByQuit: true,
+      winnerAddress,
       opponentCode,
       mode: game.mode,
     });

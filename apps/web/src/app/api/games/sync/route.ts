@@ -60,6 +60,8 @@ export async function GET(req: NextRequest) {
 
     let result: 'win' | 'lose' | 'draw' | null = null;
     let opponentCode: number[] | null = null;
+    let endedByQuit = false;
+
     if (game.status === 'COMPLETED' && game.winnerAddress) {
       const winner = game.winnerAddress.toLowerCase();
       if (winner === 'draw') {
@@ -70,6 +72,13 @@ export async function GET(req: NextRequest) {
         result = 'win';
       } else {
         result = 'lose';
+      }
+
+      // Quit end: completed without either side cracking the code.
+      if (result === 'win' || result === 'lose') {
+        const playerCracked = playerGuesses.some((g) => isWinningClues(g.clues));
+        const opponentCracked = opponentGuesses.some((g) => isWinningClues(g.clues));
+        endedByQuit = !playerCracked && !opponentCracked && winner !== 'ai' && winner !== 'draw';
       }
 
       const opponentCodeStr = isPlayer1 ? game.player2Code : game.player1Code;
@@ -102,6 +111,7 @@ export async function GET(req: NextRequest) {
       opponentGuessCount: opponentGuesses.length,
       winnerAddress: game.winnerAddress,
       result,
+      endedByQuit,
       opponentCode,
     });
   } catch (error) {

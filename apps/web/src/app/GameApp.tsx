@@ -62,6 +62,7 @@ const screenVariants = {
 import { pusherClient } from '@/lib/pusher-client';
 import { scoreDeltaForMode } from '@/lib/scoring';
 import { isRegisteredPlayer } from '@/lib/guest';
+import { fetchOpponentDisplayName, formatAddressShort } from '@/lib/display-name';
 import { useMiniAppEnvironment } from '@/hooks/use-mini-app-environment';
 import { useWalletBootstrap } from '@/hooks/use-wallet-bootstrap';
 import { isLikelyMiniPayHost } from '@/lib/minipay-host';
@@ -619,6 +620,7 @@ export default function Home() {
       opponentGuesses: GuessEntry[];
       opponentGuessCount: number;
       result?: 'win' | 'lose' | 'draw' | null;
+      endedByQuit?: boolean;
       opponentCode?: number[] | null;
     }) => {
       let pendingStatsSync: number | null = null;
@@ -628,13 +630,15 @@ export default function Home() {
 
         if (data.status === 'COMPLETED' && data.result) {
           const mode = prev.gameMode === 'ai' ? 'ai' : prev.gameMode;
-          const bothZeroGuesses =
-            data.playerGuesses.length === 0 && data.opponentGuesses.length === 0;
-          const quitContext = bothZeroGuesses
+          const quitContext = data.endedByQuit
             ? data.result === 'win'
               ? 'opponent'
-              : 'player'
-            : null;
+              : data.result === 'lose'
+                ? 'player'
+                : null
+            : prev.phase === 'result'
+              ? prev.quitContext ?? null
+              : null;
           const delta =
             data.result === 'win'
               ? scoreDeltaForMode(mode, true)
@@ -885,14 +889,51 @@ export default function Home() {
       setGs((prev: GameState): GameState => ({ ...prev, phase: 'countdown' }));
     };
 
+    const onMatchEnded = (data: {
+      reason?: string;
+      winnerAddress?: string;
+      quitterAddress?: string;
+      opponentCode?: number[] | null;
+    }) => {
+      if (data.reason !== 'quit') return;
+
+      const myAddress = addressRef.current?.toLowerCase();
+      if (!myAddress) return;
+      // Quitter already applies local result in handleQuitGame.
+      if (data.quitterAddress?.toLowerCase() === myAddress) return;
+      if (gsRef.current.phase === 'result') return;
+
+      const isWin = data.winnerAddress?.toLowerCase() === myAddress;
+      const mode = gsRef.current.gameMode === 'ai' ? 'ai' : gsRef.current.gameMode;
+      const delta = scoreDeltaForMode(mode, isWin);
+
+      setGs((prev: GameState) => ({
+        ...prev,
+        phase: 'result',
+        result: isWin ? 'win' : 'lose',
+        quitContext: isWin ? 'opponent' : 'player',
+        ratingDelta: isRegisteredPlayer(myAddress) ? delta : 0,
+        currentInput: [],
+        opponentCurrentInput: [],
+        isPlayerTurn: false,
+        opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
+      }));
+
+      if (isRegisteredPlayer(myAddress)) {
+        void syncResultStats(delta);
+      }
+    };
+
     channel.bind('client-typing', onTyping);
     channel.bind('opponent-guess', onOpponentGuess);
     channel.bind('game-started', onGameStarted);
+    channel.bind('match-ended', onMatchEnded);
 
     return () => {
       channel.unbind('client-typing', onTyping);
       channel.unbind('opponent-guess', onOpponentGuess);
       channel.unbind('game-started', onGameStarted);
+      channel.unbind('match-ended', onMatchEnded);
       pusherClient.unsubscribe(channelName);
     };
   }, [currentGameId, gs.gameMode, syncResultStats, scheduleTurnHandover, finalizeGameResult]);
@@ -1111,7 +1152,7 @@ export default function Home() {
   const handleMatchFound = useCallback((
     gameId: string,
     opponentAddress: string,
-    meta?: { mode?: GameMode; stake?: number }
+    meta?: { mode?: GameMode; stake?: number; opponentName?: string }
   ) => {
     if (rematchWaitTimeoutRef.current) {
       clearTimeout(rematchWaitTimeoutRef.current);
@@ -1128,13 +1169,16 @@ export default function Home() {
       opponentAddressRef.current = opponentAddress.toLowerCase();
     }
     const mode = isAIMatch ? 'ai' : (meta?.mode ?? 'fun');
+    const initialOpponentName = isAIMatch
+      ? 'Cipher'
+      : (meta?.opponentName || formatAddressShort(opponentAddress));
     
     setGs((prev: GameState) => ({
       ...prev,
       phase: 'setCode',
       gameMode: mode,
       stakeAmount: meta?.stake ?? prev.stakeAmount,
-      opponentName: isAIMatch ? 'Cipher' : `${opponentAddress.slice(0, 6)}...`,
+      opponentName: initialOpponentName,
       playerCode: [],
       playerGuesses: [],
       opponentGuesses: [],
@@ -1143,8 +1187,21 @@ export default function Home() {
       isPlayerTurn: true,
       timeLeft: GAME_DURATION,
       result: null,
+      quitContext: null,
       ratingDelta: null,
     }));
+
+    if (!isAIMatch) {
+      void fetchOpponentDisplayName(opponentAddress).then((name) => {
+        setGs((prev) => {
+          if (prev.phase !== 'setCode' && prev.phase !== 'countdown' && prev.phase !== 'playing' && prev.phase !== 'result') {
+            return prev;
+          }
+          if (opponentAddressRef.current !== opponentAddress.toLowerCase()) return prev;
+          return { ...prev, opponentName: name };
+        });
+      });
+    }
   }, [clearTurnHandover]);
 
   // User channel: match-found
@@ -1744,22 +1801,30 @@ export default function Home() {
       }
 
       const mode = gs.gameMode === 'ai' ? 'ai' : gs.gameMode;
-      const lossDelta = scoreDeltaForMode(mode, false);
+      const myAddr = playerAddress.toLowerCase();
+      const winnerAddr = typeof data.winnerAddress === 'string' ? data.winnerAddress.toLowerCase() : '';
+      const endedByQuit = data.endedByQuit === true || !data.alreadyEnded;
+      const isWin = winnerAddr === myAddr;
+      const isDraw = winnerAddr === 'draw';
+      const result: GameResult = isDraw ? 'draw' : isWin ? 'win' : 'lose';
+      const delta = isDraw ? 0 : scoreDeltaForMode(mode, isWin);
+      const quitContext =
+        endedByQuit && !isDraw ? (isWin ? 'opponent' : 'player') : null;
 
       setGs((prev: GameState) => ({
         ...prev,
         phase: 'result',
-        result: 'lose',
-        ratingDelta: isRegisteredPlayer(playerAddress) ? lossDelta : 0,
-        quitContext: 'player',
+        result,
+        ratingDelta: isRegisteredPlayer(playerAddress) ? delta : 0,
+        quitContext,
         currentInput: [],
         opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
       }));
       setCurrentGameId(null);
       setCurrentOnChainMatchId(null);
 
-      if (isRegisteredPlayer(playerAddress) && gs.gameMode !== 'ai') {
-        await syncResultStats(lossDelta);
+      if (isRegisteredPlayer(playerAddress) && gs.gameMode !== 'ai' && !isDraw) {
+        await syncResultStats(delta);
       }
     } catch (err) {
       console.error('Quit game failed', err);
@@ -2120,11 +2185,12 @@ export default function Home() {
           });
           return;
         }
+        const opponentLabel = await fetchOpponentDisplayName(gameData.player1Address);
         setPendingJoinStake({
           gameId: gameData.id,
           stake: parseFloat(String(gameData.stake)) || 0,
           player1Address: gameData.player1Address,
-          opponentLabel: `${gameData.player1Address.slice(0, 6)}...`,
+          opponentLabel,
         });
         setIsJoining(null);
         return;

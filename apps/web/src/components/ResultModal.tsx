@@ -200,7 +200,7 @@ export default function ResultModal({
             <p className="font-body text-sm text-[var(--wood-text-soft)]">
               {isWin
                 ? isQuitWin
-                  ? `Your opponent quit — you win!`
+                  ? `${opponentName} quit while you were still playing — you win!`
                   : `You broke ${opponentName}'s code in ${guessCount} guess${guessCount !== 1 ? 'es' : ''}!`
                 : isDraw
                   ? `Neither you nor ${opponentName} cracked the code. Well played!`
@@ -314,7 +314,7 @@ export default function ResultModal({
             transition={{ delay: 0.45 }}
           >
             <p className="text-center font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--wood-text-soft)] sm:text-xs">
-              {isWin ? (isQuitWin ? 'Opponent Quit' : 'Code You Cracked') : isQuitLose ? "Opponent Code" : "Code You Couldn't Crack"}
+              {isWin ? (isQuitWin ? "Opponent's Code" : 'Code You Cracked') : isQuitLose ? "Opponent Code" : "Code You Couldn't Crack"}
             </p>
             <div className="result-code-frame">
               <div className="flex gap-1.5 sm:gap-2">
