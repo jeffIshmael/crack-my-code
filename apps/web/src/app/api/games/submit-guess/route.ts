@@ -251,14 +251,19 @@ export async function POST(req: NextRequest) {
             void (async () => {
               const onChainMatchId = (game as any).onChainMatchId as `0x${string}` | undefined;
               const player2Address = game.player2Address ? (game.player2Address as `0x${string}`) : undefined;
-              if (!onChainMatchId || !player2Address) return;
+              if (!onChainMatchId || !player2Address) {
+                console.warn('[Blockchain] Draw skipped — missing onChainMatchId or player2', {
+                  gameId,
+                  onChainMatchId,
+                  player2Address,
+                });
+                return;
+              }
               try {
                 const allGuesses = await prisma.guess.findMany({
                   where: { gameId },
                   orderBy: { createdAt: 'asc' },
                 });
-
-                const guessArray = allGuesses.map((g: { digits: string }) => g.digits);
 
                 const ipfsHash = await uploadToIPFS({
                   gameId,
@@ -278,17 +283,27 @@ export async function POST(req: NextRequest) {
                   })),
                 });
 
-                await resolveDrawOnChain(
+                const receipt = await resolveDrawOnChain(
                   onChainMatchId,
                   player2Address,
                   p1GuessCount,
                   p2GuessCount,
                   game.player1Code || '',
                   game.player2Code || '',
-                  ipfsHash || ''
+                  ipfsHash || '',
                 );
+                console.log('[Blockchain] resolveDraw ok', {
+                  gameId,
+                  matchId: onChainMatchId,
+                  txHash: receipt.transactionHash,
+                });
               } catch (chainErr) {
-                console.error('[Blockchain] resolveDrawOnChain failed:', chainErr);
+                console.error('[Blockchain] resolveDrawOnChain failed:', {
+                  gameId,
+                  matchId: onChainMatchId,
+                  player2: player2Address,
+                  error: chainErr instanceof Error ? chainErr.message : chainErr,
+                });
               }
             })();
           }
