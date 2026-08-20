@@ -33,6 +33,16 @@ interface OnChainAnalytics {
   updatedAt: string;
 }
 
+/** 3 decimals for non-zero treasury amounts; plain "0" when empty. */
+function formatTreasuryUsdt(raw: string): string {
+  const n = parseFloat(raw);
+  if (!Number.isFinite(n) || n === 0) return '0';
+  return n.toLocaleString(undefined, {
+    minimumFractionDigits: 3,
+    maximumFractionDigits: 3,
+  });
+}
+
 function MetricCard({
   label,
   value,
@@ -153,15 +163,15 @@ export default function OnChainAnalyticsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <MetricCard
                     label="Reward pool"
-                    value={`${parseFloat(data.treasury.rewardPoolUsdt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} USDT`}
+                    value={`${formatTreasuryUsdt(data.treasury.rewardPoolUsdt)} USDT`}
                   />
                   <MetricCard
                     label="Escrow balance"
-                    value={`${parseFloat(data.treasury.escrowBalanceUsdt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} USDT`}
+                    value={`${formatTreasuryUsdt(data.treasury.escrowBalanceUsdt)} USDT`}
                   />
                   <MetricCard
                     label="Accumulated fees"
-                    value={`${parseFloat(data.treasury.accumulatedFeesUsdt).toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 })} USDT`}
+                    value={`${formatTreasuryUsdt(data.treasury.accumulatedFeesUsdt)} USDT`}
                   />
                 </div>
               </section>

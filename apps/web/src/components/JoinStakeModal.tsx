@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi';
+import { useAccount, useBalance, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
@@ -30,6 +30,7 @@ export default function JoinStakeModal({
 }: JoinStakeModalProps) {
   const { address } = useAccount();
   const { isMiniPay } = useMiniAppEnvironment();
+  const publicClient = usePublicClient();
   const { data: usdtData } = useBalance({
     address,
     token: USDT_ADDRESS as `0x${string}`,
@@ -57,28 +58,39 @@ export default function JoinStakeModal({
   const balance = parseFloat(usdtData?.formatted || '0');
   const canAfford = balance >= stake;
 
-  const { writeContract: approve, data: approveHash, isPending: isApprovingAction } = useWriteContract();
-  const { isLoading: isWaitingForApproval } = useWaitForTransactionReceipt({ hash: approveHash });
-  const isApproving = isApprovingAction || isWaitingForApproval;
+  const { writeContractAsync: approve, isPending: isApprovingAction } = useWriteContract();
+  const [isConfirmingApprove, setIsConfirmingApprove] = useState(false);
+  const isApproving = isApprovingAction || isConfirmingApprove;
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
+    setIsConfirmingApprove(true);
     try {
-      approve({
+      const hash = await approve({
         address: USDT_ADDRESS,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: [CONTRACT_ADDRESS, stakeBigInt],
       });
+      if (publicClient && hash) {
+        await publicClient.waitForTransactionReceipt({
+          hash,
+          confirmations: 1,
+          pollingInterval: 800,
+          timeout: 45_000,
+        });
+      }
+      for (let i = 0; i < 25; i++) {
+        const result = await refetchAllowance();
+        const value = (result.data as bigint | undefined) ?? 0n;
+        if (value >= stakeBigInt) break;
+        await new Promise((r) => setTimeout(r, 400));
+      }
     } catch (err) {
       toast.error('Approval Failed', { description: getErrorMessage(err) });
+    } finally {
+      setIsConfirmingApprove(false);
     }
   };
-
-  useEffect(() => {
-    if (approveHash && !isWaitingForApproval) {
-      refetchAllowance();
-    }
-  }, [approveHash, isWaitingForApproval, refetchAllowance]);
 
   const handleAddUsdt = () => {
     window.location.href = MINIPAY_ADD_USDT_URL;
@@ -152,11 +164,11 @@ export default function JoinStakeModal({
               {needsApproval ? (
                 <button
                   type="button"
-                  onClick={handleApprove}
+                  onClick={() => void handleApprove()}
                   disabled={isApproving || !canAfford}
                   className="flex-1 rounded-xl border-2 border-[var(--sky-shadow)] bg-gradient-to-b from-[var(--sky-top)] to-[var(--sky-deep)] py-2.5 font-ui text-[10px] font-bold uppercase tracking-widest text-white disabled:opacity-60"
                 >
-                  {isApproving ? 'Waiting for approval…' : 'Approve USDT'}
+                  {isApproving ? 'Approving…' : 'Approve USDT'}
                 </button>
               ) : (
                 <button

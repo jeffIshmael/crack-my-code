@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useAccount, useBalance, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useBalance, useReadContract, useWriteContract, usePublicClient } from "wagmi";
 import { usePrivy } from "@privy-io/react-auth";
 import { ConnectButton } from "@/components/connect-button";
 import type { GameMode } from '@/lib/game';
@@ -119,11 +119,11 @@ export default function Lobby({
   const [cashVisibility, setCashVisibility] = useState<boolean | null>(null);
   const [showCashTxModal, setShowCashTxModal] = useState(false);
   const [showJoinCashModal, setShowJoinCashModal] = useState(false);
-  const [pendingCreateAfterApprove, setPendingCreateAfterApprove] = useState(false);
-  const [pendingJoinAfterApprove, setPendingJoinAfterApprove] = useState(false);
   const [isJoiningPublic, setIsJoiningPublic] = useState(false);
   const [stakesWithOpen, setStakesWithOpen] = useState<number[]>([]);
   const [openByStake, setOpenByStake] = useState<Record<string, OpenChallengeSummary | null>>({});
+
+  const publicClient = usePublicClient();
 
   const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
     address: USDT_ADDRESS,
@@ -143,33 +143,51 @@ export default function Lobby({
   const cipherAtDailyCap = cipherStatusLoaded && Boolean(cipherStatus?.atDailyCap);
   const cipherButtonDisabled = isCreating || cipherAtDailyCap || cipherStatusPending || hasPendingSearch;
 
-  const { writeContractAsync: approve, data: approveHash, isPending: isApprovingAction } = useWriteContract();
+  const { writeContractAsync: approve, isPending: isApprovingAction } = useWriteContract();
+  const [isConfirmingApprove, setIsConfirmingApprove] = useState(false);
+  const isApproving = isApprovingAction || isConfirmingApprove;
 
-  const { isLoading: isWaitingForApproval } = useWaitForTransactionReceipt({
-    hash: approveHash,
-  });
-
-  useEffect(() => {
-    if (approveHash && !isWaitingForApproval) {
-      refetchAllowance();
+  const waitForAllowance = async (needed: bigint): Promise<boolean> => {
+    for (let i = 0; i < 25; i++) {
+      const result = await refetchAllowance();
+      const value = (result.data as bigint | undefined) ?? 0n;
+      if (value >= needed) return true;
+      await new Promise((r) => setTimeout(r, 400));
     }
-  }, [approveHash, isWaitingForApproval, refetchAllowance]);
-
-  const isApproving = isApprovingAction || isWaitingForApproval;
+    return false;
+  };
 
   const handleApprove = async (amount: bigint): Promise<boolean> => {
+    setIsConfirmingApprove(true);
     try {
-      await approve({
+      const hash = await approve({
         address: USDT_ADDRESS,
         abi: ERC20_ABI,
         functionName: 'approve',
         args: [CONTRACT_ADDRESS, amount],
       });
+
+      // Don't rely on wagmi's receipt hook + stale allowance cache — poll Forno directly.
+      if (publicClient && hash) {
+        await publicClient.waitForTransactionReceipt({
+          hash,
+          confirmations: 1,
+          pollingInterval: 800,
+          timeout: 45_000,
+        });
+      }
+
+      const allowanceReady = await waitForAllowance(amount);
+      if (!allowanceReady) {
+        console.warn('Allowance not visible yet after approve; continuing');
+      }
       return true;
     } catch (err) {
       console.error('Approval failed', err);
       toast.error('Approval Failed', { description: getErrorMessage(err) });
       return false;
+    } finally {
+      setIsConfirmingApprove(false);
     }
   };
 
@@ -259,16 +277,6 @@ export default function Lobby({
     }
   };
 
-  useEffect(() => {
-    if (!pendingCreateAfterApprove) return;
-    if (isApproving) return;
-    if (allowance < stakeBigInt) return;
-    if (cashVisibility === null) return;
-    setPendingCreateAfterApprove(false);
-    setCashCreatePhase('creating');
-    void handleFinalizeChallenge(cashVisibility);
-  }, [pendingCreateAfterApprove, isApproving, allowance, stakeBigInt, cashVisibility]);
-
   const handleProceedCashChallenge = async () => {
     if (cashVisibility === null) {
       toast.error('Select visibility first', {
@@ -290,13 +298,11 @@ export default function Lobby({
     // Keep modal open so the button stays Approving / Creating (never snaps back to Proceed).
     if (allowance < stakeBigInt) {
       setCashCreatePhase('approving');
-      setPendingCreateAfterApprove(true);
       const approved = await handleApprove(stakeBigInt);
       if (!approved) {
-        setPendingCreateAfterApprove(false);
         setCashCreatePhase('idle');
+        return;
       }
-      return;
     }
 
     await handleFinalizeChallenge(cashVisibility);
@@ -315,13 +321,11 @@ export default function Lobby({
 
     if (allowance < stakeBigInt) {
       setCashJoinPhase('approving');
-      setPendingJoinAfterApprove(true);
       const approved = await handleApprove(stakeBigInt);
       if (!approved) {
-        setPendingJoinAfterApprove(false);
         setCashJoinPhase('idle');
+        return;
       }
-      return;
     }
 
     setCashJoinPhase('joining');
@@ -350,16 +354,6 @@ export default function Lobby({
       setIsJoiningPublic(false);
     }
   };
-
-  useEffect(() => {
-    if (!pendingJoinAfterApprove) return;
-    if (isApproving) return;
-    if (allowance < stakeBigInt) return;
-    if (!joinTarget) return;
-    setPendingJoinAfterApprove(false);
-    setCashJoinPhase('joining');
-    void handleProceedJoinCash();
-  }, [pendingJoinAfterApprove, isApproving, allowance, stakeBigInt, joinTarget]);
 
   const proceedStartAI = async () => {
     setIsCreating(true);
@@ -1205,11 +1199,11 @@ function MatchmakingPulse({
         </h3>
 
         {isCash && stakeAmount > 0 && (
-          <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--orange)]/40 bg-[var(--orange)]/10 px-5 py-2.5">
-            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--orange)]/80">
+          <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--clue-green)]/35 bg-[var(--clue-green-bg)] px-5 py-2.5">
+            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--clue-green)]/80">
               Stake locked
             </span>
-            <span className="font-orbitron text-lg font-black text-[var(--orange)]">
+            <span className="font-orbitron text-sm font-bold text-[var(--clue-green)]">
               {stakeAmount.toFixed(2)} USDT
             </span>
           </div>
@@ -1308,11 +1302,11 @@ function InviteWaiting({
       <div className="flex flex-col items-center gap-2 text-center">
         <h3 className="font-orbitron text-base font-black tracking-widest text-[var(--accent)] uppercase">Waiting for Friend</h3>
         {isCash && stakeAmount > 0 && (
-          <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--orange)]/40 bg-[var(--orange)]/10 px-5 py-2">
-            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--orange)]/80">
+          <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--clue-green)]/35 bg-[var(--clue-green-bg)] px-5 py-2">
+            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--clue-green)]/80">
               Stake locked
             </span>
-            <span className="font-orbitron text-base font-black text-[var(--orange)]">
+            <span className="font-orbitron text-sm font-bold text-[var(--clue-green)]">
               {stakeAmount.toFixed(2)} USDT
             </span>
           </div>
