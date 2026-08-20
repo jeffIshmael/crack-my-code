@@ -180,9 +180,9 @@ export async function POST(req: NextRequest) {
               })),
             });
 
-            await resolveMatchOnChain(
+            const receipt = await resolveMatchOnChain(
               (game as any).onChainMatchId as `0x${string}`,
-              playerAddress as `0x${string}`,
+              normalizedPlayerAddress as `0x${string}`,
               (game.player2Address || '') as `0x${string}`,
               p1GuessCount,
               p2GuessCount,
@@ -191,8 +191,19 @@ export async function POST(req: NextRequest) {
               ipfsHash || '',
               guessArray,
             );
+            console.log('[Blockchain] Resolve ok', {
+              gameId,
+              matchId: (game as any).onChainMatchId,
+              winner: normalizedPlayerAddress,
+              txHash: receipt.transactionHash,
+            });
           } catch (err) {
-            console.error('[Blockchain] Resolve failed:', err);
+            console.error('[Blockchain] Resolve failed:', {
+              gameId,
+              matchId: (game as any).onChainMatchId,
+              winner: normalizedPlayerAddress,
+              error: err instanceof Error ? err.message : err,
+            });
           }
         }
 
