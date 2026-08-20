@@ -110,7 +110,12 @@ export async function POST(req: NextRequest) {
     await pusherServer.trigger(
       `private-user-${game.player1Address.toLowerCase()}`,
       'match-found',
-      { gameId: game.id, opponentAddress: joiner },
+      {
+        gameId: game.id,
+        opponentAddress: joiner,
+        mode: game.mode,
+        stake: game.stake,
+      },
     );
 
     await pusherServer.trigger('lobby-channel', 'challenge-joined', { gameId: game.id });
