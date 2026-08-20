@@ -14,6 +14,16 @@ interface JoinChallengeProps {
   onSignInRequired?: () => void;
 }
 
+function scrollJoinInputIntoView() {
+  // Wait a beat for the soft keyboard / visual viewport to settle, then keep
+  // the Game ID field above the keyboard (and over the bottom nav area).
+  window.setTimeout(() => {
+    const el = document.getElementById('join-challenge-input');
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+  }, 120);
+}
+
 export default function JoinChallenge({
   value,
   onChange,
@@ -57,8 +67,13 @@ export default function JoinChallenge({
             return;
           }
           setFocused(true);
+          document.body.classList.add('keyboard-open');
+          scrollJoinInputIntoView();
         }}
-        onBlur={() => setFocused(false)}
+        onBlur={() => {
+          setFocused(false);
+          document.body.classList.remove('keyboard-open');
+        }}
         onKeyDown={(e) => e.key === 'Enter' && !signInRequired && !isJoining && value.trim() && onJoin()}
         placeholder={signInRequired ? 'Sign in to join' : 'e.g. K7M3NP2X'}
         disabled={signInRequired || isJoining}
@@ -67,6 +82,7 @@ export default function JoinChallenge({
         autoCapitalize="characters"
         autoCorrect="off"
         spellCheck={false}
+        enterKeyHint="go"
       />
       <button
         type="button"

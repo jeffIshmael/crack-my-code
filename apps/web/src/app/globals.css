@@ -139,6 +139,16 @@ html, body {
   padding-bottom: var(--nav-clearance-with-safe);
 }
 
+/* Soft keyboard open: hide bottom nav so it doesn't float mid-screen,
+   and free the clearance so Join Challenge can sit above the keyboard. */
+body.keyboard-open .app-bottom-nav {
+  display: none !important;
+}
+
+body.keyboard-open .app-page-scroll--with-nav {
+  padding-bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+}
+
 .theme-bg-pop-cloud {
   position: absolute;
   border-radius: 50%;

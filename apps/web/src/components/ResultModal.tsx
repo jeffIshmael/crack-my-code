@@ -98,8 +98,8 @@ export default function ResultModal({
         onClick={onHome}
       />
 
-      {/* Confetti particles (win only) */}
-      {isWin && <ConfettiLayer />}
+      {/* Confetti (professional cash win only) */}
+      {gameMode === 'cash' && isWin && <ConfettiLayer />}
 
       {/* Modal card — capped height + scroll so close/header stay visible on mobile */}
       <motion.div
@@ -200,14 +200,25 @@ export default function ResultModal({
             <p className="font-body text-sm text-[var(--wood-text-soft)]">
               {isWin
                 ? isQuitWin
-                  ? `${opponentName} quit while you were still playing — you win!`
+                  ? `${opponentName} quit the match — you win!`
                   : `You broke ${opponentName}'s code in ${guessCount} guess${guessCount !== 1 ? 'es' : ''}!`
                 : isDraw
                   ? `Neither you nor ${opponentName} cracked the code. Well played!`
                   : isQuitLose
-                    ? `You quit — ${opponentName} wins.`
+                    ? `You quit — ${opponentName} won.`
                     : `${opponentName} held their code this time.`}
             </p>
+
+            {gameMode === 'cash' && isWin && (
+              <p className="font-orbitron text-xs font-black tracking-widest uppercase text-[var(--clue-green)]">
+                Congratulations — you won {winnings.toFixed(2)} USDT!
+              </p>
+            )}
+            {isQuitWin && (
+              <p className="font-body text-xs text-[var(--wood-text-soft)]">
+                You didn&apos;t need to crack their code — they left while you were still playing.
+              </p>
+            )}
           </motion.div>
 
           {/* Payout (Cash mode only) */}
@@ -224,13 +235,17 @@ export default function ResultModal({
             >
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
-                  {isWin ? 'Total Payout' : isDraw ? 'Stake Returned' : 'Stake Lost'}
+                  {!isDraw ? (isWin ? 'You received' : 'Winner received') : 'Refunded'}
                 </span>
-                <span className={`font-orbitron text-xl font-black ${isWin ? 'text-[var(--clue-green)]' : isDraw ? 'text-amber-500' : 'text-[var(--orange)]'}`}>
-                  {isWin ? `${winnings.toFixed(2)}` : isDraw ? `${stakeAmount.toFixed(2)}` : `${stakeAmount.toFixed(2)}`} USDT
+                <span
+                  className={`font-orbitron text-xl font-black ${
+                    isWin ? 'text-[var(--clue-green)]' : isDraw ? 'text-amber-500' : 'text-[var(--orange)]'
+                  }`}
+                >
+                  {!isDraw ? `${winnings.toFixed(2)}` : `${stakeAmount.toFixed(2)}`} USDT
                 </span>
               </div>
-              {isWin && (
+              {!isDraw && (
                 <div className="flex items-center justify-between border-t border-[rgba(16,185,129,0.1)] pt-2 text-[10px] text-[var(--text-dim)] uppercase">
                    <span>99% Prize Pool</span>
                    <span>1% Platform Fee Deducted</span>
@@ -238,7 +253,7 @@ export default function ResultModal({
               )}
               {isDraw && (
                 <div className="flex items-center justify-center border-t border-[rgba(217,119,6,0.1)] pt-2 text-[10px] text-amber-500/70 uppercase tracking-widest">
-                  Both stakes returned — no winner
+                  Stake refunded to both players
                 </div>
               )}
             </motion.div>
