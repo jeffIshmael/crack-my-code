@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Fredoka, Nunito } from 'next/font/google';
 import './globals.css';
 
@@ -35,6 +35,15 @@ export const metadata: Metadata = {
       '9af4936c363200c2c29e3c154ef6fcb3e0f0cc120f9ebe5f2972226558494b0063366b4864d11d567957a6127b28ccc2f3def949a27b20a84ef62becd4d884ba',
     ...buildFcEmbedMetadata(),
   },
+};
+
+/** Keep soft keyboard from resizing the layout (nav floating mid-screen on Android). */
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  viewportFit: 'cover',
+  interactiveWidget: 'overlays-content',
 };
 
 export default function RootLayout({

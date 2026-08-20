@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowRight, ChevronDown } from 'lucide-react';
 
@@ -14,14 +14,35 @@ interface JoinChallengeProps {
   onSignInRequired?: () => void;
 }
 
-function scrollJoinInputIntoView() {
-  // Wait a beat for the soft keyboard / visual viewport to settle, then keep
-  // the Game ID field above the keyboard (and over the bottom nav area).
-  window.setTimeout(() => {
-    const el = document.getElementById('join-challenge-input');
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-  }, 120);
+const JOIN_INPUT_ID = 'join-challenge-input';
+
+function setKeyboardOpen(open: boolean) {
+  document.body.classList.toggle('keyboard-open', open);
+}
+
+/** Scroll the Game ID field so it sits just above the soft keyboard. */
+function scrollJoinInputAboveKeyboard() {
+  const el = document.getElementById(JOIN_INPUT_ID);
+  const scrollRoot = document.querySelector('.app-page-scroll');
+  if (!el || !(scrollRoot instanceof HTMLElement)) return;
+
+  const place = () => {
+    const vv = window.visualViewport;
+    // Visible bottom edge (keyboard top when overlays-content; shrunk viewport otherwise).
+    const visibleBottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+    const rect = el.getBoundingClientRect();
+    const gap = 20;
+    const delta = rect.bottom - (visibleBottom - gap);
+    if (Math.abs(delta) > 6) {
+      scrollRoot.scrollBy({ top: delta, behavior: 'smooth' });
+    }
+  };
+
+  // Keyboard animation takes a few frames on MiniPay / Android.
+  requestAnimationFrame(place);
+  window.setTimeout(place, 80);
+  window.setTimeout(place, 220);
+  window.setTimeout(place, 450);
 }
 
 export default function JoinChallenge({
@@ -37,17 +58,50 @@ export default function JoinChallenge({
   const [open, setOpen] = useState(false);
   const signInRequired = disabled && !!onSignInRequired;
 
+  // Keep input pinned above the keyboard while focused (viewport may move as keypad opens).
+  useEffect(() => {
+    if (!focused) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const onViewportChange = () => {
+      setKeyboardOpen(true);
+      scrollJoinInputAboveKeyboard();
+    };
+
+    vv.addEventListener('resize', onViewportChange);
+    vv.addEventListener('scroll', onViewportChange);
+    return () => {
+      vv.removeEventListener('resize', onViewportChange);
+      vv.removeEventListener('scroll', onViewportChange);
+    };
+  }, [focused]);
+
+  useEffect(() => {
+    return () => setKeyboardOpen(false);
+  }, []);
+
   const handleToggle = () => {
     if (signInRequired) {
       onSignInRequired?.();
       return;
     }
     if (disabled) return;
-    setOpen((prev) => !prev);
+    setOpen((prev) => {
+      const next = !prev;
+      if (next) {
+        // Expand then focus so the keypad opens and we can scroll the field into place.
+        window.setTimeout(() => {
+          document.getElementById(JOIN_INPUT_ID)?.focus();
+        }, 240);
+      }
+      return next;
+    });
   };
 
   const inputBlock = (
     <div
+      id="join-challenge-field"
       className={`theme-join-input flex items-center gap-2 rounded-xl border-2 px-3 py-2 transition-colors ${
         signInRequired
           ? 'border-[var(--border-mid)] opacity-60'
@@ -57,8 +111,9 @@ export default function JoinChallenge({
       }`}
     >
       <input
-        id="join-challenge-input"
+        id={JOIN_INPUT_ID}
         type="text"
+        inputMode="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onFocus={() => {
@@ -67,12 +122,17 @@ export default function JoinChallenge({
             return;
           }
           setFocused(true);
-          document.body.classList.add('keyboard-open');
-          scrollJoinInputIntoView();
+          setKeyboardOpen(true);
+          scrollJoinInputAboveKeyboard();
         }}
         onBlur={() => {
           setFocused(false);
-          document.body.classList.remove('keyboard-open');
+          // Delay so tapping the join arrow still works before class clears.
+          window.setTimeout(() => {
+            if (document.activeElement?.id !== JOIN_INPUT_ID) {
+              setKeyboardOpen(false);
+            }
+          }, 180);
         }}
         onKeyDown={(e) => e.key === 'Enter' && !signInRequired && !isJoining && value.trim() && onJoin()}
         placeholder={signInRequired ? 'Sign in to join' : 'e.g. K7M3NP2X'}
@@ -83,6 +143,7 @@ export default function JoinChallenge({
         autoCorrect="off"
         spellCheck={false}
         enterKeyHint="go"
+        autoComplete="off"
       />
       <button
         type="button"
