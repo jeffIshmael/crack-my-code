@@ -1199,11 +1199,11 @@ function MatchmakingPulse({
         </h3>
 
         {isCash && stakeAmount > 0 && (
-          <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--clue-green)]/35 bg-[var(--clue-green-bg)] px-5 py-2.5">
-            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--clue-green)]/80">
+          <div className="flex items-center gap-2 px-1">
+            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)]">
               Stake locked
             </span>
-            <span className="font-orbitron text-sm font-bold text-[var(--clue-green)]">
+            <span className="font-orbitron text-sm font-bold text-[#1FA84A]">
               {stakeAmount.toFixed(2)} USDT
             </span>
           </div>
@@ -1302,11 +1302,11 @@ function InviteWaiting({
       <div className="flex flex-col items-center gap-2 text-center">
         <h3 className="font-orbitron text-base font-black tracking-widest text-[var(--accent)] uppercase">Waiting for Friend</h3>
         {isCash && stakeAmount > 0 && (
-          <div className="flex items-center gap-2 rounded-2xl border-2 border-[var(--clue-green)]/35 bg-[var(--clue-green-bg)] px-5 py-2">
-            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--clue-green)]/80">
+          <div className="flex items-center gap-2 px-1">
+            <span className="font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)]">
               Stake locked
             </span>
-            <span className="font-orbitron text-sm font-bold text-[var(--clue-green)]">
+            <span className="font-orbitron text-sm font-bold text-[#1FA84A]">
               {stakeAmount.toFixed(2)} USDT
             </span>
           </div>

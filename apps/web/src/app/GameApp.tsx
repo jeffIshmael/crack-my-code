@@ -386,59 +386,54 @@ export default function Home() {
   const handleCancelChallenge = useCallback(async (gameId: string, onChainMatchId?: string) => {
     if (!isConnected || !address) return false;
     setIsCancelling(gameId);
-    let onChainOk = !onChainMatchId;
-    let dbOk = false;
 
     try {
+      // On-chain first. Never touch Prisma if the wallet cancel was rejected/failed.
       if (onChainMatchId) {
         try {
           if (smartWalletClient) {
             const data = encodeFunctionData({
               abi: CONTRACT_ABI,
               functionName: 'cancelChallenge',
-              args: [onChainMatchId as `0x${string}`]
+              args: [onChainMatchId as `0x${string}`],
             });
             const txHash = await smartWalletClient.sendTransaction({
               to: CONTRACT_ADDRESS as `0x${string}`,
-              data: data,
-              value: BigInt(0)
+              data,
+              value: BigInt(0),
             });
-            if (!publicClient) throw new Error("Public client not available");
-            await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+            if (!publicClient) throw new Error('Public client not available');
+            const receipt = await publicClient.waitForTransactionReceipt({
+              hash: txHash as `0x${string}`,
+            });
+            if (receipt.status !== 'success') throw new Error('Cancel transaction failed');
           } else {
             await cancelChallenge(onChainMatchId as `0x${string}`);
           }
-          onChainOk = true;
         } catch (err) {
-          console.error('On-chain cancel failed', err);
+          // Already settled on-chain (expired/cancelled) — safe to sync DB.
+          if (!isMatchAlreadySettledError(err)) {
+            console.error('On-chain cancel failed', err);
+            toast.error('Cancel Failed', { description: getErrorMessage(err) });
+            return false;
+          }
         }
       }
 
-      try {
-        const res = await fetch('/api/games/cancel', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ gameId })
+      const res = await fetch('/api/games/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId, address }),
+      });
+      if (!res.ok && res.status !== 404) {
+        const body = await res.json().catch(() => null);
+        toast.error('Cancel Failed', {
+          description: body?.error || 'Could not update challenge status. Try again.',
         });
-        dbOk = res.ok;
-        if (res.ok) {
-          setMyActiveGames(prev => prev.filter(g => g.id !== gameId));
-        }
-      } catch (err) {
-        console.error('DB cancel failed', err);
-      }
-
-      if (!onChainOk && !dbOk) {
-        toast.error('Cancel Failed', { description: 'Could not close the challenge. Try again from Open.' });
         return false;
       }
 
-      if (!onChainOk || !dbOk) {
-        toast.warning('Challenge partially closed', {
-          description: 'One step failed — check Open if the search still appears.',
-        });
-      }
-
+      setMyActiveGames((prev) => prev.filter((g) => g.id !== gameId));
       return true;
     } finally {
       setIsCancelling(null);
@@ -1356,6 +1351,18 @@ export default function Home() {
 
     const joinMode: GameMode = gameData.mode ?? 'cash';
 
+    const releaseJoinReservation = async () => {
+      try {
+        await fetch('/api/games/release-join', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gameId: gameData.id, address: joinerAddress }),
+        });
+      } catch {
+        /* best-effort */
+      }
+    };
+
     const reserveRes = await fetch('/api/games/reserve-join', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1376,31 +1383,37 @@ export default function Home() {
     const challenger = gameData.player1Address as `0x${string}`;
     let txHash: `0x${string}`;
 
-    if (smartWalletClient) {
-      const data = encodeFunctionData({
-        abi: CONTRACT_ABI,
-        functionName: 'joinChallenge',
-        args: [challenger],
-      });
-      txHash = (await smartWalletClient.sendTransaction({
-        to: CONTRACT_ADDRESS as `0x${string}`,
-        data,
-        value: BigInt(0),
-      })) as `0x${string}`;
-      if (!publicClient) throw new Error('Public client not available');
-      const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
-      if (receipt.status !== 'success') throw new Error('Join transaction failed');
-    } else {
-      const hash = await writeContractAsync({
-        address: CONTRACT_ADDRESS,
-        abi: CONTRACT_ABI,
-        functionName: 'joinChallenge',
-        args: [challenger],
-      });
-      if (!publicClient) throw new Error('Public client not available');
-      const receipt = await publicClient.waitForTransactionReceipt({ hash });
-      if (receipt.status !== 'success') throw new Error('Join transaction failed');
-      txHash = hash;
+    try {
+      if (smartWalletClient) {
+        const data = encodeFunctionData({
+          abi: CONTRACT_ABI,
+          functionName: 'joinChallenge',
+          args: [challenger],
+        });
+        txHash = (await smartWalletClient.sendTransaction({
+          to: CONTRACT_ADDRESS as `0x${string}`,
+          data,
+          value: BigInt(0),
+        })) as `0x${string}`;
+        if (!publicClient) throw new Error('Public client not available');
+        const receipt = await publicClient.waitForTransactionReceipt({ hash: txHash });
+        if (receipt.status !== 'success') throw new Error('Join transaction failed');
+      } else {
+        const hash = await writeContractAsync({
+          address: CONTRACT_ADDRESS,
+          abi: CONTRACT_ABI,
+          functionName: 'joinChallenge',
+          args: [challenger],
+        });
+        if (!publicClient) throw new Error('Public client not available');
+        const receipt = await publicClient.waitForTransactionReceipt({ hash });
+        if (receipt.status !== 'success') throw new Error('Join transaction failed');
+        txHash = hash;
+      }
+    } catch (err) {
+      // Wallet reject / failed tx — do not confirm-join or enter the game.
+      await releaseJoinReservation();
+      throw err;
     }
 
     const confirmRes = await fetch('/api/games/confirm-join', {
@@ -1414,6 +1427,7 @@ export default function Home() {
     });
     const confirmData = await confirmRes.json();
     if (!confirmRes.ok) {
+      await releaseJoinReservation();
       if (confirmRes.status === 409) {
         throw new Error('Someone else joined first');
       }
@@ -1467,13 +1481,14 @@ export default function Home() {
     }
 
     setSearchTime(0);
-    if (mode !== 'ai') {
-      setGs(curr => ({
+    // Cipher can show matchmaking immediately (no createChallenge). PvP waits for on-chain success.
+    if (mode === 'ai') {
+      setGs((curr) => ({
         ...curr,
         phase: 'matchmaking',
         gameMode: mode,
-        stakeAmount: stake,
-        opponentName: 'SEARCHING...',
+        stakeAmount: 0,
+        opponentName: 'Cipher',
       }));
     }
 
@@ -1484,7 +1499,7 @@ export default function Home() {
     try {
       let onChainMatchId: string | undefined;
 
-      const createOnChainChallenge = async (): Promise<string | undefined> => {
+      const createOnChainChallenge = async (): Promise<string> => {
         const isPaid = mode === 'cash';
         const stakeAmt = parseUnits(stake.toString(), 6);
         let receipt;
@@ -1513,12 +1528,20 @@ export default function Home() {
           receipt = await publicClient.waitForTransactionReceipt({ hash });
         }
 
+        if (receipt.status !== 'success') {
+          throw new Error('Create challenge transaction failed');
+        }
+
         const logs = parseEventLogs({
           abi: CONTRACT_ABI,
           eventName: 'ChallengeCreated',
           logs: receipt.logs,
         });
-        return logs.length > 0 ? logs[0].args.matchId : undefined;
+        const matchId = logs.length > 0 ? logs[0].args.matchId : undefined;
+        if (!matchId) {
+          throw new Error('Challenge transaction succeeded but match id was not found');
+        }
+        return matchId as string;
       };
 
       // Public PvP: join an existing host on-chain before opening a new challenge.
@@ -1551,9 +1574,13 @@ export default function Home() {
         }
       }
 
-      if (mode !== 'ai' && isConnected && txAddress) {
+      // PvP: on-chain createChallenge must succeed before any Prisma game row.
+      if (mode !== 'ai') {
+        if (!isConnected || !txAddress) {
+          throw new Error('Connect your wallet to create a challenge');
+        }
         onChainMatchId = await createOnChainChallenge();
-        if (onChainMatchId) setCurrentOnChainMatchId(onChainMatchId);
+        setCurrentOnChainMatchId(onChainMatchId);
       }
 
       const res = await fetch('/api/games/find-match', {
@@ -1566,7 +1593,7 @@ export default function Home() {
           onChainMatchId,
           isPublic,
           smartWalletAddress: smartWalletAddress || payoutAddress,
-        })
+        }),
       });
 
       const data = await res.json();
@@ -1585,16 +1612,15 @@ export default function Home() {
         });
       } else {
         setCurrentGameId(data.gameId);
-        // Short join code when migrated; internal id still works for join lookup
         setShareableJoinCode(data.joinCode ?? (!isPublic ? data.gameId : null) ?? null);
         if (onChainMatchId) setCurrentOnChainMatchId(onChainMatchId);
-        
+
         setGs((prev: GameState): GameState => ({
           ...prev,
           phase: 'matchmaking',
           gameMode: mode,
           stakeAmount: stake,
-          opponentName: !isPublic ? 'WAITING' : (mode === 'ai' ? 'Cipher' : 'Searching...')
+          opponentName: !isPublic ? 'WAITING' : mode === 'ai' ? 'Cipher' : 'Searching...',
         }));
         fetchMyActive();
         if (mode === 'cash') {
@@ -1605,10 +1631,13 @@ export default function Home() {
       console.error('Matchmaking failed', err);
       const errMsg = getErrorMessage(err);
       toast.error('Matchmaking Error', { description: errMsg });
-      setGs(prev => ({ ...prev, phase: 'lobby' }));
+      setGs((prev) => ({ ...prev, phase: 'lobby' }));
+      setCurrentGameId(null);
+      setCurrentOnChainMatchId(null);
+      setShareableJoinCode(null);
       if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
         setTimeout(() => {
-          window.location.href = "https://link.minipay.xyz/add_cash?tokens=USDT";
+          window.location.href = 'https://link.minipay.xyz/add_cash?tokens=USDT';
         }, 1500);
       }
     }
@@ -1619,7 +1648,8 @@ export default function Home() {
     const onChainMatchId = currentOnChainMatchIdRef.current ?? undefined;
 
     if (gameId) {
-      await handleCancelChallenge(gameId, onChainMatchId);
+      const closed = await handleCancelChallenge(gameId, onChainMatchId);
+      if (!closed) return; // Wallet reject / on-chain fail — keep challenge visible
     } else if (onChainMatchId && isConnected && address) {
       setIsCancelling('pending');
       try {
@@ -1627,22 +1657,27 @@ export default function Home() {
           const data = encodeFunctionData({
             abi: CONTRACT_ABI,
             functionName: 'cancelChallenge',
-            args: [onChainMatchId as `0x${string}`]
+            args: [onChainMatchId as `0x${string}`],
           });
           const txHash = await smartWalletClient.sendTransaction({
             to: CONTRACT_ADDRESS as `0x${string}`,
-            data: data,
-            value: BigInt(0)
+            data,
+            value: BigInt(0),
           });
-          if (!publicClient) throw new Error("Public client not available");
-          await publicClient.waitForTransactionReceipt({ hash: txHash as `0x${string}` });
+          if (!publicClient) throw new Error('Public client not available');
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash: txHash as `0x${string}`,
+          });
+          if (receipt.status !== 'success') throw new Error('Cancel transaction failed');
         } else {
           await cancelChallenge(onChainMatchId as `0x${string}`);
         }
       } catch (err) {
-        console.error('On-chain cancel failed during setup', err);
-        toast.error('Cancel Failed', { description: getErrorMessage(err) });
-        return;
+        if (!isMatchAlreadySettledError(err)) {
+          console.error('On-chain cancel failed during setup', err);
+          toast.error('Cancel Failed', { description: getErrorMessage(err) });
+          return;
+        }
       } finally {
         setIsCancelling(null);
       }
@@ -1660,7 +1695,7 @@ export default function Home() {
       void refetchUsdtBalance();
     }
     if (!options?.fromTimeout) {
-      toast.info("Search Cancelled");
+      toast.info('Search Cancelled');
     }
   }, [handleCancelChallenge, isConnected, address, smartWalletClient, publicClient, cancelChallenge, fetchMyActive, refetchUsdtBalance]);
 
