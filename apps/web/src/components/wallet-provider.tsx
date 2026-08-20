@@ -79,7 +79,7 @@ function WagmiProviderWrapper({ children }: { children: React.ReactNode }) {
     return createConfig({
       chains: [celo],
       transports: {
-        [celo.id]: http(),
+        [celo.id]: http('https://forno.celo.org'),
       },
       connectors: [
         farcasterFrame(),
