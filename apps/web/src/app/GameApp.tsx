@@ -259,6 +259,28 @@ export default function Home() {
       }
     }
   }, [activeTab, showSplash]);
+
+  // Soft keyboard: hide bottom nav when the visual viewport shrinks so it doesn't
+  // float mid-screen above the keyboard (common on MiniPay / mobile WebViews).
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+
+    const syncKeyboardClass = () => {
+      const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+      document.body.classList.toggle('keyboard-open', covered > 100);
+    };
+
+    vv.addEventListener('resize', syncKeyboardClass);
+    vv.addEventListener('scroll', syncKeyboardClass);
+    return () => {
+      vv.removeEventListener('resize', syncKeyboardClass);
+      vv.removeEventListener('scroll', syncKeyboardClass);
+      document.body.classList.remove('keyboard-open');
+    };
+  }, []);
+
   const [isJoining, setIsJoining] = useState<string | null>(null);
   const oppTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
@@ -630,7 +652,13 @@ export default function Home() {
 
         if (data.status === 'COMPLETED' && data.result) {
           const mode = prev.gameMode === 'ai' ? 'ai' : prev.gameMode;
-          const quitContext = data.endedByQuit
+          const neitherCracked =
+            !data.playerGuesses.some((g) => isWinningClues(g.clues)) &&
+            !data.opponentGuesses.some((g) => isWinningClues(g.clues));
+          const endedByQuit =
+            data.endedByQuit === true ||
+            (neitherCracked && data.result !== 'draw');
+          const quitContext = endedByQuit
             ? data.result === 'win'
               ? 'opponent'
               : data.result === 'lose'
@@ -901,25 +929,36 @@ export default function Home() {
       if (!myAddress) return;
       // Quitter already applies local result in handleQuitGame.
       if (data.quitterAddress?.toLowerCase() === myAddress) return;
-      if (gsRef.current.phase === 'result') return;
 
       const isWin = data.winnerAddress?.toLowerCase() === myAddress;
+      const quitContext = isWin ? 'opponent' : 'player';
       const mode = gsRef.current.gameMode === 'ai' ? 'ai' : gsRef.current.gameMode;
       const delta = scoreDeltaForMode(mode, isWin);
+      const wasAlreadyResult = gsRef.current.phase === 'result';
 
-      setGs((prev: GameState) => ({
-        ...prev,
-        phase: 'result',
-        result: isWin ? 'win' : 'lose',
-        quitContext: isWin ? 'opponent' : 'player',
-        ratingDelta: isRegisteredPlayer(myAddress) ? delta : 0,
-        currentInput: [],
-        opponentCurrentInput: [],
-        isPlayerTurn: false,
-        opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
-      }));
+      // Always apply quitContext — even if we already entered result without it
+      // (e.g. sync race before endedByQuit was available).
+      setGs((prev: GameState) => {
+        if (prev.phase === 'result' && prev.quitContext === quitContext && prev.result === (isWin ? 'win' : 'lose')) {
+          return {
+            ...prev,
+            opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
+          };
+        }
+        return {
+          ...prev,
+          phase: 'result',
+          result: isWin ? 'win' : 'lose',
+          quitContext,
+          ratingDelta: isRegisteredPlayer(myAddress) ? delta : 0,
+          currentInput: [],
+          opponentCurrentInput: [],
+          isPlayerTurn: false,
+          opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
+        };
+      });
 
-      if (isRegisteredPlayer(myAddress)) {
+      if (!wasAlreadyResult && isRegisteredPlayer(myAddress)) {
         void syncResultStats(delta);
       }
     };
@@ -2493,8 +2532,8 @@ export default function Home() {
               onPlayAgain={handlePlayAgain}
               onHome={handleHome}
               rematchStatus={rematchStatus}
-              onRematch={handleRematch}
-              onDeclineRematch={handleDeclineRematch}
+              onRematch={gs.gameMode === 'cash' ? undefined : handleRematch}
+              onDeclineRematch={gs.gameMode === 'cash' ? undefined : handleDeclineRematch}
               rematchLoading={rematchLoading}
             />
           )}

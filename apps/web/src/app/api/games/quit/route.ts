@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         success: true,
         alreadyEnded: true,
-        endedByQuit: false,
+        endedByQuit: game.endedByQuit === true,
         winnerAddress: game.winnerAddress,
         opponentCode,
       });
@@ -131,7 +131,7 @@ export async function POST(req: NextRequest) {
 
     await prisma.game.update({
       where: { id: gameId },
-      data: { status: 'COMPLETED', winnerAddress },
+      data: { status: 'COMPLETED', winnerAddress, endedByQuit: true },
     });
 
     if (isRegisteredPlayer(opponentAddress)) {

@@ -32,6 +32,7 @@ model Game {
   player1Code     String?  // Code set by player 1
   player2Code     String?  // Code set by player 2 (or AI code)
   winnerAddress       String?
+  endedByQuit         Boolean @default(false)
   player1WantsRematch Boolean @default(false)
   player2WantsRematch Boolean @default(false)
   joinReservedBy      String?

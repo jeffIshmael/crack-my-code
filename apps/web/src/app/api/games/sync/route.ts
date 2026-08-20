@@ -74,11 +74,15 @@ export async function GET(req: NextRequest) {
         result = 'lose';
       }
 
-      // Quit end: completed without either side cracking the code.
+      // Prefer the durable quit flag; fall back to inferring from guesses.
       if (result === 'win' || result === 'lose') {
-        const playerCracked = playerGuesses.some((g) => isWinningClues(g.clues));
-        const opponentCracked = opponentGuesses.some((g) => isWinningClues(g.clues));
-        endedByQuit = !playerCracked && !opponentCracked && winner !== 'ai' && winner !== 'draw';
+        if (game.endedByQuit) {
+          endedByQuit = true;
+        } else {
+          const playerCracked = playerGuesses.some((g) => isWinningClues(g.clues));
+          const opponentCracked = opponentGuesses.some((g) => isWinningClues(g.clues));
+          endedByQuit = !playerCracked && !opponentCracked && winner !== 'ai' && winner !== 'draw';
+        }
       }
 
       const opponentCodeStr = isPlayer1 ? game.player2Code : game.player1Code;
