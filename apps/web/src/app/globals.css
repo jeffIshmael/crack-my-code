@@ -2285,6 +2285,16 @@ html, body {
   box-shadow: none;
 }
 
+.result-modal__btn--danger {
+  border: 2px solid rgba(248, 113, 113, 0.55);
+  background: rgba(254, 226, 226, 0.65);
+  color: #b91c1c;
+}
+
+.result-modal__btn--danger:active:not(:disabled) {
+  box-shadow: none;
+}
+
 .result-modal__btn--danger:hover:not(:disabled) {
   border-color: rgba(248, 113, 113, 0.55);
   background: rgba(254, 226, 226, 0.65);

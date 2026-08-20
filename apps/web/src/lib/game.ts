@@ -34,6 +34,8 @@ export interface GameState {
   isPlayerTurn: boolean;
   timeLeft: number;              // seconds (if timer used, currently static)
   result: GameResult;
+  /** Only set for quit-ends so we can display correct copy in the result modal. */
+  quitContext?: 'player' | 'opponent' | null;
   playerRating: number;
   playerPoints: number;
   ratingDelta: number | null;
@@ -256,6 +258,7 @@ export function initialGameState(points = 1000, mode: GameMode = 'fun', stake = 
     isPlayerTurn: true,
     timeLeft: GAME_DURATION,
     result: null,
+    quitContext: null,
     playerRating: points,
     playerPoints: points,
     ratingDelta: null,
