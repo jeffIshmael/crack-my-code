@@ -78,7 +78,10 @@ export default function ResultModal({
   const isQuitWin = isWin && quitContext === 'opponent';
   const isQuitLose = !isDraw && !isQuitWin && result === 'lose' && quitContext === 'player';
   const prizePool = stakeAmount * 2;
+  /** Net payout after 1% platform fee (matches on-chain treasuryFeeBps). */
   const winnings = prizePool * 0.99;
+  const formatUsdt = (n: number) =>
+    n.toLocaleString(undefined, { minimumFractionDigits: 3, maximumFractionDigits: 3 });
 
   const accentColor = isWin ? 'var(--clue-green)' : isDraw ? '#D97706' : 'var(--orange)';
   const accentBg = isWin ? 'var(--clue-green-bg)' : isDraw ? 'rgba(217,119,6,0.12)' : 'var(--orange-dim)';
@@ -211,7 +214,7 @@ export default function ResultModal({
 
             {gameMode === 'cash' && isWin && (
               <p className="font-orbitron text-xs font-black tracking-widest uppercase text-[var(--clue-green)]">
-                Congratulations — you won {winnings.toFixed(2)} USDT!
+                Congratulations — you won {formatUsdt(winnings)} USDT!
               </p>
             )}
             {isQuitWin && (
@@ -233,24 +236,20 @@ export default function ResultModal({
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.5 }}
             >
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between gap-3">
                 <span className="text-xs font-bold uppercase tracking-widest" style={{ color: 'var(--text-2)' }}>
                   {!isDraw ? (isWin ? 'You received' : 'Winner received') : 'Refunded'}
                 </span>
                 <span
-                  className={`font-orbitron text-xl font-black ${
+                  className={`inline-flex items-center gap-1.5 font-orbitron text-xl font-black ${
                     isWin ? 'text-[var(--clue-green)]' : isDraw ? 'text-amber-500' : 'text-[var(--orange)]'
                   }`}
                 >
-                  {!isDraw ? `${winnings.toFixed(2)}` : `${stakeAmount.toFixed(2)}`} USDT
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/usdt-logo.webp" alt="" width={18} height={18} className="shrink-0" aria-hidden />
+                  {!isDraw ? formatUsdt(winnings) : formatUsdt(stakeAmount)} USDT
                 </span>
               </div>
-              {!isDraw && (
-                <div className="flex items-center justify-between border-t border-[rgba(16,185,129,0.1)] pt-2 text-[10px] text-[var(--text-dim)] uppercase">
-                   <span>99% Prize Pool</span>
-                   <span>1% Platform Fee Deducted</span>
-                </div>
-              )}
               {isDraw && (
                 <div className="flex items-center justify-center border-t border-[rgba(217,119,6,0.1)] pt-2 text-[10px] text-amber-500/70 uppercase tracking-widest">
                   Stake refunded to both players
