@@ -71,6 +71,16 @@ export async function POST(req: NextRequest) {
 
     const opponentAddress = isPlayer1 ? game.player2Address : game.player1Address;
     if (!opponentAddress) {
+      // Pending open challenge — do not close DB while stake may still be escrowed.
+      if (game.onChainMatchId && (game.mode === 'cash' || game.mode === 'fun')) {
+        return NextResponse.json(
+          {
+            error:
+              'Use Cancel & Refund for open challenges. On-chain cancel must succeed before the game is closed.',
+          },
+          { status: 409 },
+        );
+      }
       await prisma.game.update({
         where: { id: gameId },
         data: { status: 'CANCELLED' },

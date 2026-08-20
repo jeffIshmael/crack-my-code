@@ -1,32 +1,34 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, RefreshCw } from 'lucide-react';
 import { ThemeLogo } from '@/components/ThemeLogo';
 
 interface OnChainAnalytics {
   contractAddress: string;
   celoscanUrl: string;
   chain: string;
-  windowDays: number;
   activity: {
-    completedGamesInWindow: number;
-    cipherGamesInWindow: number;
-    pvpGamesInWindow: number;
-    estimatedOnChainTxInWindow: number;
-    movingAverageDailyOnChainTx: number;
+    totalOnChainTx: number;
+    onChainTxLast14Days: number;
+    onChainTxLast2Days: number;
   };
   txModel: {
-    cipher: { method: string; txsPerGame: number };
-    pvp: { methods: string[]; alternateMethods: string[]; txsPerGame: number };
-    note: string;
+    cipher: { method: string; txsPerGame: number; note: string };
+    pvp: {
+      methods: string[];
+      alternateMethods: string[];
+      txsPerGame: number;
+      note: string;
+    };
   };
   treasury: {
     accumulatedFeesUsdt: string;
     escrowBalanceUsdt: string;
     rewardPoolUsdt: string;
+    contractBalanceUsdt?: string;
     readAt: string;
   } | null;
   sampleTransactions: ReadonlyArray<{ method: string; url: string | null }>;
@@ -68,26 +70,28 @@ function MetricCard({
 export default function OnChainAnalyticsPage() {
   const [data, setData] = useState<OnChainAnalytics | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = useCallback(async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true);
+    try {
+      const res = await fetch(`/api/stats/on-chain?t=${Date.now()}`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load');
+      const json = await res.json();
+      setData(json);
+      setError(null);
+    } catch {
+      setError('Could not load on-chain analytics.');
+    } finally {
+      setRefreshing(false);
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    fetch('/api/stats/on-chain')
-      .then((res) => {
-        if (!res.ok) throw new Error('Failed to load');
-        return res.json();
-      })
-      .then((json) => {
-        if (!cancelled) setData(json);
-      })
-      .catch(() => {
-        if (!cancelled) setError('Could not load on-chain analytics.');
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    void load();
+    const id = setInterval(() => void load(), 30_000);
+    return () => clearInterval(id);
+  }, [load]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-[max(1.5rem,env(safe-area-inset-bottom,0px))] pt-[max(1rem,env(safe-area-inset-top,0px))]">
@@ -97,9 +101,18 @@ export default function OnChainAnalyticsPage() {
           <div>
             <h1 className="font-ui text-xl font-bold text-[var(--text)]">On-chain analytics</h1>
             <p className="mt-1 font-body text-xs text-[var(--text-dim)]">
-              Contract activity and treasury — no player game stats
+              Live contract reads and estimated Celo transactions
             </p>
           </div>
+          <button
+            type="button"
+            onClick={() => void load(true)}
+            disabled={refreshing}
+            className="inline-flex items-center gap-1.5 rounded-full border border-[var(--border-mid)] px-3 py-1.5 font-ui text-[10px] font-bold uppercase tracking-widest text-[var(--text-dim)] disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+            Refresh
+          </button>
         </div>
 
         {error ? (
@@ -133,62 +146,71 @@ export default function OnChainAnalyticsPage() {
             </section>
 
             <section className="flex flex-col gap-2">
-              <h2 className="font-ui text-sm font-bold text-[var(--text)]">
-                Last {data.windowDays} days (estimated)
-              </h2>
-              <div className="grid grid-cols-2 gap-3">
+              <h2 className="font-ui text-sm font-bold text-[var(--text)]">On-chain transactions</h2>
+              <div className="grid grid-cols-1 gap-3">
                 <MetricCard
-                  label="Est. on-chain txs"
-                  value={data.activity.estimatedOnChainTxInWindow.toLocaleString()}
-                  hint={`~${data.activity.movingAverageDailyOnChainTx}/day avg`}
+                  label="Total on-chain txs"
+                  value={data.activity.totalOnChainTx.toLocaleString()}
+                  hint="Estimated from settled PvP matches (3 txs each)"
                 />
-                <MetricCard
-                  label="PvP matches settled"
-                  value={data.activity.pvpGamesInWindow.toLocaleString()}
-                />
-                <MetricCard
-                  label="Cipher games tracked"
-                  value={data.activity.cipherGamesInWindow.toLocaleString()}
-                />
-                <MetricCard
-                  label="Completed games (window)"
-                  value={data.activity.completedGamesInWindow.toLocaleString()}
-                />
+                <div className="grid grid-cols-2 gap-3">
+                  <MetricCard
+                    label="Last 14 days"
+                    value={data.activity.onChainTxLast14Days.toLocaleString()}
+                  />
+                  <MetricCard
+                    label="Last 2 days"
+                    value={data.activity.onChainTxLast2Days.toLocaleString()}
+                  />
+                </div>
               </div>
             </section>
 
             {data.treasury && (
               <section className="flex flex-col gap-2">
-                <h2 className="font-ui text-sm font-bold text-[var(--text)]">Live contract treasury</h2>
+                <div className="flex items-center justify-between gap-2">
+                  <h2 className="font-ui text-sm font-bold text-[var(--text)]">Live treasury</h2>
+                  <span className="font-body text-[9px] text-[var(--text-dim)]">
+                    Updated {new Date(data.treasury.readAt).toLocaleTimeString()}
+                  </span>
+                </div>
                 <div className="grid grid-cols-2 gap-3">
+                  <MetricCard
+                    label="Escrow (locked stakes)"
+                    value={`${formatTreasuryUsdt(data.treasury.escrowBalanceUsdt)} USDT`}
+                  />
                   <MetricCard
                     label="Reward pool"
                     value={`${formatTreasuryUsdt(data.treasury.rewardPoolUsdt)} USDT`}
                   />
                   <MetricCard
-                    label="Escrow balance"
-                    value={`${formatTreasuryUsdt(data.treasury.escrowBalanceUsdt)} USDT`}
-                  />
-                  <MetricCard
                     label="Accumulated fees"
                     value={`${formatTreasuryUsdt(data.treasury.accumulatedFeesUsdt)} USDT`}
                   />
+                  {data.treasury.contractBalanceUsdt != null && (
+                    <MetricCard
+                      label="Contract USDT balance"
+                      value={`${formatTreasuryUsdt(data.treasury.contractBalanceUsdt)} USDT`}
+                    />
+                  )}
                 </div>
               </section>
             )}
 
             <section className="theme-sky-readout flex flex-col gap-3 p-4">
               <h2 className="font-ui text-sm font-bold text-[var(--text)]">Transaction model</h2>
-              <p className="font-body text-xs leading-relaxed text-[var(--text-2)]">{data.txModel.note}</p>
-              <div className="flex flex-col gap-2 font-body text-xs text-[var(--text-2)]">
+              <div className="flex flex-col gap-3 font-body text-xs leading-relaxed text-[var(--text-2)]">
                 <p>
                   <span className="font-bold text-[var(--text)]">Cipher:</span>{' '}
-                  {data.txModel.cipher.txsPerGame}× {data.txModel.cipher.method}
+                  {data.txModel.cipher.note}
                 </p>
                 <p>
                   <span className="font-bold text-[var(--text)]">PvP:</span>{' '}
-                  {data.txModel.pvp.txsPerGame}× ({data.txModel.pvp.methods.join(' → ')})
+                  {data.txModel.pvp.txsPerGame} txs —{' '}
+                  {data.txModel.pvp.methods.slice(0, 2).join(' → ')} → (
+                  {data.txModel.pvp.methods[2]} or {data.txModel.pvp.alternateMethods[0]})
                 </p>
+                <p className="text-[var(--text-dim)]">{data.txModel.pvp.note}</p>
               </div>
             </section>
 
@@ -208,7 +230,7 @@ export default function OnChainAnalyticsPage() {
                         <ExternalLink size={12} />
                       </a>
                     ) : (
-                      <span>{sample.method} — sample pending</span>
+                      <span>{sample.method}</span>
                     )}
                   </li>
                 ))}
@@ -216,7 +238,7 @@ export default function OnChainAnalyticsPage() {
             </section>
 
             <p className="text-center font-body text-[10px] text-[var(--text-dim)]">
-              JSON API:{' '}
+              Live JSON:{' '}
               <a href="/api/stats/on-chain" className="text-[var(--accent)] hover:underline">
                 /api/stats/on-chain
               </a>
