@@ -21,6 +21,8 @@ interface GameBoardProps {
   pointsLoading?: boolean;
   isSubmitting?: boolean;
   isAI?: boolean;
+  /** Professional match stake (USDT). When > 0, show winner reward in the top bar. */
+  stakeAmount?: number;
   inputLocked?: boolean;
   onDigitPress: (d: number) => void;
   onDelete: () => void;
@@ -42,6 +44,7 @@ export default function GameBoard({
   pointsLoading = false,
   isSubmitting = false,
   isAI = false,
+  stakeAmount = 0,
   inputLocked = false,
   onDigitPress,
   onDelete,
@@ -53,6 +56,7 @@ export default function GameBoard({
 }: GameBoardProps) {
   const [view, setView] = useState<'player' | 'opponent'>('player');
   const canSubmit = isPlayerTurn && !inputLocked && currentInput.length === CODE_LENGTH;
+  const winnerReward = stakeAmount > 0 ? stakeAmount * 2 * 0.99 : 0;
 
   const aiReviewingPlayerGuess =
     isAI &&
@@ -125,8 +129,8 @@ export default function GameBoard({
 
       {/* Top bar */}
       <div className="flex-shrink-0 pt-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <div className="flex min-w-0 flex-1 items-center gap-2">
             <div className="theme-playful-header-chip py-1.5">
               <span className="font-ui text-[10px] font-bold tracking-wide text-[var(--wood-text)]">
                 {pointsLoading ? '---' : `${playerPoints.toLocaleString()} CMC`}
@@ -140,15 +144,29 @@ export default function GameBoard({
               Quit
             </button>
           </div>
-          <div
-            className="rounded-full px-2.5 py-1 font-ui text-[10px] font-bold uppercase tracking-wide"
-            style={{
-              background: isPlayerTurn ? 'rgba(21, 144, 214, 0.2)' : 'var(--orange-dim)',
-              color: isPlayerTurn ? 'var(--cream)' : 'var(--orange)',
-              border: `1px solid ${isPlayerTurn ? 'rgba(255,255,255,0.35)' : 'rgba(255,159,67,0.35)'}`,
-            }}
-          >
-            {isPlayerTurn ? 'Your turn' : isAI ? `${opponentName} AI` : 'Their turn'}
+
+          {winnerReward > 0 && (
+            <div className="flex shrink-0 flex-col items-center rounded-xl border border-[var(--orange)]/35 bg-[var(--orange)]/12 px-2.5 py-1">
+              <span className="font-ui text-[8px] font-bold uppercase tracking-widest text-[var(--orange)]/80">
+                Winner
+              </span>
+              <span className="font-orbitron text-[11px] font-black leading-none text-[var(--orange)]">
+                {winnerReward.toFixed(2)} USDT
+              </span>
+            </div>
+          )}
+
+          <div className="flex flex-1 justify-end">
+            <div
+              className="rounded-full px-2.5 py-1 font-ui text-[10px] font-bold uppercase tracking-wide"
+              style={{
+                background: isPlayerTurn ? 'rgba(21, 144, 214, 0.2)' : 'var(--orange-dim)',
+                color: isPlayerTurn ? 'var(--cream)' : 'var(--orange)',
+                border: `1px solid ${isPlayerTurn ? 'rgba(255,255,255,0.35)' : 'rgba(255,159,67,0.35)'}`,
+              }}
+            >
+              {isPlayerTurn ? 'Your turn' : isAI ? `${opponentName} AI` : 'Their turn'}
+            </div>
           </div>
         </div>
 

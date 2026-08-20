@@ -1467,7 +1467,13 @@ export default function Home() {
 
     setSearchTime(0);
     if (mode !== 'ai') {
-      setGs(curr => ({ ...curr, phase: 'matchmaking', gameMode: mode, opponentName: 'SEARCHING...' }));
+      setGs(curr => ({
+        ...curr,
+        phase: 'matchmaking',
+        gameMode: mode,
+        stakeAmount: stake,
+        opponentName: 'SEARCHING...',
+      }));
     }
 
     const effectiveAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
@@ -1590,6 +1596,9 @@ export default function Home() {
           opponentName: !isPublic ? 'WAITING' : (mode === 'ai' ? 'Cipher' : 'Searching...')
         }));
         fetchMyActive();
+        if (mode === 'cash') {
+          void refetchUsdtBalance();
+        }
       }
     } catch (err: any) {
       console.error('Matchmaking failed', err);
@@ -1602,7 +1611,7 @@ export default function Home() {
         }, 1500);
       }
     }
-  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive, executeOnChainJoin]);
+  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive, executeOnChainJoin, refetchUsdtBalance]);
 
   const handleCancelMatchmaking = useCallback(async (options?: { fromTimeout?: boolean }) => {
     const gameId = currentGameIdRef.current;
@@ -1639,16 +1648,20 @@ export default function Home() {
     }
 
     setIsSearchHidden(false);
+    const wasCash = gsRef.current.gameMode === 'cash';
     setGs((prev: GameState): GameState => ({ ...prev, phase: 'lobby' }));
     setSearchTime(0);
     setCurrentGameId(null);
     setShareableJoinCode(null);
     setCurrentOnChainMatchId(null);
     fetchMyActive();
+    if (wasCash) {
+      void refetchUsdtBalance();
+    }
     if (!options?.fromTimeout) {
       toast.info("Search Cancelled");
     }
-  }, [handleCancelChallenge, isConnected, address, smartWalletClient, publicClient, cancelChallenge, fetchMyActive]);
+  }, [handleCancelChallenge, isConnected, address, smartWalletClient, publicClient, cancelChallenge, fetchMyActive, refetchUsdtBalance]);
 
   const handleTimeoutExpiry = useCallback(async () => {
     const gameId = currentGameIdRef.current;
@@ -1685,7 +1698,11 @@ export default function Home() {
           : 'No opponent joined in time. Match expired.'
         : 'No opponent joined in time. Finalizing…',
     });
-  }, [address, payoutAddress, fetchMyActive, gs.gameMode, gs.stakeAmount]);
+
+    if (isStakedProfessional) {
+      void refetchUsdtBalance();
+    }
+  }, [address, payoutAddress, fetchMyActive, gs.gameMode, gs.stakeAmount, refetchUsdtBalance]);
 
   const handleHideSearch = useCallback(() => {
     setIsSearchHidden(true);
@@ -2385,6 +2402,7 @@ export default function Home() {
           hasPendingSearch={isSearchHidden}
           onShowSearch={handleShowSearch}
           pendingStake={gs.stakeAmount}
+          gameMode={gs.gameMode}
         />
       </motion.div>
     ) : gs.phase === 'setCode' ? (
@@ -2464,6 +2482,7 @@ export default function Home() {
           pendingOpponentTileClues={pendingOpponentTileClues}
           turnNotification={turnNotification}
           isAI={gs.gameMode === 'ai'}
+          stakeAmount={gs.gameMode === 'cash' ? gs.stakeAmount : 0}
           phase={gs.phase}
         />
 
