@@ -260,27 +260,6 @@ export default function Home() {
     }
   }, [activeTab, showSplash]);
 
-  // Soft keyboard: hide bottom nav when the visual viewport shrinks so it doesn't
-  // float mid-screen above the keyboard (common on MiniPay / mobile WebViews).
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const vv = window.visualViewport;
-    if (!vv) return;
-
-    const syncKeyboardClass = () => {
-      const covered = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      document.body.classList.toggle('keyboard-open', covered > 100);
-    };
-
-    vv.addEventListener('resize', syncKeyboardClass);
-    vv.addEventListener('scroll', syncKeyboardClass);
-    return () => {
-      vv.removeEventListener('resize', syncKeyboardClass);
-      vv.removeEventListener('scroll', syncKeyboardClass);
-      document.body.classList.remove('keyboard-open');
-    };
-  }, []);
-
   const [isJoining, setIsJoining] = useState<string | null>(null);
   const oppTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [currentGameId, setCurrentGameId] = useState<string | null>(null);
