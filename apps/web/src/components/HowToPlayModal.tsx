@@ -45,6 +45,11 @@ const SECTIONS = [
         <p className="font-body text-sm leading-relaxed text-[var(--wood-text-soft)]">
           If both players use all 6 guesses without cracking the code, the match ends in a <strong className="text-[var(--wood-text)]">🤝 Draw</strong> — no points change, and any staked USDT is fully refunded.
         </p>
+        <p className="font-body text-sm leading-relaxed text-[var(--wood-text-soft)]">
+          Vs another player, each turn has a <strong className="text-[var(--wood-text)]">60-second timer</strong> on the board.
+          Run out of time and you <strong className="text-[var(--wood-text)]">forfeit</strong> — your opponent wins
+          (in Professional, they take the stake).
+        </p>
       </div>
     ),
   },
