@@ -2,6 +2,43 @@
  * Utility to parse complex blockchain and API errors into human-readable messages.
  */
 
+/** True when the user dismissed / rejected the wallet prompt (not a real failure). */
+export function isUserRejectedTransaction(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof error === 'string') {
+    return /user rejected|user denied|rejected the request|request rejected|user cancelled|user canceled/i.test(
+      error,
+    );
+  }
+
+  const err = error as {
+    code?: number | string;
+    name?: string;
+    message?: string;
+    shortMessage?: string;
+    details?: string;
+    cause?: unknown;
+  };
+
+  // EIP-1193 / common wallet codes
+  if (err.code === 4001 || err.code === 'ACTION_REJECTED') return true;
+  if (err.name === 'UserRejectedRequestError') return true;
+
+  const text = [err.message, err.shortMessage, err.details]
+    .filter(Boolean)
+    .join(' ');
+  if (
+    /user rejected|user denied|rejected the request|request rejected|user cancelled|user canceled/i.test(
+      text,
+    )
+  ) {
+    return true;
+  }
+
+  if (err.cause) return isUserRejectedTransaction(err.cause);
+  return false;
+}
+
 export function getErrorMessage(error: any): string {
   if (!error) return 'An unknown error occurred.';
 
@@ -12,11 +49,7 @@ export function getErrorMessage(error: any): string {
   const data = error.data || (error.cause as any)?.data || (error.cause as any)?.cause?.data;
 
   // Handle Viem/Wagmi User Rejected
-  if (
-    message.includes('User rejected') || 
-    message.includes('User denied') || 
-    message.includes('rejected the request')
-  ) {
+  if (isUserRejectedTransaction(error)) {
     return 'Transaction cancelled by user.';
   }
 

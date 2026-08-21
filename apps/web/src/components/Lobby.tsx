@@ -10,7 +10,7 @@ import { PROFESSIONAL_MODE_ENABLED, CIPHER_DAILY_WIN_CAP } from '@/lib/game';
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, CONTRACT_ABI, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
-import { getErrorMessage } from '@/lib/errors';
+import { getErrorMessage, isUserRejectedTransaction } from '@/lib/errors';
 import { X, Lock, Check, ArrowLeft } from 'lucide-react';
 import { ThemeLogo } from '@/components/ThemeLogo';
 import { ThemePlayfulHeader } from '@/components/ThemePlayfulHeader';
@@ -111,7 +111,7 @@ export default function Lobby({
   // const [showCipherSignInModal, setShowCipherSignInModal] = useState(false);
   const [pvpStep, setPvpStep] = useState<'selection' | 'config' | 'visibility'>('selection');
   const [selectedMode, setSelectedMode] = useState<GameMode>('fun');
-  const [stake, setStake] = useState<string>('5');
+  const [stake, setStake] = useState<string>('0.2');
   const [isCreating, setIsCreating] = useState(false);
   /** Keeps the cash create modal in a locked progress state across approve → create. */
   const [cashCreatePhase, setCashCreatePhase] = useState<'idle' | 'approving' | 'creating'>('idle');
@@ -184,7 +184,9 @@ export default function Lobby({
       return true;
     } catch (err) {
       console.error('Approval failed', err);
-      toast.error('Approval Failed', { description: getErrorMessage(err) });
+      if (!isUserRejectedTransaction(err)) {
+        toast.error('Approval Failed', { description: getErrorMessage(err) });
+      }
       return false;
     } finally {
       setIsConfirmingApprove(false);
@@ -270,7 +272,9 @@ export default function Lobby({
       void refetchUsdtBalance();
     } catch (err) {
       console.error('Failed to create challenge', err);
-      toast.error('Challenge Error', { description: getErrorMessage(err) });
+      if (!isUserRejectedTransaction(err)) {
+        toast.error('Challenge Error', { description: getErrorMessage(err) });
+      }
       setCashCreatePhase('idle');
     } finally {
       setIsCreating(false);
@@ -343,11 +347,13 @@ export default function Lobby({
       void refetchUsdtBalance();
     } catch (err) {
       console.error('Public join failed', err);
-      const errMsg = getErrorMessage(err);
-      if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
-        toast.error('Challenge taken', { description: errMsg });
-      } else {
-        toast.error('Join Error', { description: errMsg });
+      if (!isUserRejectedTransaction(err)) {
+        const errMsg = getErrorMessage(err);
+        if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
+          toast.error('Challenge taken', { description: errMsg });
+        } else {
+          toast.error('Join Error', { description: errMsg });
+        }
       }
       setCashJoinPhase('idle');
     } finally {

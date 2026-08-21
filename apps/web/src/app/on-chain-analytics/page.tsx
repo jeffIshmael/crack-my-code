@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { ExternalLink, RefreshCw } from 'lucide-react';
@@ -35,14 +35,25 @@ interface OnChainAnalytics {
   updatedAt: string;
 }
 
-/** 3 decimals for non-zero treasury amounts; plain "0" when empty. */
+/** 2 decimals for non-zero treasury amounts; plain "0" when empty. */
 function formatTreasuryUsdt(raw: string): string {
   const n = parseFloat(raw);
   if (!Number.isFinite(n) || n === 0) return '0';
   return n.toLocaleString(undefined, {
-    minimumFractionDigits: 3,
-    maximumFractionDigits: 3,
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
   });
+}
+
+function UsdtAmount({ amount }: { amount: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src="/usdt-logo.webp" alt="" width={18} height={18} className="shrink-0" aria-hidden />
+      <span>{formatTreasuryUsdt(amount)}</span>
+      <span className="font-ui text-sm font-bold text-[var(--text-dim)]">USDT</span>
+    </span>
+  );
 }
 
 function MetricCard({
@@ -51,7 +62,7 @@ function MetricCard({
   hint,
 }: {
   label: string;
-  value: string | number;
+  value: ReactNode;
   hint?: string;
 }) {
   return (
@@ -177,20 +188,20 @@ export default function OnChainAnalyticsPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <MetricCard
                     label="Escrow (locked stakes)"
-                    value={`${formatTreasuryUsdt(data.treasury.escrowBalanceUsdt)} USDT`}
+                    value={<UsdtAmount amount={data.treasury.escrowBalanceUsdt} />}
                   />
                   <MetricCard
                     label="Reward pool"
-                    value={`${formatTreasuryUsdt(data.treasury.rewardPoolUsdt)} USDT`}
+                    value={<UsdtAmount amount={data.treasury.rewardPoolUsdt} />}
                   />
                   <MetricCard
                     label="Accumulated fees"
-                    value={`${formatTreasuryUsdt(data.treasury.accumulatedFeesUsdt)} USDT`}
+                    value={<UsdtAmount amount={data.treasury.accumulatedFeesUsdt} />}
                   />
                   {data.treasury.contractBalanceUsdt != null && (
                     <MetricCard
                       label="Contract USDT balance"
-                      value={`${formatTreasuryUsdt(data.treasury.contractBalanceUsdt)} USDT`}
+                      value={<UsdtAmount amount={data.treasury.contractBalanceUsdt} />}
                     />
                   )}
                 </div>

@@ -45,7 +45,7 @@ import { useSmartWallets } from '@privy-io/react-auth/smart-wallets';
 import { resolvePayoutAddress, playerAddressAliases, getSmartWalletAddress } from '@/lib/wallet-address';
 import { useGuessMyCode } from '../../blockchain/hooks';
 import { toast } from 'sonner';
-import { getErrorMessage } from '@/lib/errors';
+import { getErrorMessage, isUserRejectedTransaction } from '@/lib/errors';
 import { isMatchAlreadySettledError } from '@/lib/expire-match';
 import { sendUsdtToAddress } from '@/lib/send-usdt';
 import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, ArrowLeft, ChevronRight } from 'lucide-react';
@@ -413,6 +413,7 @@ export default function Home() {
         } catch (err) {
           // Already settled on-chain (expired/cancelled) — safe to sync DB.
           if (!isMatchAlreadySettledError(err)) {
+            if (isUserRejectedTransaction(err)) return false;
             console.error('On-chain cancel failed', err);
             toast.error('Cancel Failed', { description: getErrorMessage(err) });
             return false;
@@ -1646,6 +1647,10 @@ export default function Home() {
       }
     } catch (err: any) {
       console.error('Matchmaking failed', err);
+      // User dismissed the wallet — stay on the screen that started the tx; no error toast.
+      if (isUserRejectedTransaction(err)) {
+        throw err;
+      }
       const errMsg = getErrorMessage(err);
       toast.error('Matchmaking Error', { description: errMsg });
       setGs((prev) => ({ ...prev, phase: 'lobby' }));
@@ -1657,6 +1662,7 @@ export default function Home() {
           window.location.href = 'https://link.minipay.xyz/add_cash?tokens=USDT';
         }, 1500);
       }
+      throw err;
     }
   }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive, executeOnChainJoin, refetchUsdtBalance]);
 
@@ -1691,6 +1697,7 @@ export default function Home() {
         }
       } catch (err) {
         if (!isMatchAlreadySettledError(err)) {
+          if (isUserRejectedTransaction(err)) return;
           console.error('On-chain cancel failed during setup', err);
           toast.error('Cancel Failed', { description: getErrorMessage(err) });
           return;
@@ -1944,7 +1951,9 @@ export default function Home() {
       }
     } catch (err) {
       console.error('Quit game failed', err);
-      toast.error('Quit failed', { description: getErrorMessage(err) });
+      if (!isUserRejectedTransaction(err)) {
+        toast.error('Quit failed', { description: getErrorMessage(err) });
+      }
     } finally {
       setShowQuitConfirm(false);
       setIsQuitting(false);
@@ -2315,16 +2324,18 @@ export default function Home() {
       await executeJoinGame(gameData);
     } catch (err) {
       console.error('Join failed', err);
-      const errMsg = getErrorMessage(err);
-      if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
-        toast.error('Challenge taken', { description: errMsg });
-      } else {
-        toast.error('Join Error', { description: errMsg });
-      }
-      if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
-        setTimeout(() => {
-          window.location.href = 'https://link.minipay.xyz/add_cash?tokens=USDT';
-        }, 1500);
+      if (!isUserRejectedTransaction(err)) {
+        const errMsg = getErrorMessage(err);
+        if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
+          toast.error('Challenge taken', { description: errMsg });
+        } else {
+          toast.error('Join Error', { description: errMsg });
+        }
+        if (errMsg.toLowerCase().includes('insufficient') || errMsg.toLowerCase().includes('balance')) {
+          setTimeout(() => {
+            window.location.href = 'https://link.minipay.xyz/add_cash?tokens=USDT';
+          }, 1500);
+        }
       }
     } finally {
       setIsJoining(null);
@@ -2342,11 +2353,13 @@ export default function Home() {
       await executeJoinGame(gameData);
     } catch (err) {
       console.error('Paid join failed', err);
-      const errMsg = getErrorMessage(err);
-      if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
-        toast.error('Challenge taken', { description: errMsg });
-      } else {
-        toast.error('Join Error', { description: errMsg });
+      if (!isUserRejectedTransaction(err)) {
+        const errMsg = getErrorMessage(err);
+        if (errMsg.includes('joined first') || errMsg.includes('joining this challenge')) {
+          toast.error('Challenge taken', { description: errMsg });
+        } else {
+          toast.error('Join Error', { description: errMsg });
+        }
       }
     } finally {
       setIsJoining(null);
@@ -2426,7 +2439,11 @@ export default function Home() {
       fetchMyActive();
       void refetchUsdtBalance();
     } catch (err) {
-      toast.error(getErrorMessage(err), { id: toastId });
+      if (isUserRejectedTransaction(err)) {
+        toast.dismiss(toastId);
+      } else {
+        toast.error(getErrorMessage(err), { id: toastId });
+      }
     } finally {
       setIsCancelling(null);
     }
