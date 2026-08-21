@@ -194,13 +194,22 @@ export async function POST(req: NextRequest) {
       }
 
       try {
+        // Recipient of opponent-guess is the other player. On a win, they lost — send
+        // the winner's secret (what they couldn't crack), NOT the code that was cracked
+        // (which is their own).
+        const revealForOpponent = isWin
+          ? (isPlayer1 ? game.player1Code : game.player2Code)
+              ?.split('')
+              .map(Number)
+          : undefined;
+
         await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
           digits,
           clues,
           tileClues,
           sender: normalizedPlayerAddress,
           nextTurnAddress,
-          revealCode: isWin ? opponentCode : undefined,
+          revealCode: revealForOpponent,
           winnerAddress: winner ?? undefined,
         });
       } catch (pusherErr) {

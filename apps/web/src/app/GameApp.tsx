@@ -845,12 +845,19 @@ export default function Home() {
 
           void (async () => {
             try {
+              // Always fetch via /reveal — Pusher used to send the cracked code (your own).
               const res = await fetch('/api/games/reveal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gameId: currentGameId, address: addressRef.current || 'GUEST' }),
               });
               const revealData = await res.json();
+              const revealed =
+                Array.isArray(revealData.opponentCode) && revealData.opponentCode.length > 0
+                  ? revealData.opponentCode
+                  : Array.isArray(data.revealCode)
+                    ? data.revealCode
+                    : [];
               setGs((curr) => ({
                 ...curr,
                 opponentGuesses: newGuesses,
@@ -858,7 +865,7 @@ export default function Home() {
                 result: 'lose',
                 ratingDelta: isRegisteredPlayer(addressRef.current) ? loss : 0,
                 opponentCurrentInput: [],
-                opponentCode: revealData.opponentCode || data.revealCode || [],
+                opponentCode: revealed,
                 isPlayerTurn: false,
               }));
               if (isRegisteredPlayer(addressRef.current)) {
@@ -890,9 +897,11 @@ export default function Home() {
       });
 
       if (data.winnerAddress) {
-        void finalizeGameResult(data.winnerAddress, gsRef.current.gameMode, {
-          opponentCode: data.revealCode,
-        });
+        // Opponent-win path above already reveals + shows result; avoid a second pass
+        // that used to overwrite with the cracked (loser's) code from Pusher.
+        if (!opponentWon) {
+          void finalizeGameResult(data.winnerAddress, gsRef.current.gameMode);
+        }
         return;
       }
 
