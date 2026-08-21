@@ -6,7 +6,7 @@ import { useAccount, useBalance, useReadContract, useWriteContract, usePublicCli
 import { parseUnits } from 'viem';
 import { CONTRACT_ADDRESS, USDT_ADDRESS, ERC20_ABI } from '../../blockchain/constants';
 import { toast } from 'sonner';
-import { getErrorMessage } from '@/lib/errors';
+import { getErrorMessage, isUserRejectedTransaction } from '@/lib/errors';
 import { useMiniAppEnvironment } from '@/hooks/use-mini-app-environment';
 
 const MINIPAY_ADD_USDT_URL = 'https://link.minipay.xyz/add_cash?tokens=USDT';
@@ -100,7 +100,9 @@ export default function JoinStakeModal({
       }
       return true;
     } catch (err) {
-      toast.error('Approval Failed', { description: getErrorMessage(err) });
+      if (!isUserRejectedTransaction(err)) {
+        toast.error('Approval Failed', { description: getErrorMessage(err) });
+      }
       return false;
     }
   };
