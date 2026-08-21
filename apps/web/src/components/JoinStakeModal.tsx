@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAccount, useBalance, useReadContract, useWriteContract, usePublicClient } from 'wagmi';
 import { parseUnits } from 'viem';
@@ -47,7 +47,7 @@ export default function JoinStakeModal({
     }
   }, [stake]);
 
-  const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
+  const { refetch: refetchAllowance } = useReadContract({
     address: USDT_ADDRESS,
     abi: ERC20_ABI,
     functionName: 'allowance',
@@ -55,7 +55,6 @@ export default function JoinStakeModal({
     query: { enabled: !!address && open },
   });
 
-  const allowance = (allowanceData as bigint) ?? 0n;
   const balance = parseFloat(usdtData?.formatted || '0');
   const canAfford = balance >= stake;
 
@@ -63,10 +62,9 @@ export default function JoinStakeModal({
   const [phase, setPhase] = useState<JoinPhase>('idle');
   const busy = phase !== 'idle' || isJoining || isApprovingAction;
 
-  // Reset progress when modal closes so the next open starts clean.
-  if (!open && phase !== 'idle') {
-    setPhase('idle');
-  }
+  useEffect(() => {
+    if (!open) setPhase('idle');
+  }, [open]);
 
   const waitForAllowance = async (needed: bigint): Promise<boolean> => {
     for (let i = 0; i < 25; i++) {

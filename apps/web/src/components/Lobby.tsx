@@ -125,7 +125,7 @@ export default function Lobby({
 
   const publicClient = usePublicClient();
 
-  const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
+  const { data: _allowanceData, refetch: refetchAllowance } = useReadContract({
     address: USDT_ADDRESS,
     abi: ERC20_ABI,
     functionName: 'allowance',
@@ -134,8 +134,6 @@ export default function Lobby({
       enabled: !!walletAddress,
     }
   });
-
-  const allowance = (allowanceData as bigint) ?? 0n;
 
   const cipherStatusPending = isSignedIn && !!payoutAddress && !cipherStatusLoaded;
   const cipherGamesToday = cipherStatus?.gamesPlayedToday ?? 0;
