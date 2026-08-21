@@ -389,27 +389,31 @@ export default function Home() {
 
     try {
       // On-chain first. Never touch Prisma if the wallet cancel was rejected/failed.
+      // Always wait for the receipt — MiniPay writeContractAsync resolves on submit, and the
+      // cancel API will 409 if it still sees Pending (false "on-chain still open" toast).
       if (onChainMatchId) {
         try {
+          if (!publicClient) throw new Error('Public client not available');
+          let txHash: `0x${string}`;
           if (smartWalletClient) {
             const data = encodeFunctionData({
               abi: CONTRACT_ABI,
               functionName: 'cancelChallenge',
               args: [onChainMatchId as `0x${string}`],
             });
-            const txHash = await smartWalletClient.sendTransaction({
+            txHash = (await smartWalletClient.sendTransaction({
               to: CONTRACT_ADDRESS as `0x${string}`,
               data,
               value: BigInt(0),
-            });
-            if (!publicClient) throw new Error('Public client not available');
-            const receipt = await publicClient.waitForTransactionReceipt({
-              hash: txHash as `0x${string}`,
-            });
-            if (receipt.status !== 'success') throw new Error('Cancel transaction failed');
+            })) as `0x${string}`;
           } else {
-            await cancelChallenge(onChainMatchId as `0x${string}`);
+            txHash = await cancelChallenge(onChainMatchId as `0x${string}`);
           }
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash: txHash,
+            confirmations: 1,
+          });
+          if (receipt.status !== 'success') throw new Error('Cancel transaction failed');
         } catch (err) {
           // Already settled on-chain (expired/cancelled) — safe to sync DB.
           if (!isMatchAlreadySettledError(err)) {
@@ -421,21 +425,30 @@ export default function Home() {
         }
       }
 
-      const res = await fetch('/api/games/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameId, address }),
-      });
-      if (!res.ok && res.status !== 404) {
-        const body = await res.json().catch(() => null);
-        toast.error('Cancel Failed', {
-          description: body?.error || 'Could not update challenge status. Try again.',
+      // Retry briefly: Forno can lag behind the cancel receipt and still report Pending.
+      let lastError = 'Could not update challenge status. Try again.';
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const res = await fetch('/api/games/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gameId, address }),
         });
+        if (res.ok || res.status === 404) {
+          setMyActiveGames((prev) => prev.filter((g) => g.id !== gameId));
+          return true;
+        }
+        const body = await res.json().catch(() => null);
+        lastError = body?.error || lastError;
+        if (res.status === 409 || res.status === 503) {
+          await new Promise((r) => setTimeout(r, 400 + attempt * 250));
+          continue;
+        }
+        toast.error('Cancel Failed', { description: lastError });
         return false;
       }
 
-      setMyActiveGames((prev) => prev.filter((g) => g.id !== gameId));
-      return true;
+      toast.error('Cancel Failed', { description: lastError });
+      return false;
     } finally {
       setIsCancelling(null);
     }
@@ -1676,25 +1689,27 @@ export default function Home() {
     } else if (onChainMatchId && isConnected && address) {
       setIsCancelling('pending');
       try {
+        if (!publicClient) throw new Error('Public client not available');
+        let txHash: `0x${string}`;
         if (smartWalletClient) {
           const data = encodeFunctionData({
             abi: CONTRACT_ABI,
             functionName: 'cancelChallenge',
             args: [onChainMatchId as `0x${string}`],
           });
-          const txHash = await smartWalletClient.sendTransaction({
+          txHash = (await smartWalletClient.sendTransaction({
             to: CONTRACT_ADDRESS as `0x${string}`,
             data,
             value: BigInt(0),
-          });
-          if (!publicClient) throw new Error('Public client not available');
-          const receipt = await publicClient.waitForTransactionReceipt({
-            hash: txHash as `0x${string}`,
-          });
-          if (receipt.status !== 'success') throw new Error('Cancel transaction failed');
+          })) as `0x${string}`;
         } else {
-          await cancelChallenge(onChainMatchId as `0x${string}`);
+          txHash = await cancelChallenge(onChainMatchId as `0x${string}`);
         }
+        const receipt = await publicClient.waitForTransactionReceipt({
+          hash: txHash,
+          confirmations: 1,
+        });
+        if (receipt.status !== 'success') throw new Error('Cancel transaction failed');
       } catch (err) {
         if (!isMatchAlreadySettledError(err)) {
           if (isUserRejectedTransaction(err)) return;
@@ -2419,21 +2434,41 @@ export default function Home() {
     try {
       if (onChainMatchId) {
         try {
-          await cancelChallenge(onChainMatchId as `0x${string}`);
+          if (!publicClient) throw new Error('Public client not available');
+          const txHash = await cancelChallenge(onChainMatchId as `0x${string}`);
+          const receipt = await publicClient.waitForTransactionReceipt({
+            hash: txHash,
+            confirmations: 1,
+          });
+          if (receipt.status !== 'success') throw new Error('Cancel transaction failed');
         } catch (err) {
           // Already expired/cancelled on-chain — stake refunded; still sync DB/UI.
           if (!isMatchAlreadySettledError(err)) throw err;
         }
       }
-      const res = await fetch('/api/games/cancel', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ gameId, address }),
-      });
-      if (!res.ok && res.status !== 404) {
+
+      let lastError = 'API cancellation failed';
+      let synced = false;
+      for (let attempt = 0; attempt < 6; attempt++) {
+        const res = await fetch('/api/games/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gameId, address }),
+        });
+        if (res.ok || res.status === 404) {
+          synced = true;
+          break;
+        }
         const body = await res.json().catch(() => null);
-        throw new Error(body?.error || 'API cancellation failed');
+        lastError = body?.error || lastError;
+        if (res.status === 409 || res.status === 503) {
+          await new Promise((r) => setTimeout(r, 400 + attempt * 250));
+          continue;
+        }
+        throw new Error(lastError);
       }
+      if (!synced) throw new Error(lastError);
+
       setMyActiveGames((prev) => prev.filter((g) => g.id !== gameId));
       toast.success('Challenge closed', { id: toastId });
       fetchMyActive();
@@ -2447,7 +2482,7 @@ export default function Home() {
     } finally {
       setIsCancelling(null);
     }
-  }, [address, cancelChallenge, fetchMyActive, refetchUsdtBalance]);
+  }, [address, publicClient, cancelChallenge, fetchMyActive, refetchUsdtBalance]);
 
   const pointsLoading = !!address && !playerStatsLoaded;
 

@@ -259,6 +259,20 @@ export default function Lobby({
     };
   }, [showPvPModal, pvpStep, selectedMode, cashVisibility, walletAddress]);
 
+  // Header balance uses Lobby's own wagmi query — re-pull after stake locks (RPC can lag).
+  useEffect(() => {
+    if (!isMatchmaking || gameMode !== 'cash' || !walletAddress) return;
+    void refetchUsdtBalance();
+    const timers = [800, 2000, 4000].map((ms) =>
+      setTimeout(() => {
+        void refetchUsdtBalance();
+      }, ms),
+    );
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [isMatchmaking, gameMode, pendingStake, walletAddress, refetchUsdtBalance]);
+
   const handleStartPvP = (mode: GameMode) => {
     if (mode === 'cash' && !PROFESSIONAL_MODE_ENABLED) {
       toast.info('Professional mode coming soon', {
@@ -523,8 +537,8 @@ export default function Lobby({
                   <InviteWaiting
                     searchTime={searchTime}
                     onCancel={onCancelMatchmaking}
+                    isCancelling={isCancellingMatchmaking}
                     joinCode={shareableJoinCode}
-                    isCreating={isCreating}
                     onHide={onHideSearch}
                     stakeAmount={pendingStake}
                     isCash={gameMode === 'cash'}
@@ -1289,16 +1303,16 @@ function MatchmakingPulse({
 function InviteWaiting({
   searchTime,
   onCancel,
+  isCancelling = false,
   joinCode,
-  isCreating,
   onHide,
   stakeAmount = 0,
   isCash = false,
 }: {
   searchTime: number,
   onCancel?: () => void,
+  isCancelling?: boolean,
   joinCode: string,
-  isCreating?: boolean,
   onHide?: () => void,
   stakeAmount?: number,
   isCash?: boolean,
@@ -1372,17 +1386,19 @@ function InviteWaiting({
             <button
               type="button"
               onClick={onHide}
-              className="flex-1 rounded-2xl border border-[var(--border-mid)] bg-[var(--bg-elevated)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] transition-all hover:bg-[var(--bg-elevated)]/80"
+              disabled={isCancelling}
+              className="flex-1 rounded-2xl border border-[var(--border-mid)] bg-[var(--bg-elevated)] py-4 text-[10px] font-black uppercase tracking-widest text-[var(--text-dim)] transition-all hover:bg-[var(--bg-elevated)]/80 disabled:opacity-50"
             >
               HIDE
             </button>
           )}
           <button
+            type="button"
             onClick={onCancel}
-            disabled={isCreating}
+            disabled={isCancelling || !onCancel}
             className="flex-1 rounded-2xl border border-red-500/30 bg-red-500/10 py-4 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all hover:bg-red-500/20 disabled:opacity-50"
           >
-            {isCreating ? 'CANCELLING...' : 'CANCEL INVITE'}
+            {isCancelling ? 'Cancelling…' : isCash ? 'Cancel & Refund' : 'Cancel Invite'}
           </button>
         </div>
       </div>
