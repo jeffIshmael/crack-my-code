@@ -845,12 +845,19 @@ export default function Home() {
 
           void (async () => {
             try {
+              // Always fetch via /reveal — Pusher used to send the cracked code (your own).
               const res = await fetch('/api/games/reveal', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ gameId: currentGameId, address: addressRef.current || 'GUEST' }),
               });
               const revealData = await res.json();
+              const revealed =
+                Array.isArray(revealData.opponentCode) && revealData.opponentCode.length > 0
+                  ? revealData.opponentCode
+                  : Array.isArray(data.revealCode)
+                    ? data.revealCode
+                    : [];
               setGs((curr) => ({
                 ...curr,
                 opponentGuesses: newGuesses,
@@ -858,7 +865,7 @@ export default function Home() {
                 result: 'lose',
                 ratingDelta: isRegisteredPlayer(addressRef.current) ? loss : 0,
                 opponentCurrentInput: [],
-                opponentCode: revealData.opponentCode || data.revealCode || [],
+                opponentCode: revealed,
                 isPlayerTurn: false,
               }));
               if (isRegisteredPlayer(addressRef.current)) {
@@ -890,9 +897,11 @@ export default function Home() {
       });
 
       if (data.winnerAddress) {
-        void finalizeGameResult(data.winnerAddress, gsRef.current.gameMode, {
-          opponentCode: data.revealCode,
-        });
+        // Opponent-win path above already reveals + shows result; avoid a second pass
+        // that used to overwrite with the cracked (loser's) code from Pusher.
+        if (!opponentWon) {
+          void finalizeGameResult(data.winnerAddress, gsRef.current.gameMode);
+        }
         return;
       }
 
@@ -1622,7 +1631,9 @@ export default function Home() {
 
       if (!res.ok) {
         if (data.code === 'DAILY_CIPHER_CAP') {
-          throw new Error(data.error || 'Daily Cipher limit reached. See you tomorrow!');
+          const capErr = new Error(data.error || 'Daily Cipher limit reached. See you tomorrow!');
+          (capErr as Error & { code?: string }).code = 'DAILY_CIPHER_CAP';
+          throw capErr;
         }
         throw new Error(data.error || 'Matchmaking failed');
       }
@@ -1656,7 +1667,19 @@ export default function Home() {
         throw err;
       }
       const errMsg = getErrorMessage(err);
-      toast.error('Matchmaking Error', { description: errMsg });
+      const isDailyCap =
+        err?.code === 'DAILY_CIPHER_CAP' ||
+        /daily cipher|see you tomorrow|cipher limit/i.test(errMsg);
+
+      if (isDailyCap) {
+        bumpCipherDaily();
+        toast.info('Free Cipher games finished', {
+          description: 'You’ve used today’s free Cipher games. Come back tomorrow!',
+        });
+      } else {
+        toast.error('Matchmaking Error', { description: errMsg });
+      }
+
       setGs((prev) => ({ ...prev, phase: 'lobby' }));
       setCurrentGameId(null);
       setCurrentOnChainMatchId(null);
@@ -1668,7 +1691,7 @@ export default function Home() {
       }
       throw err;
     }
-  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive, executeOnChainJoin, refetchUsdtBalance]);
+  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive, executeOnChainJoin, refetchUsdtBalance, bumpCipherDaily]);
 
   const handleCancelMatchmaking = useCallback(async (options?: { fromTimeout?: boolean }) => {
     const gameId = currentGameIdRef.current;
@@ -2199,11 +2222,26 @@ export default function Home() {
 
   const handlePlayAgain = useCallback(() => {
     if (gs.gameMode !== 'ai') return;
-    exitResultScreen();
-    setTimeout(() => {
-      handleFindMatch('ai', 0, true);
-    }, 100);
-  }, [gs.gameMode, exitResultScreen, handleFindMatch]);
+
+    // Leave result → set code (skip homepage). Daily cap checked in find-match.
+    if (rematchWaitTimeoutRef.current) {
+      clearTimeout(rematchWaitTimeoutRef.current);
+      rematchWaitTimeoutRef.current = null;
+    }
+    clearOppTimer();
+    clearTurnHandover();
+    setResultStats(null);
+    setLastCipherReward(null);
+    setRematchStatus('idle');
+    setRematchLoading(false);
+    setShareableJoinCode(null);
+    opponentAddressRef.current = null;
+    bumpCipherDaily();
+
+    void handleFindMatch('ai', 0, true).catch(() => {
+      /* find-match already toasts + returns to lobby on failure / daily cap */
+    });
+  }, [gs.gameMode, clearTurnHandover, bumpCipherDaily, handleFindMatch]);
 
   const handleRematch = useCallback(async () => {
     if (!currentGameId || !address || gs.gameMode === 'ai') return;
