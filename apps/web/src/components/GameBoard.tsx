@@ -163,45 +163,7 @@ export default function GameBoard({
             </div>
           )}
 
-          <div className="flex flex-1 flex-col items-end gap-1">
-            {turnSecondsLeft !== null && phase === 'playing' && (
-              <div
-                className="rounded-full px-2.5 py-1 font-orbitron text-[11px] font-black tabular-nums tracking-wide"
-                style={{
-                  background:
-                    turnSecondsLeft <= 15
-                      ? 'rgba(255,107,43,0.2)'
-                      : isPlayerTurn
-                        ? 'rgba(21, 144, 214, 0.18)'
-                        : 'rgba(0,0,0,0.08)',
-                  color:
-                    turnSecondsLeft <= 15
-                      ? 'var(--orange)'
-                      : isPlayerTurn
-                        ? 'var(--cream)'
-                        : 'var(--wood-text)',
-                  border: `1px solid ${
-                    turnSecondsLeft <= 15
-                      ? 'rgba(255,107,43,0.45)'
-                      : 'rgba(255,255,255,0.25)'
-                  }`,
-                }}
-                aria-live="polite"
-                aria-label={
-                  isPlayerTurn
-                    ? `${turnSecondsLeft} seconds left to guess`
-                    : `Opponent has ${turnSecondsLeft} seconds left`
-                }
-              >
-                {turnSecondsLeft <= 0
-                  ? isPlayerTurn
-                    ? 'TIME UP'
-                    : 'FORFEIT…'
-                  : `${Math.floor(turnSecondsLeft / 60)}:${(turnSecondsLeft % 60)
-                      .toString()
-                      .padStart(2, '0')}`}
-              </div>
-            )}
+          <div className="flex flex-1 justify-end">
             <div
               className="rounded-full px-2.5 py-1 font-ui text-[10px] font-bold uppercase tracking-wide"
               style={{
@@ -246,6 +208,7 @@ export default function GameBoard({
           phase={phase}
           maxGuesses={MAX_GUESSES}
           turnLocked={inputLocked}
+          turnSecondsLeft={turnSecondsLeft}
         />
       </div>
 

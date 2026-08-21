@@ -1741,9 +1741,10 @@ body.keyboard-open .theme-shell {
 }
 
 .scoreboard-plaque__header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
+  gap: 0.35rem;
   padding: 0 0.125rem;
   font-family: var(--font-ui);
   font-size: 0.625rem;
@@ -1754,7 +1755,61 @@ body.keyboard-open .theme-shell {
   text-shadow: 0 1px 0 rgba(255, 255, 255, 0.45);
 }
 
+.scoreboard-plaque__header-label {
+  justify-self: start;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scoreboard-plaque__header-timer {
+  justify-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.28rem 0.55rem;
+  border-radius: 999px;
+  font-family: var(--font-orbitron), var(--font-ui), sans-serif;
+  font-size: 0.8125rem;
+  font-weight: 900;
+  letter-spacing: 0.06em;
+  tabular-nums: true;
+  font-variant-numeric: tabular-nums;
+  color: var(--wood-text);
+  background: rgba(255, 255, 255, 0.28);
+  border: 1.5px solid rgba(110, 64, 28, 0.35);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  text-shadow: none;
+  line-height: 1;
+}
+
+.scoreboard-plaque__header-timer-emoji {
+  font-size: 0.95rem;
+  line-height: 1;
+}
+
+.scoreboard-plaque__header-timer--urgent {
+  color: #b42318;
+  background: rgba(255, 107, 43, 0.28);
+  border-color: rgba(180, 35, 24, 0.55);
+  animation: scoreboard-timer-pulse 0.85s ease-in-out infinite;
+}
+
+@keyframes scoreboard-timer-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.06);
+  }
+}
+
 .scoreboard-plaque__header-count {
+  justify-self: end;
   color: var(--wood-text-soft);
   font-size: 0.5625rem;
 }

@@ -16,6 +16,15 @@ interface ScoreboardProps {
   phase: 'playing' | 'countdown' | 'result' | string;
   maxGuesses?: number;
   turnLocked?: boolean;
+  /** PvP turn seconds remaining; shown centered on the wooden header. */
+  turnSecondsLeft?: number | null;
+}
+
+function formatTurnClock(seconds: number): string {
+  if (seconds <= 0) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
 function EmptySlots({ active }: { active?: boolean }) {
@@ -60,6 +69,7 @@ export function Scoreboard({
   phase,
   maxGuesses = MAX_GUESSES,
   turnLocked = false,
+  turnSecondsLeft = null,
 }: ScoreboardProps) {
   const boardLabel = view === 'player' ? 'My Board' : `${opponentName}'s Board`;
   const showOpponentLive =
@@ -68,11 +78,37 @@ export function Scoreboard({
     !isPlayerTurn &&
     (pendingOpponentTileClues !== null ||
       (!turnLocked && opponentCurrentInput.length > 0));
+  const showTimer = turnSecondsLeft !== null && phase === 'playing';
+  const isUrgent = showTimer && turnSecondsLeft <= 15;
 
   return (
     <div className="scoreboard-plaque">
       <div className="scoreboard-plaque__header">
-        <span>{boardLabel}</span>
+        <span className="scoreboard-plaque__header-label">{boardLabel}</span>
+        {showTimer ? (
+          <span
+            className={`scoreboard-plaque__header-timer${isUrgent ? ' scoreboard-plaque__header-timer--urgent' : ''}`}
+            aria-live="polite"
+            aria-label={
+              isPlayerTurn
+                ? `${Math.max(0, turnSecondsLeft)} seconds left to guess`
+                : `Opponent has ${Math.max(0, turnSecondsLeft)} seconds left`
+            }
+          >
+            <span className="scoreboard-plaque__header-timer-emoji" aria-hidden>
+              {isUrgent ? '⚠️' : '⏰'}
+            </span>
+            <span>
+              {turnSecondsLeft <= 0
+                ? isPlayerTurn
+                  ? 'TIME'
+                  : 'WAIT'
+                : formatTurnClock(turnSecondsLeft)}
+            </span>
+          </span>
+        ) : (
+          <span aria-hidden />
+        )}
         <span className="scoreboard-plaque__header-count">
           {guesses.length}/{maxGuesses}
         </span>
