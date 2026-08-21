@@ -125,7 +125,7 @@ export default function Lobby({
 
   const publicClient = usePublicClient();
 
-  const { data: allowanceData, refetch: refetchAllowance } = useReadContract({
+  const { data: _allowanceData, refetch: refetchAllowance } = useReadContract({
     address: USDT_ADDRESS,
     abi: ERC20_ABI,
     functionName: 'allowance',
@@ -134,8 +134,6 @@ export default function Lobby({
       enabled: !!walletAddress,
     }
   });
-
-  const allowance = (allowanceData as bigint) ?? 0n;
 
   const cipherStatusPending = isSignedIn && !!payoutAddress && !cipherStatusLoaded;
   const cipherGamesToday = cipherStatus?.gamesPlayedToday ?? 0;
@@ -149,12 +147,31 @@ export default function Lobby({
 
   const waitForAllowance = async (needed: bigint): Promise<boolean> => {
     for (let i = 0; i < 25; i++) {
-      const result = await refetchAllowance();
-      const value = (result.data as bigint | undefined) ?? 0n;
-      if (value >= needed) return true;
+      const live = await readLiveAllowance();
+      void refetchAllowance();
+      if (live >= needed) return true;
       await new Promise((r) => setTimeout(r, 400));
     }
     return false;
+  };
+
+  /** Fresh on-chain allowance — wagmi cache can still show the pre-create value after transferFrom. */
+  const readLiveAllowance = async (): Promise<bigint> => {
+    if (!walletAddress || !publicClient) {
+      const result = await refetchAllowance();
+      return (result.data as bigint | undefined) ?? 0n;
+    }
+    try {
+      return (await publicClient.readContract({
+        address: USDT_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [walletAddress as `0x${string}`, CONTRACT_ADDRESS as `0x${string}`],
+      })) as bigint;
+    } catch {
+      const result = await refetchAllowance();
+      return (result.data as bigint | undefined) ?? 0n;
+    }
   };
 
   const handleApprove = async (amount: bigint): Promise<boolean> => {
@@ -300,7 +317,10 @@ export default function Lobby({
     }
 
     // Keep modal open so the button stays Approving / Creating (never snaps back to Proceed).
-    if (allowance < stakeBigInt) {
+    // Use live allowance: after a prior createChallenge, transferFrom spent the approval and
+    // refunds do not restore it — wagmi cache often still looks "enough" and skips approve.
+    const liveAllowance = await readLiveAllowance();
+    if (liveAllowance < stakeBigInt) {
       setCashCreatePhase('approving');
       const approved = await handleApprove(stakeBigInt);
       if (!approved) {
@@ -323,7 +343,8 @@ export default function Lobby({
       return;
     }
 
-    if (allowance < stakeBigInt) {
+    const liveAllowance = await readLiveAllowance();
+    if (liveAllowance < stakeBigInt) {
       setCashJoinPhase('approving');
       const approved = await handleApprove(stakeBigInt);
       if (!approved) {

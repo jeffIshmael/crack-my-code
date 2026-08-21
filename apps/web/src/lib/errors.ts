@@ -58,6 +58,15 @@ export function getErrorMessage(error: any): string {
     return 'Insufficient balance for network fees.';
   }
 
+  // Handle ERC20: transfer amount exceeds allowance (stale skip-approve / spent allowance)
+  if (
+    message.includes('transfer amount exceeds allowance') ||
+    message.includes('ERC20: transfer amount exceeds allowance') ||
+    message.includes('exceeds allowance')
+  ) {
+    return 'USDT approval is missing or too low. Tap Proceed again to approve, then create/join.';
+  }
+
   // Handle ERC20: transfer amount exceeds balance (Hex or String)
   // Hex for "ERC20: transfer amount exceeds balance" often appears in AA reverts
   if (
