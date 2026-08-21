@@ -305,6 +305,12 @@ export default function Home() {
   const [showQuitConfirm, setShowQuitConfirm] = useState(false);
   const [isQuitting, setIsQuitting] = useState(false);
   const rematchWaitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  /** ISO deadline from server for the current PvP turn. */
+  const [turnDeadlineAt, setTurnDeadlineAt] = useState<string | null>(null);
+  /** clientNow ≈ serverNow + offsetMs */
+  const serverTimeOffsetMsRef = useRef(0);
+  const claimingTimeoutRef = useRef(false);
+  const [turnSecondsLeft, setTurnSecondsLeft] = useState<number | null>(null);
   const [lastCipherReward, setLastCipherReward] = useState<{
     paid: boolean;
     amount?: number;
@@ -621,6 +627,23 @@ export default function Home() {
     [refreshUserStats, address]
   );
 
+  const applyTurnClock = useCallback((deadlineIso?: string | null, serverNowIso?: string | null) => {
+    if (typeof serverNowIso === 'string') {
+      const serverMs = Date.parse(serverNowIso);
+      if (!Number.isNaN(serverMs)) {
+        serverTimeOffsetMsRef.current = serverMs - Date.now();
+      }
+    }
+    if (deadlineIso === null) {
+      setTurnDeadlineAt(null);
+      setTurnSecondsLeft(null);
+      return;
+    }
+    if (typeof deadlineIso === 'string') {
+      setTurnDeadlineAt(deadlineIso);
+    }
+  }, []);
+
   // ─── Real-time Gameplay Logic ───────────────────────────────────────────
 
   const applySyncPayload = useCallback(
@@ -633,7 +656,13 @@ export default function Home() {
       result?: 'win' | 'lose' | 'draw' | null;
       endedByQuit?: boolean;
       opponentCode?: number[] | null;
+      turnDeadlineAt?: string | null;
+      serverNow?: string | null;
     }) => {
+      if ('turnDeadlineAt' in data || data.serverNow) {
+        applyTurnClock(data.turnDeadlineAt, data.serverNow);
+      }
+
       let pendingStatsSync: number | null = null;
 
       setGs((prev: GameState) => {
@@ -655,6 +684,10 @@ export default function Home() {
                 : null
             : prev.phase === 'result'
               ? prev.quitContext ?? null
+              : null;
+          const forfeitReason =
+            endedByQuit && quitContext
+              ? (prev.forfeitReason ?? 'quit')
               : null;
           const delta =
             data.result === 'win'
@@ -679,6 +712,7 @@ export default function Home() {
             opponentCurrentInput: [],
             currentInput: [],
             quitContext,
+            forfeitReason,
             opponentCode: data.opponentCode ?? prev.opponentCode,
           };
         }
@@ -719,7 +753,7 @@ export default function Home() {
         void syncResultStats(pendingStatsSync);
       }
     },
-    [syncResultStats],
+    [syncResultStats, applyTurnClock],
   );
 
   const syncGameState = useCallback(async () => {
@@ -817,7 +851,13 @@ export default function Home() {
       nextTurnAddress?: string;
       revealCode?: number[];
       winnerAddress?: string;
+      turnDeadlineAt?: string | null;
+      serverNow?: string | null;
     }) => {
+      if ('turnDeadlineAt' in data || data.serverNow) {
+        applyTurnClock(data.turnDeadlineAt ?? null, data.serverNow);
+      }
+
       const myAddress = addressRef.current?.toLowerCase();
       if (!myAddress || data.sender?.toLowerCase() === myAddress) return;
 
@@ -910,8 +950,14 @@ export default function Home() {
       }
     };
 
-    const onGameStarted = () => {
+    const onGameStarted = (data?: {
+      turnDeadlineAt?: string | null;
+      serverNow?: string | null;
+    }) => {
       setIsWaiting(false);
+      if (data && ('turnDeadlineAt' in data || data.serverNow)) {
+        applyTurnClock(data.turnDeadlineAt ?? null, data.serverNow);
+      }
       setGs((prev: GameState): GameState => ({ ...prev, phase: 'countdown' }));
     };
 
@@ -921,25 +967,31 @@ export default function Home() {
       quitterAddress?: string;
       opponentCode?: number[] | null;
     }) => {
-      if (data.reason !== 'quit') return;
+      if (data.reason !== 'quit' && data.reason !== 'timeout') return;
 
       const myAddress = addressRef.current?.toLowerCase();
       if (!myAddress) return;
       // Quitter already applies local result in handleQuitGame.
-      if (data.quitterAddress?.toLowerCase() === myAddress) return;
+      if (data.reason === 'quit' && data.quitterAddress?.toLowerCase() === myAddress) return;
 
       const isWin = data.winnerAddress?.toLowerCase() === myAddress;
       const quitContext = isWin ? 'opponent' : 'player';
+      const forfeitReason = data.reason === 'timeout' ? 'timeout' : 'quit';
       const mode = gsRef.current.gameMode === 'ai' ? 'ai' : gsRef.current.gameMode;
       const delta = scoreDeltaForMode(mode, isWin);
       const wasAlreadyResult = gsRef.current.phase === 'result';
 
-      // Always apply quitContext — even if we already entered result without it
-      // (e.g. sync race before endedByQuit was available).
+      applyTurnClock(null);
+
       setGs((prev: GameState) => {
-        if (prev.phase === 'result' && prev.quitContext === quitContext && prev.result === (isWin ? 'win' : 'lose')) {
+        if (
+          prev.phase === 'result' &&
+          prev.quitContext === quitContext &&
+          prev.result === (isWin ? 'win' : 'lose')
+        ) {
           return {
             ...prev,
+            forfeitReason: prev.forfeitReason ?? forfeitReason,
             opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
           };
         }
@@ -948,6 +1000,7 @@ export default function Home() {
           phase: 'result',
           result: isWin ? 'win' : 'lose',
           quitContext,
+          forfeitReason,
           ratingDelta: isRegisteredPlayer(myAddress) ? delta : 0,
           currentInput: [],
           opponentCurrentInput: [],
@@ -973,7 +1026,7 @@ export default function Home() {
       channel.unbind('match-ended', onMatchEnded);
       pusherClient.unsubscribe(channelName);
     };
-  }, [currentGameId, gs.gameMode, syncResultStats, scheduleTurnHandover, finalizeGameResult]);
+  }, [currentGameId, gs.gameMode, syncResultStats, scheduleTurnHandover, finalizeGameResult, applyTurnClock]);
 
   // Poll server turn state during PvP — backup when Pusher events are missed
   useEffect(() => {
@@ -989,6 +1042,116 @@ export default function Home() {
     if (gs.phase !== 'playing' || !currentGameId || gs.gameMode === 'ai' || !address) return;
     syncGameState();
   }, [gs.phase, currentGameId, gs.gameMode, address, syncGameState]);
+
+  // PvP turn countdown (server-authoritative deadline, local display).
+  useEffect(() => {
+    if (gs.phase !== 'playing' || gs.gameMode === 'ai' || !turnDeadlineAt) {
+      setTurnSecondsLeft(null);
+      return;
+    }
+    const tick = () => {
+      const deadlineMs = Date.parse(turnDeadlineAt);
+      if (Number.isNaN(deadlineMs)) {
+        setTurnSecondsLeft(null);
+        return;
+      }
+      const serverAlignedNow = Date.now() + serverTimeOffsetMsRef.current;
+      setTurnSecondsLeft(Math.max(0, Math.ceil((deadlineMs - serverAlignedNow) / 1000)));
+    };
+    tick();
+    const id = window.setInterval(tick, 250);
+    return () => window.clearInterval(id);
+  }, [gs.phase, gs.gameMode, turnDeadlineAt]);
+
+  const claimTurnTimeout = useCallback(async (): Promise<'ok' | 'too_early' | 'fail'> => {
+    if (claimingTimeoutRef.current) return 'fail';
+    const gameId = currentGameIdRef.current;
+    const playerAddress = addressRef.current;
+    if (!gameId || !playerAddress) return 'fail';
+    if (gsRef.current.phase !== 'playing' || gsRef.current.gameMode === 'ai') return 'fail';
+
+    claimingTimeoutRef.current = true;
+    try {
+      const res = await fetch('/api/games/claim-timeout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ gameId, address: playerAddress }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.status === 425) {
+        if (data?.turnDeadlineAt || data?.serverNow) {
+          applyTurnClock(data.turnDeadlineAt, data.serverNow);
+        }
+        return 'too_early';
+      }
+      if (!res.ok || !data?.success) return 'fail';
+
+      // Idempotent: already settled (or we just settled).
+      const myAddr = playerAddress.toLowerCase();
+      const winnerAddr = typeof data.winnerAddress === 'string' ? data.winnerAddress.toLowerCase() : '';
+      if (!winnerAddr) return 'ok';
+
+      const isWin = winnerAddr === myAddr;
+      const wasPlaying = gsRef.current.phase === 'playing';
+      const delta = scoreDeltaForMode(gsRef.current.gameMode === 'cash' ? 'cash' : 'fun', isWin);
+      const quitContext = isWin ? 'opponent' : 'player';
+
+      applyTurnClock(null);
+      setGs((prev: GameState) => {
+        if (prev.phase === 'result') {
+          return {
+            ...prev,
+            forfeitReason: prev.forfeitReason ?? 'timeout',
+            quitContext: prev.quitContext ?? quitContext,
+            opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
+          };
+        }
+        return {
+          ...prev,
+          phase: 'result',
+          result: isWin ? 'win' : 'lose',
+          quitContext,
+          forfeitReason: 'timeout',
+          ratingDelta: isRegisteredPlayer(playerAddress) ? delta : 0,
+          currentInput: [],
+          opponentCurrentInput: [],
+          isPlayerTurn: false,
+          opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
+        };
+      });
+      if (wasPlaying && isRegisteredPlayer(playerAddress)) {
+        void syncResultStats(delta);
+      }
+      return 'ok';
+    } catch (err) {
+      console.error('Claim turn timeout failed', err);
+      return 'fail';
+    } finally {
+      claimingTimeoutRef.current = false;
+    }
+  }, [applyTurnClock, syncResultStats]);
+
+  // Auto-claim after deadline; retry through server grace (425).
+  useEffect(() => {
+    if (gs.phase !== 'playing' || gs.gameMode === 'ai' || !turnDeadlineAt) return;
+    if (turnSecondsLeft === null || turnSecondsLeft > 0) return;
+
+    let cancelled = false;
+    const attempt = () => {
+      if (cancelled || gsRef.current.phase !== 'playing') return;
+      void claimTurnTimeout().then((status) => {
+        if (cancelled || gsRef.current.phase !== 'playing') return;
+        if (status === 'too_early' || status === 'fail') {
+          window.setTimeout(attempt, 1000);
+        }
+      });
+    };
+    const t = window.setTimeout(attempt, 500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [gs.phase, gs.gameMode, turnDeadlineAt, turnSecondsLeft, claimTurnTimeout]);
 
   // PvP: show turn banner only when the turn actually flips (not after each guess)
   useEffect(() => {
@@ -1201,6 +1364,7 @@ export default function Home() {
     setRematchStatus('idle');
     setRematchLoading(false);
     clearTurnHandover();
+    applyTurnClock(null);
     const isAIMatch = opponentAddress === 'AI_BOT' || opponentAddress === 'AI';
     if (!isAIMatch) {
       opponentAddressRef.current = opponentAddress.toLowerCase();
@@ -1234,6 +1398,7 @@ export default function Home() {
         timeLeft: GAME_DURATION,
         result: null,
         quitContext: null,
+        forfeitReason: null,
         ratingDelta: null,
       };
     });
@@ -1249,7 +1414,7 @@ export default function Home() {
         });
       });
     }
-  }, [clearTurnHandover]);
+  }, [clearTurnHandover, applyTurnClock]);
 
   // User channel: match-found
   useEffect(() => {
@@ -1963,12 +2128,14 @@ export default function Home() {
       const quitContext =
         endedByQuit && !isDraw ? (isWin ? 'opponent' : 'player') : null;
 
+      applyTurnClock(null);
       setGs((prev: GameState) => ({
         ...prev,
         phase: 'result',
         result,
         ratingDelta: isRegisteredPlayer(playerAddress) ? delta : 0,
         quitContext,
+        forfeitReason: quitContext ? 'quit' : null,
         currentInput: [],
         opponentCode: Array.isArray(data.opponentCode) ? data.opponentCode : prev.opponentCode,
       }));
@@ -1999,6 +2166,7 @@ export default function Home() {
     writeContractAsync,
     clearTurnHandover,
     syncResultStats,
+    applyTurnClock,
   ]);
 
   // ─── Phase: SetCode → Playing ─────────────────────────────────────────────
@@ -2076,6 +2244,12 @@ export default function Home() {
         const data = await res.json();
 
         if (data.success) {
+          if ('turnDeadlineAt' in data || data.serverNow) {
+            applyTurnClock(
+              data.turnDeadlineAt ?? null,
+              typeof data.serverNow === 'string' ? data.serverNow : null,
+            );
+          }
           const clues = data.clues as Clue[];
           const tileClues = data.tileClues as TileClue[] | undefined;
           const won = isWinningClues(clues);
@@ -2171,7 +2345,7 @@ export default function Home() {
       setIsSubmitting(false);
       isSubmittingRef.current = false;
     }
-  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, finalizeGameResult, emitTyping]);
+  }, [gs, currentGameId, isSignedIn, payoutAddress, isSubmitting, syncResultStats, scheduleTurnHandover, finalizeGameResult, emitTyping, applyTurnClock]);
 
   // ─── Number pad: add / remove digit ──────────────────────────────────────
 
@@ -2656,6 +2830,7 @@ export default function Home() {
           isAI={gs.gameMode === 'ai'}
           stakeAmount={gs.gameMode === 'cash' ? gs.stakeAmount : 0}
           phase={gs.phase}
+          turnSecondsLeft={gs.gameMode === 'ai' ? null : turnSecondsLeft}
         />
 
         <AnimatePresence>
@@ -2687,6 +2862,7 @@ export default function Home() {
             <ResultModal
               result={gs.result}
               quitContext={gs.quitContext ?? null}
+              forfeitReason={gs.forfeitReason ?? null}
               gameMode={gs.gameMode}
               stakeAmount={gs.stakeAmount}
               opponentCode={gs.opponentCode}

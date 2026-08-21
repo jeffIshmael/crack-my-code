@@ -117,6 +117,8 @@ export async function GET(req: NextRequest) {
       result,
       endedByQuit,
       opponentCode,
+      turnDeadlineAt: game.turnDeadlineAt?.toISOString() ?? null,
+      serverNow: new Date().toISOString(),
     });
   } catch (error) {
     console.error('Game sync error:', error);

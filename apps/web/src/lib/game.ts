@@ -34,8 +34,10 @@ export interface GameState {
   isPlayerTurn: boolean;
   timeLeft: number;              // seconds (if timer used, currently static)
   result: GameResult;
-  /** Only set for quit-ends so we can display correct copy in the result modal. */
+  /** Only set for quit/timeout ends so we can display correct copy in the result modal. */
   quitContext?: 'player' | 'opponent' | null;
+  /** Distinguishes voluntary quit vs turn-timer forfeit (same win/lose outcome). */
+  forfeitReason?: 'quit' | 'timeout' | null;
   playerRating: number;
   playerPoints: number;
   ratingDelta: number | null;
@@ -44,7 +46,7 @@ export interface GameState {
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
-export const GAME_DURATION = 60;            // seconds per match
+export const GAME_DURATION = 60;            // seconds per PvP turn
 export const MAX_GUESSES = 6;
 /** Max Cipher AI matches per signed-in wallet per UTC day */
 export const CIPHER_DAILY_WIN_CAP = 5;
@@ -259,6 +261,7 @@ export function initialGameState(points = 1000, mode: GameMode = 'fun', stake = 
     timeLeft: GAME_DURATION,
     result: null,
     quitContext: null,
+    forfeitReason: null,
     playerRating: points,
     playerPoints: points,
     ratingDelta: null,

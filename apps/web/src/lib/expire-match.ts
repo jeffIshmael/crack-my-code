@@ -21,6 +21,8 @@ export function isMatchAlreadySettledError(err: unknown): boolean {
   return (
     msg.includes('match not pending') ||
     msg.includes('match already started') ||
-    msg.includes('match not found')
+    msg.includes('match not found') ||
+    msg.includes('match not active') ||
+    msg.includes('already') && msg.includes('abandon')
   );
 }

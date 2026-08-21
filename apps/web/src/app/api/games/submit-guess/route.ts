@@ -11,6 +11,7 @@ import { uploadToIPFS } from '@/lib/pinata';
 import { isRegisteredPlayer } from '@/lib/guest';
 import { findUserByAddress } from '@/lib/user-address';
 import { getNextTurnAddress } from '@/lib/turn';
+import { nextTurnDeadline, isTurnDeadlineClaimable } from '@/lib/turn-deadline';
 
 export type CipherRewardPayload =
   | { paid: true; amount: number; txHash: string }
@@ -82,6 +83,15 @@ export async function POST(req: NextRequest) {
       ) {
         return NextResponse.json({ error: 'Not your turn' }, { status: 403 });
       }
+
+      // Once the turn is claimable as a timeout, reject — claim-timeout owns settlement.
+      const deadline = (game as { turnDeadlineAt?: Date | null }).turnDeadlineAt;
+      if (deadline && isTurnDeadlineClaimable(deadline)) {
+        return NextResponse.json(
+          { error: 'Turn timer expired. The match may be forfeited.' },
+          { status: 409 },
+        );
+      }
     }
 
     // Save guess to DB
@@ -119,7 +129,11 @@ export async function POST(req: NextRequest) {
       winner = normalizedPlayerAddress;
       await prisma.game.update({
         where: { id: gameId },
-        data: { status: 'COMPLETED', winnerAddress: normalizedPlayerAddress }
+        data: {
+          status: 'COMPLETED',
+          winnerAddress: normalizedPlayerAddress,
+          turnDeadlineAt: null,
+        },
       });
 
       const isAI = game.mode === 'ai';
@@ -211,6 +225,8 @@ export async function POST(req: NextRequest) {
           nextTurnAddress,
           revealCode: revealForOpponent,
           winnerAddress: winner ?? undefined,
+          turnDeadlineAt: null,
+          serverNow: new Date().toISOString(),
         });
       } catch (pusherErr) {
         console.error('[Pusher] opponent-guess failed:', pusherErr);
@@ -226,7 +242,7 @@ export async function POST(req: NextRequest) {
         if (isAI) {
           await prisma.game.update({
             where: { id: gameId },
-            data: { status: 'COMPLETED', winnerAddress: 'AI' },
+            data: { status: 'COMPLETED', winnerAddress: 'AI', turnDeadlineAt: null },
           });
           winner = 'AI';
         } else {
@@ -236,7 +252,7 @@ export async function POST(req: NextRequest) {
           if (opponentGuessCount >= guessLimit) {
             await prisma.game.update({
               where: { id: gameId },
-              data: { status: 'COMPLETED', winnerAddress: 'DRAW' },
+              data: { status: 'COMPLETED', winnerAddress: 'DRAW', turnDeadlineAt: null },
             });
             winner = 'DRAW';
 
@@ -288,6 +304,20 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // PvP: refresh turn deadline while the match stays active.
+    let turnDeadlineAtIso: string | null = null;
+    const gameEndedEarly = isWin || winner !== null;
+    if (game.mode !== 'ai' && !gameEndedEarly) {
+      const refreshed = nextTurnDeadline();
+      await prisma.game.update({
+        where: { id: gameId },
+        data: { turnDeadlineAt: refreshed },
+      });
+      turnDeadlineAtIso = refreshed.toISOString();
+    }
+
+    const serverNowIso = new Date().toISOString();
+
     if (!isWin) {
       try {
         await pusherServer.trigger(`private-game-${gameId}`, 'opponent-guess', {
@@ -297,6 +327,8 @@ export async function POST(req: NextRequest) {
           sender: normalizedPlayerAddress,
           nextTurnAddress,
           winnerAddress: winner ?? undefined,
+          turnDeadlineAt: turnDeadlineAtIso,
+          serverNow: serverNowIso,
         });
       } catch (pusherErr) {
         console.error('[Pusher] opponent-guess failed:', pusherErr);
@@ -322,6 +354,8 @@ export async function POST(req: NextRequest) {
       cipherReward,
       isYourTurn: false,
       nextTurnAddress,
+      turnDeadlineAt: turnDeadlineAtIso,
+      serverNow: serverNowIso,
     });
   } catch (error) {
     console.error('Submit guess error:', error);
