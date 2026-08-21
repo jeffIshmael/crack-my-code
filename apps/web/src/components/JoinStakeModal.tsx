@@ -70,12 +70,31 @@ export default function JoinStakeModal({
 
   const waitForAllowance = async (needed: bigint): Promise<boolean> => {
     for (let i = 0; i < 25; i++) {
-      const result = await refetchAllowance();
-      const value = (result.data as bigint | undefined) ?? 0n;
-      if (value >= needed) return true;
+      const live = await readLiveAllowance();
+      void refetchAllowance();
+      if (live >= needed) return true;
       await new Promise((r) => setTimeout(r, 400));
     }
     return false;
+  };
+
+  /** Fresh on-chain allowance — avoids skipping approve after a prior stake transferFrom. */
+  const readLiveAllowance = async (): Promise<bigint> => {
+    if (!address || !publicClient) {
+      const result = await refetchAllowance();
+      return (result.data as bigint | undefined) ?? 0n;
+    }
+    try {
+      return (await publicClient.readContract({
+        address: USDT_ADDRESS,
+        abi: ERC20_ABI,
+        functionName: 'allowance',
+        args: [address, CONTRACT_ADDRESS as `0x${string}`],
+      })) as bigint;
+    } catch {
+      const result = await refetchAllowance();
+      return (result.data as bigint | undefined) ?? 0n;
+    }
   };
 
   const handleApprove = async (amount: bigint): Promise<boolean> => {
@@ -111,7 +130,8 @@ export default function JoinStakeModal({
     if (!canAfford || busy) return;
 
     // Continuous: Approve USDT (if needed) → joinChallenge. One Proceed, no button flip.
-    if (allowance < stakeBigInt) {
+    const liveAllowance = await readLiveAllowance();
+    if (liveAllowance < stakeBigInt) {
       setPhase('approving');
       const ok = await handleApprove(stakeBigInt);
       if (!ok) {
