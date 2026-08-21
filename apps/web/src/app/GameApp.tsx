@@ -1512,16 +1512,7 @@ export default function Home() {
     }
 
     setSearchTime(0);
-    // Cipher can show matchmaking immediately (no createChallenge). PvP waits for on-chain success.
-    if (mode === 'ai') {
-      setGs((curr) => ({
-        ...curr,
-        phase: 'matchmaking',
-        gameMode: mode,
-        stakeAmount: 0,
-        opponentName: 'Cipher',
-      }));
-    }
+    // PvP waits for on-chain success before matchmaking UI. Cipher goes straight to setCode.
 
     const effectiveAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
     setCurrentGameId(null);
@@ -2887,7 +2878,7 @@ export default function Home() {
     </motion.div>
   );
 
-  const showBottomNav = splashResolved && !showSplash && (gs.phase === 'lobby' || (gs.phase === 'matchmaking' && gs.gameMode === 'ai'));
+  const showBottomNav = splashResolved && !showSplash && gs.phase === 'lobby';
   const contentHidden = !splashResolved || showSplash;
 
   return (
