@@ -1512,7 +1512,19 @@ export default function Home() {
     }
 
     setSearchTime(0);
-    // PvP waits for on-chain success before matchmaking UI. Cipher goes straight to setCode.
+    // Cipher: show "Getting Cipher ready" while find-match runs (no artificial delay).
+    // PvP waits for on-chain success before matchmaking UI.
+    if (mode === 'ai') {
+      setGs((curr) => ({
+        ...curr,
+        phase: 'matchmaking',
+        gameMode: mode,
+        stakeAmount: 0,
+        opponentName: 'Cipher',
+        result: null,
+        quitContext: null,
+      }));
+    }
 
     const effectiveAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
     setCurrentGameId(null);
@@ -1622,7 +1634,9 @@ export default function Home() {
 
       if (!res.ok) {
         if (data.code === 'DAILY_CIPHER_CAP') {
-          throw new Error(data.error || 'Daily Cipher limit reached. See you tomorrow!');
+          const capErr = new Error(data.error || 'Daily Cipher limit reached. See you tomorrow!');
+          (capErr as Error & { code?: string }).code = 'DAILY_CIPHER_CAP';
+          throw capErr;
         }
         throw new Error(data.error || 'Matchmaking failed');
       }
@@ -1656,7 +1670,19 @@ export default function Home() {
         throw err;
       }
       const errMsg = getErrorMessage(err);
-      toast.error('Matchmaking Error', { description: errMsg });
+      const isDailyCap =
+        err?.code === 'DAILY_CIPHER_CAP' ||
+        /daily cipher|see you tomorrow|cipher limit/i.test(errMsg);
+
+      if (isDailyCap) {
+        bumpCipherDaily();
+        toast.info('Free Cipher games finished', {
+          description: 'You’ve used today’s free Cipher games. Come back tomorrow!',
+        });
+      } else {
+        toast.error('Matchmaking Error', { description: errMsg });
+      }
+
       setGs((prev) => ({ ...prev, phase: 'lobby' }));
       setCurrentGameId(null);
       setCurrentOnChainMatchId(null);
@@ -1668,7 +1694,7 @@ export default function Home() {
       }
       throw err;
     }
-  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive, executeOnChainJoin, refetchUsdtBalance]);
+  }, [isSignedIn, payoutAddress, smartWalletAddress, txAddress, isConnected, smartWalletClient, publicClient, writeContractAsync, handleMatchFound, fetchMyActive, executeOnChainJoin, refetchUsdtBalance, bumpCipherDaily]);
 
   const handleCancelMatchmaking = useCallback(async (options?: { fromTimeout?: boolean }) => {
     const gameId = currentGameIdRef.current;
@@ -2199,11 +2225,27 @@ export default function Home() {
 
   const handlePlayAgain = useCallback(() => {
     if (gs.gameMode !== 'ai') return;
-    exitResultScreen();
-    setTimeout(() => {
-      handleFindMatch('ai', 0, true);
-    }, 100);
-  }, [gs.gameMode, exitResultScreen, handleFindMatch]);
+
+    // Leave the result modal → Getting Cipher ready → set code (skip homepage).
+    // Daily cap is checked in find-match; if hit, that path returns to lobby + toast.
+    if (rematchWaitTimeoutRef.current) {
+      clearTimeout(rematchWaitTimeoutRef.current);
+      rematchWaitTimeoutRef.current = null;
+    }
+    clearOppTimer();
+    clearTurnHandover();
+    setResultStats(null);
+    setLastCipherReward(null);
+    setRematchStatus('idle');
+    setRematchLoading(false);
+    setShareableJoinCode(null);
+    opponentAddressRef.current = null;
+    bumpCipherDaily();
+
+    void handleFindMatch('ai', 0, true).catch(() => {
+      /* find-match already toasts + returns to lobby on failure / daily cap */
+    });
+  }, [gs.gameMode, clearTurnHandover, bumpCipherDaily, handleFindMatch]);
 
   const handleRematch = useCallback(async () => {
     if (!currentGameId || !address || gs.gameMode === 'ai') return;
@@ -2878,7 +2920,7 @@ export default function Home() {
     </motion.div>
   );
 
-  const showBottomNav = splashResolved && !showSplash && gs.phase === 'lobby';
+  const showBottomNav = splashResolved && !showSplash && (gs.phase === 'lobby' || (gs.phase === 'matchmaking' && gs.gameMode === 'ai'));
   const contentHidden = !splashResolved || showSplash;
 
   return (

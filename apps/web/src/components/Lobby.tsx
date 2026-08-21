@@ -1236,7 +1236,7 @@ function MatchmakingPulse({
       {/* Status text + countdown */}
       <div className="flex flex-col items-center gap-3 text-center">
         <h3 className="font-orbitron text-base font-black tracking-widest uppercase" style={{ color: accent }}>
-          {isAI ? 'Initializing AI' : isCash ? 'Professional Match' : 'Finding Opponent'}
+          {isAI ? 'Getting Cipher ready' : isCash ? 'Professional Match' : 'Finding Opponent'}
         </h3>
 
         {isCash && stakeAmount > 0 && (
@@ -1256,7 +1256,7 @@ function MatchmakingPulse({
           transition={{ duration: 1.6, repeat: Infinity }}
         >
           {isAI
-            ? 'Booting logical engine…'
+            ? 'Almost there…'
             : isCash
               ? 'Waiting for a challenger to match your stake…'
               : 'Scanning for challengers…'}
