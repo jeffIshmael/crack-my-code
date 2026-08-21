@@ -67,6 +67,13 @@ export function getErrorMessage(error: any): string {
     return 'USDT approval is missing or too low. Tap Proceed again to approve, then create/join.';
   }
 
+  if (
+    message.includes('on-chain challenge is still open') ||
+    message.includes('complete the wallet cancel first')
+  ) {
+    return 'Waiting for the cancel transaction to confirm. Try again in a moment.';
+  }
+
   // Handle ERC20: transfer amount exceeds balance (Hex or String)
   // Hex for "ERC20: transfer amount exceeds balance" often appears in AA reverts
   if (
