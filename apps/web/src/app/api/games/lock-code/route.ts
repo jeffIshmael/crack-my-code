@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma';
 
 export const dynamic = 'force-dynamic';
 import { pusherServer } from '@/lib/pusher-server';
+import { nextTurnDeadline } from '@/lib/turn-deadline';
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest) {
     const normalizedAddress = address === 'GUEST' ? 'GUEST' : address.toLowerCase();
 
     const game = await prisma.game.findUnique({
-      where: { id: gameId }
+      where: { id: gameId },
     });
 
     if (!game) {
@@ -29,30 +30,36 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Not a player in this game' }, { status: 403 });
     }
 
-    const updateData: any = {};
+    const updateData: { player1Code?: string; player2Code?: string } = {};
     if (isPlayer1) updateData.player1Code = code;
     else updateData.player2Code = code;
 
     const updatedGame = await prisma.game.update({
       where: { id: gameId },
-      data: updateData
+      data: updateData,
     });
 
-    // Check if both codes are set
     if (updatedGame.player1Code && updatedGame.player2Code) {
-       await prisma.game.update({
-         where: { id: gameId },
-         data: { status: 'ACTIVE' }
-       });
+      const isPvP = updatedGame.mode !== 'ai';
+      const turnDeadlineAt = isPvP ? nextTurnDeadline() : null;
 
-       // Notify both players that the game has started
-       await pusherServer.trigger(`private-game-${gameId}`, 'game-started', {
-         status: 'ACTIVE'
-       });
+      await prisma.game.update({
+        where: { id: gameId },
+        data: {
+          status: 'ACTIVE',
+          turnDeadlineAt,
+        },
+      });
+
+      const serverNow = new Date();
+      await pusherServer.trigger(`private-game-${gameId}`, 'game-started', {
+        status: 'ACTIVE',
+        turnDeadlineAt: turnDeadlineAt?.toISOString() ?? null,
+        serverNow: serverNow.toISOString(),
+      });
     }
 
     return NextResponse.json({ success: true });
-
   } catch (error) {
     console.error('Lock code error:', error);
     return NextResponse.json({ error: 'Failed to lock code' }, { status: 500 });

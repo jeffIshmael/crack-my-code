@@ -6,8 +6,10 @@ import type { GameMode, GameResult } from '@/lib/game';
 
 interface ResultModalProps {
   result: GameResult;
-  /** When a match ends because someone quit, we show the correct copy. */
+  /** When a match ends because someone quit or timed out, we show the correct copy. */
   quitContext?: 'player' | 'opponent' | null;
+  /** Distinguishes voluntary quit vs turn-timer forfeit. */
+  forfeitReason?: 'quit' | 'timeout' | null;
   gameMode: GameMode;
   stakeAmount: number;
   opponentCode: number[];
@@ -55,6 +57,7 @@ function cipherRewardMessage(reason?: string): string {
 export default function ResultModal({
   result,
   quitContext = null,
+  forfeitReason = null,
   gameMode,
   stakeAmount,
   opponentCode,
@@ -75,6 +78,7 @@ export default function ResultModal({
 }: ResultModalProps) {
   const isWin = result === 'win';
   const isDraw = result === 'draw';
+  const isTimeout = forfeitReason === 'timeout';
   const isQuitWin = isWin && quitContext === 'opponent';
   const isQuitLose = !isDraw && !isQuitWin && result === 'lose' && quitContext === 'player';
   const prizePool = stakeAmount * 2;
@@ -85,6 +89,34 @@ export default function ResultModal({
 
   const accentColor = isWin ? 'var(--clue-green)' : isDraw ? '#D97706' : 'var(--orange)';
   const accentBg = isWin ? 'var(--clue-green-bg)' : isDraw ? 'rgba(217,119,6,0.12)' : 'var(--orange-dim)';
+
+  const title = isWin
+    ? isQuitWin
+      ? isTimeout
+        ? 'OPPONENT TIMED OUT'
+        : 'OPPONENT QUIT'
+      : 'CODE CRACKED'
+    : isDraw
+      ? "IT'S A DRAW"
+      : isQuitLose
+        ? isTimeout
+          ? 'TIME RAN OUT'
+          : 'YOU QUIT'
+        : 'DEFEATED';
+
+  const subtitle = isWin
+    ? isQuitWin
+      ? isTimeout
+        ? `${opponentName} ran out of time — you win!`
+        : `${opponentName} quit the match — you win!`
+      : `You broke ${opponentName}'s code in ${guessCount} guess${guessCount !== 1 ? 'es' : ''}!`
+    : isDraw
+      ? `Neither you nor ${opponentName} cracked the code. Well played!`
+      : isQuitLose
+        ? isTimeout
+          ? 'You ran out of time — forfeit.'
+          : `You quit — ${opponentName} won.`
+        : `${opponentName} held their code this time.`;
 
   return (
     <motion.div
@@ -198,18 +230,10 @@ export default function ResultModal({
           >
             <h2 className="font-orbitron text-2xl font-black tracking-widest sm:text-3xl"
               style={{ color: accentColor }}>
-              {isWin ? (isQuitWin ? 'OPPONENT QUIT' : 'CODE CRACKED') : isDraw ? "IT'S A DRAW" : isQuitLose ? 'YOU QUIT' : 'DEFEATED'}
+              {title}
             </h2>
             <p className="font-body text-sm text-[var(--wood-text-soft)]">
-              {isWin
-                ? isQuitWin
-                  ? `${opponentName} quit the match — you win!`
-                  : `You broke ${opponentName}'s code in ${guessCount} guess${guessCount !== 1 ? 'es' : ''}!`
-                : isDraw
-                  ? `Neither you nor ${opponentName} cracked the code. Well played!`
-                  : isQuitLose
-                    ? `You quit — ${opponentName} won.`
-                    : `${opponentName} held their code this time.`}
+              {subtitle}
             </p>
 
             {gameMode === 'cash' && isWin && (
@@ -217,9 +241,14 @@ export default function ResultModal({
                 Congratulations — you won {formatUsdt(winnings)} USDT!
               </p>
             )}
-            {isQuitWin && (
+            {isQuitWin && !isTimeout && (
               <p className="font-body text-xs text-[var(--wood-text-soft)]">
                 You didn&apos;t need to crack their code — they left while you were still playing.
+              </p>
+            )}
+            {isQuitWin && isTimeout && (
+              <p className="font-body text-xs text-[var(--wood-text-soft)]">
+                Each turn has a 60-second limit. They ran out of time on their turn.
               </p>
             )}
           </motion.div>
