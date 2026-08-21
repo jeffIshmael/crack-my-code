@@ -1512,19 +1512,7 @@ export default function Home() {
     }
 
     setSearchTime(0);
-    // Cipher: show "Getting Cipher ready" while find-match runs (no artificial delay).
-    // PvP waits for on-chain success before matchmaking UI.
-    if (mode === 'ai') {
-      setGs((curr) => ({
-        ...curr,
-        phase: 'matchmaking',
-        gameMode: mode,
-        stakeAmount: 0,
-        opponentName: 'Cipher',
-        result: null,
-        quitContext: null,
-      }));
-    }
+    // PvP waits for on-chain success before matchmaking UI. Cipher goes straight to setCode.
 
     const effectiveAddress = isSignedIn && payoutAddress ? payoutAddress : 'GUEST';
     setCurrentGameId(null);
@@ -2226,8 +2214,7 @@ export default function Home() {
   const handlePlayAgain = useCallback(() => {
     if (gs.gameMode !== 'ai') return;
 
-    // Leave the result modal → Getting Cipher ready → set code (skip homepage).
-    // Daily cap is checked in find-match; if hit, that path returns to lobby + toast.
+    // Leave result → set code (skip homepage). Daily cap checked in find-match.
     if (rematchWaitTimeoutRef.current) {
       clearTimeout(rematchWaitTimeoutRef.current);
       rematchWaitTimeoutRef.current = null;
@@ -2920,7 +2907,7 @@ export default function Home() {
     </motion.div>
   );
 
-  const showBottomNav = splashResolved && !showSplash && (gs.phase === 'lobby' || (gs.phase === 'matchmaking' && gs.gameMode === 'ai'));
+  const showBottomNav = splashResolved && !showSplash && gs.phase === 'lobby';
   const contentHidden = !splashResolved || showSplash;
 
   return (
