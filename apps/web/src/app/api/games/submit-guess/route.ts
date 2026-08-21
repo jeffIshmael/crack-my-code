@@ -66,18 +66,22 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No guesses remaining' }, { status: 400 });
     }
 
-    const expectedTurn = getNextTurnAddress(
-      game.player1Address,
-      game.player2Address,
-      p1GuessCountBefore,
-      p2GuessCountBefore,
-    );
-    if (
-      expectedTurn &&
-      normalizedPlayerAddress !== 'GUEST' &&
-      expectedTurn !== normalizedPlayerAddress.toLowerCase()
-    ) {
-      return NextResponse.json({ error: 'Not your turn' }, { status: 403 });
+    // Cipher AI guesses are computed client-side and never written to Guess rows.
+    // Alternating turn checks would permanently lock signed-in players after guess #1.
+    if (game.mode !== 'ai') {
+      const expectedTurn = getNextTurnAddress(
+        game.player1Address,
+        game.player2Address,
+        p1GuessCountBefore,
+        p2GuessCountBefore,
+      );
+      if (
+        expectedTurn &&
+        normalizedPlayerAddress !== 'GUEST' &&
+        expectedTurn !== normalizedPlayerAddress.toLowerCase()
+      ) {
+        return NextResponse.json({ error: 'Not your turn' }, { status: 403 });
+      }
     }
 
     // Save guess to DB
