@@ -212,6 +212,7 @@ export default function JoinStakeModal({
               </div>
             )}
             <ul className="mt-3 space-y-2.5 font-body text-sm text-[var(--text-dim)]">
+              <li>• Each turn has a 60-second timer. If it runs out, you forfeit and lose your stake.</li>
               <li>• If you quit during the match, your opponent wins and you lose your stake.</li>
               <li>• In case of a draw, your stake is automatically refunded.</li>
             </ul>

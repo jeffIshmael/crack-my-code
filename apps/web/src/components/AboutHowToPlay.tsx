@@ -59,6 +59,11 @@ export function AboutHowToPlay() {
           you have <strong>6 attempts</strong> to crack it. After each guess, colored tiles on the wooden board
           show how close you are — check the scoreboard to track your hints.
         </p>
+        <p className="font-body text-sm leading-relaxed">
+          In Player vs Player matches, each turn has a <strong>60-second timer</strong> on the wooden board.
+          If the clock runs out before you submit a guess, you <strong>forfeit</strong> and your opponent wins
+          (same outcome as quitting).
+        </p>
       </div>
 
       <div className="theme-sky-readout flex flex-col gap-4">
@@ -118,6 +123,7 @@ export function AboutHowToPlay() {
         </ul>
         <p className="font-body text-sm leading-relaxed">
           <strong>💰 Professional</strong> — Stake USDT and play for real. The winner takes the pot (minus a 1% platform fee).
+          Quitting or letting your turn timer expire both forfeit the match — your opponent wins and keeps the stake.
         </p>
       </div>
 

@@ -824,7 +824,7 @@ export default function Lobby({
                           <span className="text-xl transition-transform group-hover:scale-110" aria-hidden>⚔️</span>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          <p className="font-body text-[11px] text-[var(--text-dim)]">Free match · climb the global ranking</p>
+                          <p className="font-body text-[11px] text-[var(--text-dim)]">Free match · 60s turns · climb the ranking</p>
                           <span
                             className="shrink-0 text-lg font-black leading-none text-[var(--text-dim)] transition-colors group-hover:text-[var(--accent)]"
                             aria-hidden
@@ -847,7 +847,7 @@ export default function Lobby({
                         </div>
                         <div className="flex items-center justify-between gap-2">
                           <p className="font-body text-[11px] text-[var(--text-dim)]">
-                            USDT stakes · winner takes 99%
+                            USDT stakes · 60s turns · winner takes 99%
                           </p>
                           <span
                             className="shrink-0 text-lg font-black leading-none text-[var(--text-dim)] transition-colors group-hover:text-[var(--accent)]"
@@ -1083,6 +1083,7 @@ export default function Lobby({
                 <li>Join the challenge on-chain</li>
               </ol>
               <ul className="mt-3 space-y-2.5 font-body text-sm text-[var(--text-dim)]">
+                <li>• Each turn has a 60-second timer. If it runs out, you forfeit and lose your stake.</li>
                 <li>• If you quit during the match, your opponent wins and you lose your stake.</li>
                 <li>• In case of a draw, your stake is automatically refunded.</li>
               </ul>
@@ -1148,6 +1149,7 @@ export default function Lobby({
               </p>
               <ul className="mt-3 space-y-2.5 font-body text-sm text-[var(--text-dim)]">
                 <li>• If no one joins, your stake is automatically refunded.</li>
+                <li>• Each turn has a 60-second timer. If it runs out, you forfeit and lose your stake.</li>
                 <li>• If you quit during the match, your opponent wins and you lose your stake.</li>
                 <li>• In case of a draw, your stake is automatically refunded.</li>
               </ul>
