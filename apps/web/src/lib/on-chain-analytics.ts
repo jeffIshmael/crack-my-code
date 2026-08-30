@@ -125,7 +125,7 @@ export async function getOnChainAnalytics() {
       cipher: {
         method: 'none',
         txsPerGame: ON_CHAIN_TX_PER_CIPHER_GAME,
-        note: 'Cipher games do not write on-chain (trackGame / rewards removed).',
+        note: 'Cipher games do not write on-chain.',
       },
       pvp: {
         methods: ['createChallenge', 'joinChallenge', 'resolveMatch'],
