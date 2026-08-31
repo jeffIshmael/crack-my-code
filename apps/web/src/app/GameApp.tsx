@@ -11,6 +11,7 @@ import MatchHistoryList from '@/components/MatchHistoryList';
 import { LeaderboardPanel } from '@/components/LeaderboardPanel';
 import Image from 'next/image';
 import SetCode from '@/components/SetCode';
+import OpponentCodeWaitOverlay, { SETUP_CODE_TIMEOUT_SEC } from '@/components/OpponentCodeWaitOverlay';
 import GameBoard from '@/components/GameBoard';
 import ResultModal from '@/components/ResultModal';
 import { BottomNav, type NavTab } from '@/components/BottomNav';
@@ -48,7 +49,7 @@ import { toast } from 'sonner';
 import { getErrorMessage, isUserRejectedTransaction } from '@/lib/errors';
 import { isMatchAlreadySettledError } from '@/lib/expire-match';
 import { sendUsdtToAddress } from '@/lib/send-usdt';
-import { Wallet, LogOut, ExternalLink, ShieldCheck, Copy, Check, History, ArrowLeft, ChevronRight } from 'lucide-react';
+import { Wallet, LogOut, ExternalLink, Copy, Check, History, ArrowLeft, ChevronRight } from 'lucide-react';
 
 // ─── Settings ───────────────────────────────────────────────────────────────
 
@@ -273,6 +274,10 @@ export default function Home() {
     opponentLabel: string;
   } | null>(null);
   const [isWaiting, setIsWaiting] = useState(false);
+  const [isAbortingSetup, setIsAbortingSetup] = useState(false);
+  const [setupCodeTime, setSetupCodeTime] = useState(0);
+  const setupAbortHandledRef = useRef<string | null>(null);
+  const abortSetupMatchRef = useRef<(reason?: 'back' | 'leave' | 'timeout') => Promise<void>>(async () => {});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
   const [myActiveGames, setMyActiveGames] = useState<any[]>([]);
@@ -831,6 +836,86 @@ export default function Home() {
     [currentGameId, syncResultStats],
   );
 
+  const handleSetupAborted = useCallback(
+    (payload: { gameId?: string; leaverAddress?: string; reason?: string }) => {
+      const gameId = payload.gameId ?? currentGameIdRef.current;
+      if (!gameId) return;
+      if (setupAbortHandledRef.current === gameId) return;
+      if (gsRef.current.phase !== 'setCode') return;
+
+      setupAbortHandledRef.current = gameId;
+      setIsWaiting(false);
+      setIsAbortingSetup(false);
+      setSetupCodeTime(0);
+      clearOppTimer();
+      clearTurnHandover();
+      setGs(initialGameState(gsRef.current.playerPoints));
+      setCurrentGameId(null);
+      setShareableJoinCode(null);
+      setCurrentOnChainMatchId(null);
+
+      const myAddr = addressRef.current?.toLowerCase();
+      const leaver = payload.leaverAddress?.toLowerCase();
+      const iLeft = !!(leaver && myAddr && leaver === myAddr);
+
+      if (payload.reason === 'timeout') {
+        toast.info('Setup timed out — returned to home.');
+      } else if (!iLeft) {
+        if (payload.reason === 'poll' && !leaver) {
+          toast.info('The match was cancelled.');
+        } else {
+          toast.info(`${gsRef.current.opponentName} left the match`);
+        }
+      }
+
+      fetchMyActive();
+      void refetchUsdtBalance();
+    },
+    [clearTurnHandover, fetchMyActive, refetchUsdtBalance],
+  );
+
+  const abortSetupMatch = useCallback(
+    async (reason: 'back' | 'leave' | 'timeout' = 'back') => {
+      const gameId = currentGameIdRef.current;
+      const playerAddress = payoutAddress || address;
+      if (!gameId || gsRef.current.gameMode === 'ai' || !playerAddress) return;
+      if (gsRef.current.phase !== 'setCode') return;
+
+      setIsAbortingSetup(true);
+      const isCash = gsRef.current.gameMode === 'cash';
+      const toastId = isCash ? toast.loading('Refunding stake…') : undefined;
+
+      try {
+        const res = await fetch('/api/games/abort-setup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gameId, address: playerAddress, reason }),
+        });
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok && !data.alreadyClosed) {
+          throw new Error(data.error || 'Could not leave the match');
+        }
+
+        if (toastId) toast.dismiss(toastId);
+        handleSetupAborted({
+          gameId,
+          leaverAddress: data.leaverAddress ?? playerAddress.toLowerCase(),
+          reason,
+        });
+      } catch (err) {
+        if (toastId) toast.error(getErrorMessage(err), { id: toastId });
+        else toast.error(getErrorMessage(err));
+        setIsAbortingSetup(false);
+      }
+    },
+    [address, payoutAddress, handleSetupAborted],
+  );
+
+  useEffect(() => {
+    abortSetupMatchRef.current = abortSetupMatch;
+  }, [abortSetupMatch]);
+
   useEffect(() => {
     if (!currentGameId || gs.gameMode === 'ai') return;
 
@@ -1014,19 +1099,29 @@ export default function Home() {
       }
     };
 
+    const onSetupAborted = (data: {
+      gameId?: string;
+      leaverAddress?: string;
+      reason?: string;
+    }) => {
+      handleSetupAborted(data);
+    };
+
     channel.bind('client-typing', onTyping);
     channel.bind('opponent-guess', onOpponentGuess);
     channel.bind('game-started', onGameStarted);
     channel.bind('match-ended', onMatchEnded);
+    channel.bind('setup-aborted', onSetupAborted);
 
     return () => {
       channel.unbind('client-typing', onTyping);
       channel.unbind('opponent-guess', onOpponentGuess);
       channel.unbind('game-started', onGameStarted);
       channel.unbind('match-ended', onMatchEnded);
+      channel.unbind('setup-aborted', onSetupAborted);
       pusherClient.unsubscribe(channelName);
     };
-  }, [currentGameId, gs.gameMode, syncResultStats, scheduleTurnHandover, finalizeGameResult, applyTurnClock]);
+  }, [currentGameId, gs.gameMode, syncResultStats, scheduleTurnHandover, finalizeGameResult, applyTurnClock, handleSetupAborted]);
 
   // Poll server turn state during PvP — backup when Pusher events are missed
   useEffect(() => {
@@ -1359,6 +1454,9 @@ export default function Home() {
       rematchWaitTimeoutRef.current = null;
     }
     setIsSearchHidden(false);
+    setupAbortHandledRef.current = null;
+    setSetupCodeTime(0);
+    setIsWaiting(false);
     setCurrentGameId(gameId);
     setResultStats(null);
     setRematchStatus('idle');
@@ -1466,14 +1564,22 @@ export default function Home() {
       toast.success('Rematch starting!', { description: 'Set your secret code to begin.' });
     });
 
+    channel.bind(
+      'setup-aborted',
+      (data: { gameId?: string; leaverAddress?: string; reason?: string }) => {
+        handleSetupAborted(data);
+      },
+    );
+
     return () => {
       channel.unbind('match-found');
       channel.unbind('rematch-request');
       channel.unbind('rematch-declined');
       channel.unbind('rematch-started');
+      channel.unbind('setup-aborted');
       pusherClient.unsubscribe(channelName);
     };
-  }, [address, handleMatchFound]);
+  }, [address, handleMatchFound, handleSetupAborted]);
 
   // Poll while matchmaking (public queue + private invite) — backup if Pusher misses
   useEffect(() => {
@@ -1531,6 +1637,10 @@ export default function Home() {
         const res = await fetch(`/api/games/lobby?id=${currentGameId}`);
         if (!res.ok) return;
         const game = await res.json();
+        if (game?.status === 'CANCELLED' || game?.status === 'EXPIRED') {
+          handleSetupAborted({ gameId: currentGameId, reason: 'poll' });
+          return;
+        }
         if (game?.player1Code && game?.player2Code) {
           setIsWaiting(false);
           setGs((prev: GameState) => ({ ...prev, phase: 'countdown' }));
@@ -1543,7 +1653,28 @@ export default function Home() {
     poll();
     const interval = setInterval(poll, 2000);
     return () => clearInterval(interval);
-  }, [gs.phase, currentGameId, gs.gameMode]);
+  }, [gs.phase, currentGameId, gs.gameMode, handleSetupAborted]);
+
+  // Auto-abort if neither player finishes set-code within 2 minutes
+  useEffect(() => {
+    if (gs.phase !== 'setCode' || gs.gameMode === 'ai') {
+      setSetupCodeTime(0);
+      return;
+    }
+
+    const interval = setInterval(() => {
+      setSetupCodeTime((prev) => {
+        if (prev >= SETUP_CODE_TIMEOUT_SEC) {
+          clearInterval(interval);
+          void abortSetupMatchRef.current('timeout');
+          return prev;
+        }
+        return prev + 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [gs.phase, gs.gameMode]);
 
   const executeOnChainJoin = useCallback(async (gameData: {
     id: string;
@@ -2757,52 +2888,22 @@ export default function Home() {
           opponentName={gs.opponentName}
           onLockCode={handleLockCode}
           onBack={() => {
-            void abandonCipherGame();
+            if (gs.gameMode === 'ai') {
+              void abandonCipherGame();
+            } else {
+              void abortSetupMatch('back');
+            }
           }}
           isWaiting={isWaiting}
         />
         <AnimatePresence>
           {isWaiting && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#030C15]/80 backdrop-blur-xl p-8 text-center"
-            >
-              <div className="relative mb-8 h-24 w-24">
-                <motion.div
-                  className="absolute inset-0 rounded-full border-4 border-[var(--accent)]/20"
-                />
-                <motion.div
-                  className="absolute inset-0 rounded-full border-4 border-t-[var(--accent)]"
-                  animate={{ rotate: 360 }}
-                  transition={{ duration: 1.5, repeat: Infinity, ease: 'linear' }}
-                />
-                <motion.div
-                  className="absolute inset-0 flex items-center justify-center"
-                  animate={{ opacity: [0.4, 1, 0.4] }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                >
-                  <ShieldCheck size={40} className="text-[var(--accent)]" />
-                </motion.div>
-              </div>
-              
-              <h3 className="font-orbitron text-2xl font-black tracking-widest text-white uppercase mb-2">Synchronizing...</h3>
-              <p className="text-sm text-[var(--text-dim)] uppercase tracking-widest max-w-xs mx-auto mb-8">
-                Waiting for <span className="text-[var(--accent)]">{gs.opponentName}</span> to finalize their encryption code.
-              </p>
-              
-              <div className="flex gap-2">
-                {[0, 1, 2].map((i) => (
-                  <motion.div
-                    key={i}
-                    className="h-2 w-2 rounded-full bg-[var(--accent)]"
-                    animate={{ scale: [1, 1.5, 1], opacity: [0.3, 1, 0.3] }}
-                    transition={{ duration: 1, repeat: Infinity, delay: i * 0.2 }}
-                  />
-                ))}
-              </div>
-            </motion.div>
+            <OpponentCodeWaitOverlay
+              opponentName={gs.opponentName}
+              setupCodeTime={setupCodeTime}
+              onLeave={() => void abortSetupMatch('leave')}
+              isLeaving={isAbortingSetup}
+            />
           )}
         </AnimatePresence>
       </motion.div>
